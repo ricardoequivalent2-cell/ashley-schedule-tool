@@ -162,13 +162,19 @@
 <body>
 
   <h2>📊 애슐리 스케줄링 진단 대시보드</h2>
-  <div class="sub" style="color:#888; font-size:13px; margin-bottom:20px;">파일만 올리면 바로 진단됩니다. 브라우저 안에서만 처리되며, 파일이 외부로 전송되지 않습니다.</div>
+  <div class="sub" style="color:#888; font-size:13px; margin-bottom:20px;">파일만 올리면 바로 진단됩니다. 계산은 브라우저 안에서 처리되며, "결과 저장"을 누른 경우에만 요약 결과가 중앙 관리자 페이지로 전송됩니다.</div>
 
   <div class="upload-box">
     <div>진단할 스케줄 파일(.xlsx)을 선택하세요</div>
     <div style="font-size:12px;color:#999;margin-top:4px;">파일 안에 <b>"주방"</b> 시트와 <b>"기준모델"</b> 시트가 있어야 합니다. <b>"홀"</b> 시트는 있으면 함께 진단됩니다.</div>
     <input type="file" id="fileInput" accept=".xlsx">
     <div id="status"></div>
+    <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
+      <label style="font-size:13px; color:#555;">매장명: </label>
+      <input type="text" id="storeNameInput" style="padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; width:200px;">
+      <button id="saveBtn" style="margin-left:8px; padding:7px 16px; background:#4a6cf7; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">📤 결과 저장 (관리자 페이지에 반영)</button>
+      <div id="saveStatus" style="font-size:12px; color:#666; margin-top:8px;"></div>
+    </div>
   </div>
 
   <div id="app">
@@ -888,6 +894,8 @@ async function computeDiagnosis(kitchenSheet, standardSheet, hallSheet) {
 // ==================== 파일 업로드 처리 ====================
 document.getElementById('fileInput').addEventListener('change', handleFile);
 
+let lastResult = null; // 저장 버튼에서 사용
+
 async function handleFile(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -905,15 +913,63 @@ async function handleFile(e) {
     if (!standardSheet) throw new Error('"기준모델" 시트를 찾을 수 없습니다.');
 
     const result = await computeDiagnosis(kitchenSheet, standardSheet, hallSheet);
+    lastResult = result;
     statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ')';
     document.getElementById('app').style.display = 'block';
     renderApp(result);
+
+    // 파일명에서 매장명 자동추출 (확장자·"_TEST"류 접미사 제거), 저장 UI 노출
+    let guessedName = file.name.replace(/\.xlsx$/i, '').replace(/_?TEST$|_?테스트$/i, '').trim();
+    document.getElementById('storeNameInput').value = guessedName || '이름없는매장';
+    document.getElementById('saveBox').style.display = 'block';
+    document.getElementById('saveStatus').textContent = '';
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = '오류: ' + err.message;
     console.error(err);
   }
 }
+
+function buildHeadlineSummary(result) {
+  // 관리자 목록에 보여줄 짧은 텍스트 요약 (renderGlanceTop3의 매장특성 로직과 동일한 판단)
+  const candidates = [];
+  (result.weeklyBlockSummary || []).forEach(b => {
+    if (b.verdict === '과다') candidates.push({ source: '주방', block: b.name, part: b.topOverPart, diff: b.netDiffHours });
+  });
+  (result.weeklyHallBlockSummary || []).forEach(b => {
+    if (b.verdict === '과다') candidates.push({ source: '홀', block: b.name, part: null, diff: b.netDiffHours });
+  });
+  if (!candidates.length) return '✅ 이번 주 뚜렷한 과다 문제가 없는 매장';
+  candidates.sort((a, b) => b.diff - a.diff);
+  const top = candidates[0];
+  const partText = top.part ? (top.part + ' 파트 중심, ') : '';
+  return top.source + ' ' + top.block + ' 과다 (' + partText + '주간 +' + top.diff + 'h)';
+}
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  const storeName = document.getElementById('storeNameInput').value.trim();
+  const saveStatusEl = document.getElementById('saveStatus');
+  if (!storeName) { saveStatusEl.textContent = '매장명을 입력해주세요.'; return; }
+  if (!lastResult) { saveStatusEl.textContent = '먼저 파일을 진단해주세요.'; return; }
+
+  saveStatusEl.textContent = '저장 중...';
+  try {
+    const payload = {
+      storeName,
+      headline: buildHeadlineSummary(lastResult),
+      weeklySummary: lastResult.weeklySummary,
+      result: lastResult, // 상세보기 대비 전체 결과도 저장
+    };
+    const res = await fetch('/api/save', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '저장 실패');
+    saveStatusEl.textContent = '✅ 저장 완료 (' + new Date().toLocaleString('ko-KR') + ')';
+  } catch (err) {
+    saveStatusEl.textContent = '❌ 저장 실패: ' + err.message;
+  }
+});
 
     function renderApp(data) {
     const dateHeaders = data.dateHeaders;
