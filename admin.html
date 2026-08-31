@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>애슐리 스케줄링 진단 - 관리자 페이지</title>
+<style>
+  body { font-family: 'Malgun Gothic', sans-serif; margin: 24px; color: #333; background: #fafaf7; }
+  h2 { margin-bottom: 4px; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+  #status { font-size: 13px; color: #666; margin-bottom: 16px; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; }
+  .toolbar input { flex: 1; max-width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+  .toolbar button { padding: 8px 16px; background: #4a6cf7; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
+
+  .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .store-card { border-radius: 12px; padding: 16px 18px; border: 1px solid #e2e2e2; background: white; }
+  .store-card.has-issue { background: #fdecea; border-color: #f1b0aa; }
+  .store-card.ok { background: #eafaf1; border-color: #a9dfbf; }
+  .store-name { font-size: 16px; font-weight: bold; color: #1c2733; margin-bottom: 6px; }
+  .store-headline { font-size: 13px; color: #444; margin-bottom: 10px; line-height: 1.4; }
+  .store-numbers { font-size: 11px; color: #888; border-top: 1px dashed #ccc; padding-top: 8px; }
+  .store-savedat { font-size: 10px; color: #aaa; margin-top: 4px; }
+  .empty-msg { color: #888; font-size: 14px; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<h2>🗂️ 애슐리 스케줄링 진단 - 관리자 페이지</h2>
+<div class="sub">각 매장에서 저장한 진단 결과를 한 화면에서 모아봅니다.</div>
+<div id="status">불러오는 중...</div>
+
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="매장명으로 검색...">
+  <button id="refreshBtn">🔄 새로고침</button>
+</div>
+
+<div class="store-grid" id="storeGrid"></div>
+
+<script>
+let allStores = [];
+
+async function loadStores() {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = '불러오는 중...';
+  try {
+    const res = await fetch('/api/list');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '불러오기 실패');
+    allStores = data.stores || [];
+    statusEl.textContent = '총 ' + allStores.length + '개 매장 저장됨';
+    renderGrid(allStores);
+  } catch (err) {
+    statusEl.textContent = '오류: ' + err.message;
+  }
+}
+
+function renderGrid(stores) {
+  const grid = document.getElementById('storeGrid');
+  if (!stores.length) {
+    grid.innerHTML = '<div class="empty-msg">아직 저장된 매장이 없습니다. 각 매장에서 진단 후 "결과 저장"을 눌러주세요.</div>';
+    return;
+  }
+  grid.innerHTML = stores.map(s => {
+    const hasIssue = s.headline && s.headline.indexOf('✅') === -1;
+    const cls = hasIssue ? 'has-issue' : 'ok';
+    const w = s.weeklySummary || {};
+    const savedDate = s.savedAt ? new Date(s.savedAt).toLocaleString('ko-KR') : '-';
+    return '<div class="store-card ' + cls + '">' +
+      '<div class="store-name">' + s.storeName + '</div>' +
+      '<div class="store-headline">' + (s.headline || '(요약 없음)') + '</div>' +
+      '<div class="store-numbers">' +
+        (w.totalActual !== undefined ? ('사용시간 ' + w.totalActual + 'h (목표 ' + w.totalTarget1 + 'h) · ' + (w.verdict || '')) : '') +
+      '</div>' +
+      '<div class="store-savedat">저장: ' + savedDate + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  const q = e.target.value.trim();
+  const filtered = q ? allStores.filter(s => s.storeName.indexOf(q) !== -1) : allStores;
+  renderGrid(filtered);
+});
+document.getElementById('refreshBtn').addEventListener('click', loadStores);
+
+loadStores();
+</script>
+</body>
+</html>
