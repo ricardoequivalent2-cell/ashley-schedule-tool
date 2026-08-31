@@ -1,108 +1,254 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>애슐리 스케줄링 진단 (파일 업로드형)</title>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<style>
-  body { font-family: 'Malgun Gothic', sans-serif; margin: 24px; color: #333; background: #fafaf7; }
-  h2 { margin-bottom: 4px; }
-  .sub { color: #888; font-size: 13px; margin-bottom: 20px; }
+  <base target="_top">
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; margin: 16px; color: #333; }
+    h2 { margin-top: 0; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tab-btn {
+      padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
+      background: #f5f5f5; cursor: pointer; font-size: 13px;
+    }
+    .tab-btn.active { background: #4a6cf7; color: white; border-color: #4a6cf7; }
+    table.heatmap { border-collapse: collapse; font-size: 11px; margin-bottom: 24px; }
+    table.heatmap th, table.heatmap td {
+      border: 1px solid #ddd; padding: 3px 6px; text-align: center; min-width: 40px;
+    }
+    table.heatmap th { background: #333; color: white; position: sticky; top: 0; }
+    .diff-pos { background: #ffd1d1; } /* 과다 */
+    .diff-neg { background: #cfe0ff; } /* 부족 */
+    .diff-zero { background: #ffffff; }
+    .diagnosis-list { border-collapse: collapse; width: 100%; font-size: 13px; }
+    .diagnosis-list th, .diagnosis-list td { border: 1px solid #ddd; padding: 6px 8px; }
+    .diagnosis-list th { background: #eee; }
+    .type-과다 { color: #c0392b; font-weight: bold; }
+    .type-부족 { color: #2980b9; font-weight: bold; }
+    .section-title { margin-top: 24px; font-size: 15px; font-weight: bold; }
 
-  .upload-box {
-    border: 2px dashed #ccc; border-radius: 12px; padding: 28px; text-align: center;
-    margin-bottom: 24px; background: white;
-  }
-  .upload-box input[type=file] { margin-top: 10px; }
-  #status { font-size: 13px; color: #666; margin-top: 10px; white-space: pre-line; }
-  #status.error { color: #c0392b; font-weight: bold; }
+    .priority-list { display: flex; flex-direction: column; gap: 10px; }
+    .priority-card {
+      display: flex; align-items: center; gap: 14px;
+      border: 1px solid #e2e2e2; border-radius: 10px; padding: 10px 16px;
+      background: #fafafa;
+    }
+    .priority-rank {
+      flex: none; width: 32px; height: 32px; border-radius: 50%;
+      background: #4a6cf7; color: white; font-weight: bold;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .priority-rank.rank-1 { background: #c0392b; }
+    .priority-rank.rank-2 { background: #e67e22; }
+    .priority-body { flex: 1; }
+    .priority-headline { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
+    .priority-detail { font-size: 12px; color: #666; }
+    .priority-empty { color: #888; font-size: 13px; padding: 12px 0; }
 
-  #app { display: none; }
+    .block-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .block-card { border-radius: 12px; padding: 14px 16px; border: 1px solid #e2e2e2; }
+    .block-card.verdict-과다 { background: #fdecea; border-color: #f1b0aa; }
+    .block-card.verdict-부족 { background: #eaf2fb; border-color: #a9c6e8; }
+    .block-card.verdict-적정 { background: #eafaf1; border-color: #a9dfbf; }
+    .block-name { font-size: 13px; color: #666; margin-bottom: 2px; }
+    .block-time { font-size: 11px; color: #999; margin-bottom: 8px; }
+    .block-verdict { font-size: 15px; font-weight: bold; margin-bottom: 6px; line-height: 1.35; }
+    .block-verdict .badge-과다 { color: #c0392b; }
+    .block-verdict .badge-부족 { color: #2471a3; }
+    .block-verdict .badge-적정 { color: #229954; }
+    .block-action { font-size: 12px; color: #444; margin-bottom: 8px; line-height: 1.5; }
+    .block-numbers { font-size: 11px; color: #888; border-top: 1px dashed #ccc; padding-top: 8px; }
 
-  .main-tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
-  .main-tab-btn { padding: 10px 20px; border: none; background: none; cursor: pointer; font-size: 15px; font-weight: bold; color: #999; border-bottom: 3px solid transparent; }
-  .main-tab-btn.active { color: #4a6cf7; border-bottom-color: #4a6cf7; }
-  .view-panel { display: none; }
-  .view-panel.active { display: block; }
+    .matrix-table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 20px; }
+    .matrix-table th, .matrix-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .matrix-table th { background: #333; color: white; }
+    .matrix-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; min-width: 56px; }
+    .matrix-badge.과다 { background: #fdecea; color: #c0392b; }
+    .matrix-badge.부족 { background: #eaf2fb; color: #2471a3; }
+    .matrix-badge.적정 { background: #eafaf1; color: #229954; }
 
-  .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-  .tab-btn { padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px; background: #f5f5f5; cursor: pointer; font-size: 13px; }
-  .tab-btn.active { background: #4a6cf7; color: white; border-color: #4a6cf7; }
+    .headline-banner {
+      border-radius: 12px; padding: 18px 22px; margin-bottom: 16px;
+      font-size: 22px; font-weight: 800; line-height: 1.4;
+    }
+    .headline-banner .headline-sub { display:block; font-size: 13px; font-weight: 500; margin-top: 6px; opacity: 0.85; }
+    .headline-banner.hl-critical { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; }
+    .headline-banner.hl-warning { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; }
+    .headline-banner.hl-ok { background: #eafaf1; color: #1e8449; }
 
-  .summary-banner, .tier-banner { border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
-  .summary-title { font-size: 13px; color: #666; margin-bottom: 4px; }
-  .summary-verdict, .verdict-text { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
-  .summary-numbers, .tier-numbers { font-size: 13px; color: #555; line-height: 1.6; }
+    .glance-top3 {
+      background: #1c2733; color: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px;
+    }
+    .glance-character {
+      font-size: 16px; font-weight: 600; color: #ffd166; margin-bottom: 14px;
+      padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .glance-top3 .rank1 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+    .glance-top3 .rank2, .glance-top3 .rank3 { font-size: 14px; color: #cbd3da; margin-bottom: 4px; }
+    .glance-top3 .rank-label { display:inline-block; width: 20px; }
 
-  .verdict-미달 { background: #fadbd8; }
-  .verdict-충족 { background: #fdebd0; }
-  .verdict-2차 { background: #d6eaf8; }
-  .verdict-달성 { background: #d5f5e3; }
+    .glance-block-row { margin-bottom: 14px; }
+    .glance-block-row .block-label { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 6px; }
+    .glance-day-cards { display: flex; gap: 6px; flex-wrap: wrap; }
+    .glance-day-card {
+      flex: 1; min-width: 70px; text-align: center; border-radius: 8px; padding: 8px 4px;
+      font-size: 12px; border: 1px solid #eee;
+    }
+    .glance-day-card .day-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+    .glance-day-card .day-score { font-weight: bold; font-size: 14px; }
+    .glance-day-card.gd-over { background: #fdecea; }
+    .glance-day-card.gd-under { background: #eaf2fb; }
+    .glance-day-card.gd-ok { background: #f7f7f7; }
+    .glance-weekend-sep { width: 1px; background: #ddd; margin: 0 4px; }
 
-  .section-title { margin-top: 24px; margin-bottom: 10px; font-size: 15px; font-weight: bold; }
+    table.glance-heatmap { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 22px; }
+    table.glance-heatmap th, table.glance-heatmap td { border: 1px solid #eee; padding: 10px 6px; text-align: center; }
+    table.glance-heatmap th { background: #333; color: white; font-weight: normal; font-size: 11px; }
+    table.glance-heatmap td:first-child, table.glance-heatmap th:first-child { text-align: left; padding-left: 10px; font-weight: bold; background: #f4f4f4; color: #333; }
 
-  .block-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .block-card { border-radius: 12px; padding: 14px 16px; border: 1px solid #e2e2e2; }
-  .block-card.과다 { background: #fdecea; border-color: #f1b0aa; }
-  .block-card.부족 { background: #eaf2fb; border-color: #a9c6e8; }
-  .block-card.적정 { background: #eafaf1; border-color: #a9dfbf; }
-  .block-name { font-size: 13px; color: #666; margin-bottom: 2px; }
-  .block-time { font-size: 11px; color: #999; margin-bottom: 8px; }
-  .block-verdict { font-size: 15px; font-weight: bold; margin-bottom: 6px; line-height: 1.35; }
-  .block-numbers { font-size: 11px; color: #888; border-top: 1px dashed #ccc; padding-top: 8px; }
+    .trend-table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 20px; }
+    .trend-table th, .trend-table td { border: 1px solid #ddd; padding: 6px 8px; text-align: center; }
+    .trend-table th { background: #333; color: white; }
+    .verdict-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;
+    }
+    .verdict-미달 { background: #fadbd8; color: #c0392b; }
+    .verdict-충족 { background: #fdebd0; color: #b9770e; }
+    .verdict-달성 { background: #d5f5e3; color: #1e8449; }
+    .verdict-2차 { background: #d6eaf8; color: #21618c; }
 
-  table.trend-table, table.matrix-table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 20px; }
-  table.trend-table th, table.trend-table td, table.matrix-table th, table.matrix-table td { border: 1px solid #ddd; padding: 7px; text-align: center; }
-  table.trend-table th, table.matrix-table th { background: #333; color: white; }
-  .matrix-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; }
-  .matrix-badge.과다 { background: #fdecea; color: #c0392b; }
-  .matrix-badge.부족 { background: #eaf2fb; color: #2471a3; }
-  .matrix-badge.적정 { background: #eafaf1; color: #229954; }
-</style>
+    .tier-banner {
+      border-radius: 10px; padding: 14px 18px; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    .tier-banner .verdict-text { font-size: 16px; font-weight: bold; }
+    .tier-banner .tier-numbers { font-size: 12px; color: #555; }
+
+    .compare-section { margin-bottom: 20px; }
+    .compare-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .compare-label { flex: none; width: 50px; font-size: 13px; font-weight: bold; }
+    .compare-bar-bg { flex: 1; background: #eee; border-radius: 6px; overflow: hidden; height: 22px; }
+    .compare-bar-fill { height: 100%; display: flex; align-items: center; padding-left: 8px; color: white; font-size: 12px; font-weight: bold; }
+    .compare-bar-fill.kitchen { background: #4a6cf7; }
+    .compare-bar-fill.hall { background: #9b59b6; }
+
+    .priority-names { font-size: 12px; color: #333; margin-top: 4px; }
+    .priority-names b { color: #c0392b; }
+
+    .main-tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 2px solid #eee; }
+    .main-tab-btn {
+      padding: 10px 20px; border: none; background: none; cursor: pointer;
+      font-size: 15px; font-weight: bold; color: #999; border-bottom: 3px solid transparent;
+    }
+    .main-tab-btn.active { color: #4a6cf7; border-bottom-color: #4a6cf7; }
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    .summary-banner {
+      border-radius: 10px; padding: 18px 20px; margin-bottom: 20px;
+    }
+    .summary-banner .summary-title { font-size: 15px; color: #666; margin-bottom: 4px; }
+    .summary-banner .summary-verdict { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
+    .summary-banner .summary-numbers { font-size: 13px; color: #555; line-height: 1.6; }
+    .summary-note { font-size: 11px; color: #999; margin-top: 8px; }
+  </style>
+
+    .upload-box { border: 2px dashed #ccc; border-radius: 12px; padding: 28px; text-align: center; margin-bottom: 24px; background: #fafaf7; }
+    .upload-box input[type=file] { margin-top: 10px; }
+    #status { font-size: 13px; color: #666; margin-top: 10px; white-space: pre-line; }
+    #status.error { color: #c0392b; font-weight: bold; }
+    #app { display: none; }
+  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 </head>
 <body>
 
-<h2>📊 애슐리 스케줄링 진단 대시보드</h2>
-<div class="sub">파일만 올리면 바로 진단됩니다. Google Sheets/설치 불필요, 브라우저 안에서만 처리됩니다 (파일이 외부로 전송되지 않음).</div>
+  <h2>📊 애슐리 스케줄링 진단 대시보드</h2>
+  <div class="sub" style="color:#888; font-size:13px; margin-bottom:20px;">파일만 올리면 바로 진단됩니다. 브라우저 안에서만 처리되며, 파일이 외부로 전송되지 않습니다.</div>
 
-<div class="upload-box">
-  <div>진단할 스케줄 파일(.xlsx)을 선택하세요</div>
-  <div style="font-size:12px;color:#999;margin-top:4px;">파일 안에 <b>"주방"</b> 시트와 <b>"기준모델"</b> 시트가 있어야 합니다.</div>
-  <input type="file" id="fileInput" accept=".xlsx">
-  <div id="status"></div>
-</div>
-
-<div id="app">
-  <div class="main-tabs" id="mainTabs">
-    <button class="main-tab-btn active" data-view="weekly">📅 주간</button>
-    <button class="main-tab-btn" data-view="daily">📆 일간</button>
+  <div class="upload-box">
+    <div>진단할 스케줄 파일(.xlsx)을 선택하세요</div>
+    <div style="font-size:12px;color:#999;margin-top:4px;">파일 안에 <b>"주방"</b> 시트와 <b>"기준모델"</b> 시트가 있어야 합니다. <b>"홀"</b> 시트는 있으면 함께 진단됩니다.</div>
+    <input type="file" id="fileInput" accept=".xlsx">
+    <div id="status"></div>
   </div>
 
-  <div class="view-panel active" id="view-weekly">
+  <div id="app">
+
+  <div class="main-tabs" id="mainTabs">
+    <button class="main-tab-btn active" data-view="glance">🎯 한눈에</button>
+    <button class="main-tab-btn" data-view="weekly">📅 주간(상세)</button>
+    <button class="main-tab-btn" data-view="daily">📆 일간(상세)</button>
+  </div>
+
+  <!-- ===================== 한눈에 (1페이지 요약) ===================== -->
+  <div class="view-panel active" id="view-glance">
+    <div class="glance-top3" id="glanceTop3"></div>
+
+    <div class="section-title" style="margin-top:0;">시간대별 요일 점수 (주방)</div>
+    <div id="glanceScoreCards"></div>
+
+    <div class="section-title">시간대별 요일 점수 (홀, 파트구분 없음)</div>
+    <div id="glanceHallScoreCards"></div>
+
+    <div class="section-title">평일 히트맵 (세로=시간대 · 가로=파트, 진할수록 문제 심각)</div>
+    <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
+
+    <div class="section-title">주말 히트맵</div>
+    <table class="glance-heatmap" id="glanceHeatmapWeekend"></table>
+  </div>
+
+  <!-- ===================== 주간 ===================== -->
+  <div class="view-panel" id="view-weekly">
+    <div class="headline-banner" id="weeklyHeadline"></div>
     <div class="summary-banner" id="weeklyBanner"></div>
-    <div class="section-title" style="margin-top:0;">🕓 이번 주 교대블록 종합진단</div>
+
+    <div class="section-title" style="margin-top:0;">🕓 이번 주 시간대 종합진단 (주방)</div>
     <div class="block-grid" id="weeklyBlockDiagnosis"></div>
-    <div class="section-title">🗓️ 요일 × 교대블록 한눈에 보기</div>
+
+    <div class="section-title">🕓 이번 주 시간대 종합진단 (홀, 파트구분 없음)</div>
+    <div class="block-grid" id="weeklyHallBlockDiagnosis"></div>
+
+    <div class="section-title">🗓️ 요일 × 시간대 한눈에 보기</div>
     <table class="matrix-table" id="weekBlockMatrix"></table>
+
     <div class="section-title">📅 이번 주 총사용시간 추세</div>
     <table class="trend-table" id="trendTable"></table>
   </div>
 
+  <!-- ===================== 일간 ===================== -->
   <div class="view-panel" id="view-daily">
     <div class="tabs" id="tabs"></div>
+    <div class="headline-banner" id="dailyHeadline"></div>
     <div class="tier-banner" id="tierBanner"></div>
-    <div class="section-title" style="margin-top:0;">🕓 교대블록별 진단</div>
-    <div class="block-grid" id="blockDiagnosis"></div>
-  </div>
-</div>
 
-<script>
-// ==================== CONFIG (Code.gs와 동일한 값) ====================
-const COLOR_TO_PART = {
-  'FF0000': '핫', 'FFC000': '피파', '7AADDC': '콜드', '92D050': '스시',
-  '9F5FCF': '그릴', 'F4B084': '베이커리', 'A6A6A6': 'DMO',
+    <div class="section-title" style="margin-top:0;">🕓 시간대별 진단 (주방)</div>
+    <div class="block-grid" id="blockDiagnosis"></div>
+
+    <div class="section-title">🕓 시간대별 진단 (홀, 파트구분 없음)</div>
+    <div class="block-grid" id="hallBlockDiagnosis"></div>
+
+    <div class="section-title">🍳 주방 vs 🙋 홀 사용계획시간 비교</div>
+    <div class="compare-section" id="compareSection"></div>
+
+    <div class="section-title">🎯 세부 우선순위 조치 (Top 5)</div>
+    <div class="priority-list" id="priorityList"></div>
+
+    <div class="section-title">🔥 30분 단위 상세 히트맵 (참고, 원자료)</div>
+    <div id="heatmapContainer"></div>
+    <div style="font-size:11px; color:#999; margin-bottom:16px;">
+      ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림)
+    </div>
+  </div>
+  </div>
+
+  <script>
+
+// ==================== CONFIG (Code.gs 최신본과 동일) ====================
+const COLOR_TO_PART_DEFAULT = {
+  '#FF0000': '핫', '#FFC000': '피파', '#7AADDC': '콜드', '#92D050': '스시',
+  '#9F5FCF': '그릴', '#A6A6A6': 'DMO', '#F4B084': '베이커리',
 };
 const PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO'];
+const ALL_MODEL_PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO','데코이','폴리싱','홀'];
 
 const GUEST_UNIT_PRICE_WEEKDAY = 21138;
 const GUEST_UNIT_PRICE_WEEKEND = 24889;
@@ -124,56 +270,38 @@ const SHIFT_BLOCKS = [
 ];
 
 const SLOT_START_MIN = 8*60+30, SLOT_END_MIN = 22*60, SLOT_SIZE_MIN = 30;
+const DATE_BLOCK_COUNT = 7;
 
-// ==================== 파일 업로드 처리 ====================
-document.getElementById('fileInput').addEventListener('change', handleFile);
+const FLAT_PARTS = ['DMO', '데코이', '폴리싱'];
+const NO_EXTRAPOLATE_PARTS = ['DMO', '데코이', '폴리싱', '홀'];
+const FLAT_PART_SALES_THRESHOLD = 20000000;
+const FLAT_PART_CAP_BELOW_THRESHOLD = 1;
 
-async function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const statusEl = document.getElementById('status');
-  statusEl.className = ''; statusEl.textContent = '읽는 중...';
-
-  try {
-    const buf = await file.arrayBuffer();
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buf);
-    const kitchenSheet = wb.getWorksheet('주방');
-    const standardSheet = wb.getWorksheet('기준모델');
-    if (!kitchenSheet) throw new Error('"주방" 시트를 찾을 수 없습니다.');
-    if (!standardSheet) throw new Error('"기준모델" 시트를 찾을 수 없습니다.');
-
-    const result = computeAll(kitchenSheet, standardSheet);
-    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨)';
-    document.getElementById('app').style.display = 'block';
-    renderAll(result);
-  } catch (err) {
-    statusEl.className = 'error';
-    statusEl.textContent = '오류: ' + err.message;
-    console.error(err);
-  }
+function getTimeSlots() {
+  const slots = [];
+  for (let m = SLOT_START_MIN; m < SLOT_END_MIN; m += SLOT_SIZE_MIN) slots.push(m);
+  return slots;
+}
+function minToLabel(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
 }
 
-// ==================== 레이아웃 자동탐지 ====================
+// ==================== 레이아웃/셀 헬퍼 ====================
 function detectLayout(sheet) {
   for (let r = 1; r <= sheet.rowCount; r++) {
     for (let c = 1; c <= sheet.columnCount; c++) {
-      const v = sheet.getCell(r, c).value;
-      if (v === '이름') {
+      if (sheet.getCell(r, c).value === '이름') {
         let dateCol = -1;
         for (let cc = c; cc <= sheet.columnCount; cc++) {
-          const dv = sheet.getCell(r, cc).value;
-          if (dv instanceof Date) { dateCol = cc; break; }
+          if (sheet.getCell(r, cc).value instanceof Date) { dateCol = cc; break; }
         }
-        if (dateCol > 0) {
-          return { headerRow: r, dataStartRow: r + 2, dateBlockStartCol: dateCol, nameCol: c };
-        }
+        if (dateCol > 0) return { headerRow: r, dataStartRow: r + 2, dateBlockStartCol: dateCol, nameCol: c };
       }
     }
   }
   throw new Error('"' + sheet.name + '" 시트에서 "이름" 헤더를 찾을 수 없습니다.');
 }
-
 function findRowWithText(sheet, text, fromRow) {
   for (let r = (fromRow || 1); r <= sheet.rowCount; r++) {
     for (let c = 1; c <= sheet.columnCount; c++) {
@@ -182,49 +310,66 @@ function findRowWithText(sheet, text, fromRow) {
   }
   return -1;
 }
-
 function getCellFillHex(cell) {
   const fill = cell.fill;
   if (fill && fill.type === 'pattern' && fill.fgColor && fill.fgColor.argb) {
-    return fill.fgColor.argb.slice(2).toUpperCase(); // ARGB -> RGB만
+    return '#' + fill.fgColor.argb.slice(2).toUpperCase();
   }
   return null;
 }
 
-// ==================== 시각 파싱 (공휴일 특수표기 포함) ====================
-function parseShiftTimes(startVal, endVal) {
-  if (typeof startVal === 'number' && typeof endVal === 'number') {
-    return { startNum: startVal, endNum: endVal };
+// 매장 자체 색상범례 자동탐지 (헤더행 바로 위 줄에서 파트명+배경색)
+function detectColorLegend(sheet, layout) {
+  const legendRow = layout.headerRow - 1;
+  if (legendRow < 1) return null;
+  const map = {};
+  let found = 0;
+  for (let c = 1; c <= sheet.columnCount; c++) {
+    const cell = sheet.getCell(legendRow, c);
+    const text = (cell.value || '').toString().trim();
+    if (PARTS.indexOf(text) !== -1) {
+      const hex = getCellFillHex(cell);
+      if (hex && hex !== '#FFFFFF' && hex !== '#000000') { map[hex] = text; found++; }
+    }
   }
+  return found > 0 ? map : null;
+}
+
+// 매장휴무 등 공지가 있는 날짜는 진단에서 제외
+function getExcludedDayLabels(sheet, layout, dateHeaders) {
+  const noticeRow = layout.headerRow + 1;
+  const excluded = new Set();
+  for (let i = 0; i < DATE_BLOCK_COUNT; i++) {
+    if (!dateHeaders[i]) continue;
+    const startCol = layout.dateBlockStartCol + i * 2;
+    const notice = sheet.getCell(noticeRow, startCol).value;
+    const text = (notice || '').toString().replace(/\s/g, '');
+    if (text.indexOf('매장휴무') !== -1) excluded.add(dateHeaders[i]);
+  }
+  return excluded;
+}
+
+// ==================== 시각/매출 파싱 ====================
+function parseShiftTimes(startVal, endVal) {
+  if (typeof startVal === 'number' && typeof endVal === 'number') return { startNum: startVal, endNum: endVal };
   if (typeof startVal === 'string' && startVal.indexOf('공휴일') !== -1 && typeof endVal === 'string') {
     const m = endVal.trim().match(/^(\d+(?:\.\d+)?)\s*~\s*(\d+(?:\.\d+)?)$/);
     if (m) return { startNum: parseFloat(m[1]), endNum: parseFloat(m[2]) };
   }
   return null;
 }
-
-function applyBreakDeduction(h) {
-  if (h > 8) return h - 1;
-  if (h >= 4) return h - 0.5;
-  return h;
-}
-
 function parseSalesNumber(v) {
   if (v === null || v === undefined || v === '') return null;
-  const s = String(v).replace(/[^0-9.]/g, '');
-  const n = parseFloat(s);
+  const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
   return isNaN(n) || n === 0 ? null : n;
 }
-
 function isWeekendLabel(lbl) { return /[토일]\s*$/.test(lbl.trim()); }
-
 function formatDateLabel(dateVal, dayName) {
-  let s = dateVal instanceof Date
-    ? (dateVal.getMonth() + 1) + '/' + dateVal.getDate()
-    : String(dateVal);
+  let s = dateVal instanceof Date ? (dateVal.getMonth() + 1) + '/' + dateVal.getDate() : String(dateVal);
   if (dayName) s += ' ' + dayName;
   return s;
 }
+function overlapMinutes(aS, aE, bS, bE) { return Math.max(0, Math.min(aE, bE) - Math.max(aS, bS)); }
 
 // ==================== V1.0 커브 ====================
 function tierHoursDaily(p, n) {
@@ -248,7 +393,6 @@ function parseStandardModels(sheet) {
   for (let c = 1; c <= sheet.columnCount; c++) {
     if (sheet.getCell(headerRow, c).value === '구분') blockCols.push(c);
   }
-
   const timeRe = /\d{1,2}:\d{2}\s*~\s*\d{1,2}:\d{2}/;
   let timeStartRow = headerRow + 1, timeEndRow = timeStartRow;
   for (let r = timeStartRow; r <= sheet.rowCount; r++) {
@@ -274,7 +418,7 @@ function parseStandardModels(sheet) {
       const slotIdx = r - timeStartRow;
       table[slotIdx] = {};
       partNames.forEach((name, i) => {
-        if (PARTS.indexOf(name) === -1) return;
+        if (ALL_MODEL_PARTS.indexOf(name) === -1) return;
         const v = sheet.getCell(r, sc + 1 + i).value;
         table[slotIdx][name] = typeof v === 'number' ? v : 0;
       });
@@ -284,26 +428,59 @@ function parseStandardModels(sheet) {
   return models;
 }
 
+function normalizeModelTable(model) {
+  let total = 0;
+  Object.keys(model.table).forEach(slot => {
+    ALL_MODEL_PARTS.forEach(p => { total += (model.table[slot][p] || 0); });
+  });
+  const normTable = {};
+  Object.keys(model.table).forEach(slot => {
+    normTable[slot] = {};
+    ALL_MODEL_PARTS.forEach(p => { normTable[slot][p] = total > 0 ? (model.table[slot][p] || 0) / total : 0; });
+  });
+  return { sales: model.sales, table: normTable };
+}
+function scaleShapeTable(shapeTable, scaleFactor) {
+  const scaled = {};
+  Object.keys(shapeTable).forEach(slot => {
+    scaled[slot] = {};
+    Object.keys(shapeTable[slot]).forEach(p => { scaled[slot][p] = shapeTable[slot][p] * scaleFactor; });
+  });
+  return scaled;
+}
+
 function interpolateStandard(models, targetSales) {
   const sorted = models.slice().sort((a, b) => a.sales - b.sales);
-  let lo = sorted[0], hi = sorted[sorted.length - 1];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    if (targetSales >= sorted[i].sales && targetSales <= sorted[i + 1].sales) {
-      lo = sorted[i]; hi = sorted[i + 1]; break;
-    }
-  }
-  if (targetSales <= sorted[0].sales) { lo = hi = sorted[0]; }
-  if (targetSales >= sorted[sorted.length - 1].sales) { lo = hi = sorted[sorted.length - 1]; }
-  const ratio = hi.sales === lo.sales ? 0 : (targetSales - lo.sales) / (hi.sales - lo.sales);
+  const slotCount = Object.keys(sorted[0].table).length;
+  let lower, upper, ratio, isOutOfRange = false;
 
-  const slotCount = Object.keys(lo.table).length;
+  if (sorted.length === 1) { lower = upper = sorted[0]; ratio = 0; }
+  else if (targetSales < sorted[0].sales) {
+    lower = sorted[0]; upper = sorted[1];
+    ratio = (targetSales - lower.sales) / (upper.sales - lower.sales);
+    isOutOfRange = true;
+  } else if (targetSales > sorted[sorted.length - 1].sales) {
+    lower = sorted[sorted.length - 2]; upper = sorted[sorted.length - 1];
+    ratio = (targetSales - lower.sales) / (upper.sales - lower.sales);
+    isOutOfRange = true;
+  } else {
+    lower = sorted[0]; upper = sorted[sorted.length - 1];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      if (targetSales >= sorted[i].sales && targetSales <= sorted[i + 1].sales) { lower = sorted[i]; upper = sorted[i + 1]; break; }
+    }
+    ratio = (upper.sales === lower.sales) ? 0 : (targetSales - lower.sales) / (upper.sales - lower.sales);
+  }
+
+  const clampedRatio = ratio < 0 ? 0 : 1;
   const result = {};
   for (let si = 0; si < slotCount; si++) {
     result[si] = {};
-    PARTS.forEach(p => {
-      const lv = (lo.table[si] && lo.table[si][p]) || 0;
-      const hv = (hi.table[si] && hi.table[si][p]) || 0;
-      result[si][p] = lv + (hv - lv) * ratio;
+    ALL_MODEL_PARTS.forEach(p => {
+      const lv = (lower.table[si] && lower.table[si][p]) || 0;
+      const uv = (upper.table[si] && upper.table[si][p]) || 0;
+      const useRatio = (isOutOfRange && NO_EXTRAPOLATE_PARTS.indexOf(p) !== -1) ? clampedRatio : ratio;
+      const v = lv + (uv - lv) * useRatio;
+      result[si][p] = Math.max(0, v);
     });
   }
   return result;
@@ -315,247 +492,984 @@ function truncateHeadcount(v) {
   return Math.floor(v);
 }
 
-function overlapMinutes(aS, aE, bS, bE) { return Math.max(0, Math.min(aE, bE) - Math.max(aS, bS)); }
 
-// ==================== 메인 계산 ====================
-function computeAll(kitchenSheet, standardSheet) {
-  const layout = detectLayout(kitchenSheet);
-  const empEndRow = findRowWithText(kitchenSheet, '근무인원', layout.dataStartRow);
+// ==================== 근무시간/매출 요약행 ====================
+function getSummaryRowValues(sheet, layout, rowIdx) {
+  const result = {};
+  for (let i = 0; i < DATE_BLOCK_COUNT; i++) {
+    const startCol = layout.dateBlockStartCol + i * 2;
+    const dateVal = sheet.getCell(layout.headerRow, startCol).value;
+    const dayName = sheet.getCell(layout.headerRow, startCol + 1).value;
+    const label = formatDateLabel(dateVal, dayName);
+    const v = sheet.getCell(rowIdx, startCol).value;
+    result[label] = v;
+  }
+  return result;
+}
+
+function computeSheetDailyTotalHours(sheet, layout) {
+  const workHoursRow = findRowWithText(sheet, '근무시간', layout.dataStartRow);
+  if (workHoursRow === -1) return {};
+  const raw = getSummaryRowValues(sheet, layout, workHoursRow);
+  const result = {};
+  Object.keys(raw).forEach(label => {
+    result[label] = parseSalesNumber(raw[label]) || 0;
+  });
+  return result;
+}
+
+function getSalesInputs(sheet, layout) {
+  const salesRow = findRowWithText(sheet, '예상 총매출', layout.dataStartRow);
+  if (salesRow === -1) return {};
+  const raw = getSummaryRowValues(sheet, layout, salesRow);
+  const result = {};
+  Object.keys(raw).forEach(label => { result[label] = parseSalesNumber(raw[label]) || 0; });
+  return result;
+}
+
+// ==================== 실배치(주방) ====================
+function computeActualCounts(sheet) {
+  const layout = detectLayout(sheet);
+  const empEndRow = findRowWithText(sheet, '근무인원', layout.dataStartRow);
   if (empEndRow === -1) throw new Error('"근무인원" 요약행을 찾을 수 없습니다.');
   const numRows = empEndRow - layout.dataStartRow;
-
-  const salesRow = findRowWithText(kitchenSheet, '예상 총매출', layout.dataStartRow);
-  const workHoursRow = findRowWithText(kitchenSheet, '근무시간', layout.dataStartRow);
-
-  const models = parseStandardModels(standardSheet);
-  const slotCount = Math.floor((SLOT_END_MIN - SLOT_START_MIN) / SLOT_SIZE_MIN);
+  const colorMapRaw = detectColorLegend(sheet, layout);
+  const colorMap = Object.assign({}, COLOR_TO_PART_DEFAULT, colorMapRaw || {});
 
   const dateHeaders = [];
-  const days = {};
+  const actualCounts = {};
+  const actualNames = {};
+  const slots = getTimeSlots();
 
-  for (let d = 0; d < 7; d++) {
-    const startCol = layout.dateBlockStartCol + d * 2;
+  for (let i = 0; i < DATE_BLOCK_COUNT; i++) {
+    const startCol = layout.dateBlockStartCol + i * 2;
     const endCol = startCol + 1;
-    const dateVal = kitchenSheet.getCell(layout.headerRow, startCol).value;
-    const dayName = kitchenSheet.getCell(layout.headerRow, endCol).value;
+    const dateVal = sheet.getCell(layout.headerRow, startCol).value;
+    const dayName = sheet.getCell(layout.headerRow, endCol).value;
     const label = formatDateLabel(dateVal, dayName);
     dateHeaders.push(label);
 
-    const salesVal = salesRow > 0 ? (parseSalesNumber(kitchenSheet.getCell(salesRow, startCol).value) || 0) : 0;
-    const price = isWeekendLabel(label) ? GUEST_UNIT_PRICE_WEEKEND : GUEST_UNIT_PRICE_WEEKDAY;
-    const guestCount = salesVal / price;
-
-    let actualTotal = 0;
-    if (workHoursRow > 0) {
-      actualTotal = parseSalesNumber(kitchenSheet.getCell(workHoursRow, startCol).value) || 0;
-    }
-
-    const hurdle = tierHoursDaily(CURVE.TIERS['최소허들'], guestCount);
-    const target1 = tierHoursDaily(CURVE.TIERS['1차목표'], guestCount);
-    const target2 = tierHoursDaily(CURVE.TIERS['2차목표'], guestCount);
-
-    const stdTable = interpolateStandard(models, salesVal);
-
-    const blockStandard = {}, blockActual = {};
-    SHIFT_BLOCKS.forEach(b => { blockStandard[b.name] = 0; blockActual[b.name] = 0; });
-
-    SHIFT_BLOCKS.forEach(b => {
-      let sum = 0;
-      for (let si = 0; si < slotCount; si++) {
-        const slotMin = SLOT_START_MIN + si * SLOT_SIZE_MIN;
-        if (slotMin >= b.startMin && slotMin < b.endMin) {
-          PARTS.forEach(p => { sum += truncateHeadcount((stdTable[si] && stdTable[si][p]) || 0); });
-        }
-      }
-      blockStandard[b.name] = sum * (SLOT_SIZE_MIN / 60);
+    actualCounts[label] = {};
+    actualNames[label] = {};
+    slots.forEach(s => {
+      actualCounts[label][s] = {};
+      actualNames[label][s] = {};
+      PARTS.forEach(p => { actualCounts[label][s][p] = 0; actualNames[label][s][p] = []; });
     });
 
     for (let r = 0; r < numRows; r++) {
       const rowIdx = layout.dataStartRow + r;
-      const sCell = kitchenSheet.getCell(rowIdx, startCol);
-      const eCell = kitchenSheet.getCell(rowIdx, endCol);
+      const empName = (sheet.getCell(rowIdx, layout.nameCol).value || '').toString().trim() || '(이름없음)';
+      const sCell = sheet.getCell(rowIdx, startCol), eCell = sheet.getCell(rowIdx, endCol);
       const times = parseShiftTimes(sCell.value, eCell.value);
       if (!times) continue;
 
       const sMin = times.startNum * 60, eMin = times.endNum * 60;
       const startHex = getCellFillHex(sCell), endHex = getCellFillHex(eCell);
-      const startPart = startHex ? COLOR_TO_PART[startHex] : null;
-      const endPart = endHex ? COLOR_TO_PART[endHex] : null;
+      const startPart = startHex ? colorMap[startHex] : null;
+      const endPart = endHex ? colorMap[endHex] : null;
 
-      const segs = [];
+      let segs = [];
       if (startPart && endPart && startPart !== endPart) {
         const mid = (sMin + eMin) / 2;
-        segs.push({ s: sMin, e: mid }, { s: mid, e: eMin });
+        segs.push({ s: sMin, e: mid, part: startPart }, { s: mid, e: eMin, part: endPart });
       } else if (startPart || endPart) {
-        segs.push({ s: sMin, e: eMin });
+        segs.push({ s: sMin, e: eMin, part: startPart || endPart });
+      } else if (r >= numRows / 2) {
+        // 둘다 무색인데 명단 아래쪽 절반이면 DMO로 간주
+        segs.push({ s: sMin, e: eMin, part: 'DMO' });
       }
 
       segs.forEach(seg => {
-        SHIFT_BLOCKS.forEach(b => {
-          const ov = overlapMinutes(seg.s, seg.e, b.startMin, b.endMin);
-          if (ov > 0) blockActual[b.name] += ov / 60;
+        slots.forEach(s => {
+          if (s >= seg.s && s < seg.e) {
+            actualCounts[label][s][seg.part] = (actualCounts[label][s][seg.part] || 0) + 1;
+            if (actualNames[label][s][seg.part].indexOf(empName) === -1) actualNames[label][s][seg.part].push(empName);
+          }
+        });
+      });
+    }
+  }
+  return { actualCounts, actualNames, dateHeaders, layout };
+}
+
+// ==================== 실배치(홀, 파트구분 없음) ====================
+function computeHallActualCounts(sheet) {
+  if (!sheet) return {};
+  const layout = detectLayout(sheet);
+  const empEndRow = findRowWithText(sheet, '근무인원', layout.dataStartRow);
+  const numRows = Math.max(0, (empEndRow === -1 ? layout.dataStartRow - 1 : empEndRow) - layout.dataStartRow);
+  if (numRows < 1) return {};
+
+  const slots = getTimeSlots();
+  const result = {};
+  for (let i = 0; i < DATE_BLOCK_COUNT; i++) {
+    const startCol = layout.dateBlockStartCol + i * 2;
+    const endCol = startCol + 1;
+    const dateVal = sheet.getCell(layout.headerRow, startCol).value;
+    const dayName = sheet.getCell(layout.headerRow, endCol).value;
+    const label = formatDateLabel(dateVal, dayName);
+    result[label] = {};
+    slots.forEach(s => { result[label][s] = 0; });
+
+    for (let r = 0; r < numRows; r++) {
+      const rowIdx = layout.dataStartRow + r;
+      const sVal = sheet.getCell(rowIdx, startCol).value, eVal = sheet.getCell(rowIdx, endCol).value;
+      const times = parseShiftTimes(sVal, eVal);
+      if (!times) continue;
+      const sMin = times.startNum * 60, eMin = times.endNum * 60;
+      slots.forEach(s => { if (s >= sMin && s < eMin) result[label][s] += 1; });
+    }
+  }
+  return result;
+}
+
+// ==================== 시간대별(교대블록) 진단 ====================
+function computeBlockDiagnosis(actualCountsForDate, heatmapForDate, slots, actualHourScaleFactor) {
+  const hourPerSlot = SLOT_SIZE_MIN / 60;
+  const scaleFactor = actualHourScaleFactor || 1;
+
+  return SHIFT_BLOCKS.map(block => {
+    const blockSlots = slots.filter(s => s >= block.startMin && s < block.endMin);
+    let actualHours = 0, standardHours = 0;
+    const partDiffHours = {};
+
+    PARTS.forEach(part => {
+      let partActualCount = 0, partDiffCount = 0;
+      blockSlots.forEach(s => {
+        const actual = (actualCountsForDate[s] && actualCountsForDate[s][part]) || 0;
+        const diff = (heatmapForDate[s] && heatmapForDate[s][part]) || 0;
+        partActualCount += actual; partDiffCount += diff;
+      });
+      const partStdCount = partActualCount - partDiffCount;
+      const partActualHours = partActualCount * hourPerSlot * scaleFactor;
+      const partStandardHours = partStdCount * hourPerSlot;
+      actualHours += partActualHours; standardHours += partStandardHours;
+      partDiffHours[part] = Math.round((partActualHours - partStandardHours) * 10) / 10;
+    });
+
+    const netDiffHours = Math.round((actualHours - standardHours) * 10) / 10;
+    let worstOver = null, worstUnder = null;
+    PARTS.forEach(part => {
+      const d = partDiffHours[part];
+      if (d > 0 && (!worstOver || d > worstOver.diffHours)) worstOver = { part, diffHours: d };
+      if (d < 0 && (!worstUnder || d < worstUnder.diffHours)) worstUnder = { part, diffHours: d };
+    });
+
+    let verdict, action;
+    const THRESH = 0.5;
+    if (Math.abs(netDiffHours) < THRESH) { verdict = '적정'; action = '별도 조치 불필요'; }
+    else if (netDiffHours > 0) {
+      verdict = '과다';
+      action = worstOver ? `${worstOver.part} ${Math.abs(worstOver.diffHours)}h 재배치 검토` : '재배치 검토';
+    } else {
+      verdict = '부족';
+      action = worstUnder ? `${worstUnder.part} ${Math.abs(worstUnder.diffHours)}h 추가배치 검토` : '추가배치 검토';
+    }
+
+    return {
+      name: block.name, timeLabel: minToLabel(block.startMin) + '~' + minToLabel(block.endMin),
+      actualHours: Math.round(actualHours * 10) / 10, standardHours: Math.round(standardHours * 10) / 10,
+      netDiffHours, verdict, worstOver, worstUnder, action, partDiffHours,
+    };
+  });
+}
+
+function computeWeeklyBlockSummary(blockDiagnosisAll, dateHeaders) {
+  const THRESH = 0.5;
+  return SHIFT_BLOCKS.map(blockDef => {
+    let totalActual = 0, totalStandard = 0;
+    let overDays = 0, underDays = 0, okDays = 0;
+    const overPartCount = {}, underPartCount = {};
+    const overPartDayLabels = {}, underPartDayLabels = {};
+
+    dateHeaders.forEach(label => {
+      const dayBlocks = blockDiagnosisAll[label];
+      if (!dayBlocks) return;
+      const b = dayBlocks.find(x => x.name === blockDef.name);
+      if (!b) return;
+      totalActual += b.actualHours; totalStandard += b.standardHours;
+      if (b.verdict === '과다') {
+        overDays++;
+        if (b.worstOver) {
+          const part = b.worstOver.part;
+          overPartCount[part] = (overPartCount[part] || 0) + 1;
+          (overPartDayLabels[part] = overPartDayLabels[part] || []).push(label);
+        }
+      } else if (b.verdict === '부족') {
+        underDays++;
+        if (b.worstUnder) {
+          const part = b.worstUnder.part;
+          underPartCount[part] = (underPartCount[part] || 0) + 1;
+          (underPartDayLabels[part] = underPartDayLabels[part] || []).push(label);
+        }
+      } else okDays++;
+    });
+
+    const netDiffHours = Math.round((totalActual - totalStandard) * 10) / 10;
+    const verdict = Math.abs(netDiffHours) < THRESH ? '적정' : (netDiffHours > 0 ? '과다' : '부족');
+    const topPartFrom = (counts) => {
+      const entries = Object.entries(counts);
+      if (!entries.length) return null;
+      entries.sort((a, b) => b[1] - a[1]);
+      return entries[0];
+    };
+    const topOver = topPartFrom(overPartCount), topUnder = topPartFrom(underPartCount);
+    let action;
+    if (verdict === '적정') action = '이번 주 전체적으로 균형있게 운영됨';
+    else if (verdict === '과다') action = topOver ? `${topOver[0]} - ${overDays}일 중 ${topOver[1]}일 원인, 재배치 검토` : `${overDays}일 과다`;
+    else action = topUnder ? `${topUnder[0]} - ${underDays}일 중 ${topUnder[1]}일 원인, 추가배치 검토` : `${underDays}일 부족`;
+
+    return {
+      name: blockDef.name,
+      totalActualHours: Math.round(totalActual * 10) / 10, totalStandardHours: Math.round(totalStandard * 10) / 10,
+      netDiffHours, verdict, overDays, underDays, okDays, action,
+      topOverPart: topOver ? topOver[0] : null, topOverCount: topOver ? topOver[1] : 0,
+      topOverDayLabels: topOver ? overPartDayLabels[topOver[0]] : [],
+      topUnderPart: topUnder ? topUnder[0] : null, topUnderCount: topUnder ? topUnder[1] : 0,
+      topUnderDayLabels: topUnder ? underPartDayLabels[topUnder[0]] : [],
+    };
+  });
+}
+
+function computeWeeklySummary(tierDiagnosis, dateHeaders) {
+  let totalActual = 0, totalHurdle = 0, totalTarget1 = 0, totalTarget2 = 0, totalGuest = 0, totalKitchen = 0, totalHall = 0;
+  dateHeaders.forEach(d => {
+    const t = tierDiagnosis[d]; if (!t) return;
+    totalActual += t.actualTotal; totalHurdle += t.hurdle; totalTarget1 += t.target1; totalTarget2 += t.target2;
+    totalGuest += t.guestCount; totalKitchen += t.kitchenActualHours; totalHall += t.hallActualHours;
+  });
+  let verdict;
+  if (totalActual > totalHurdle) verdict = '최소허들 초과 (비효율)';
+  else if (totalActual > totalTarget1) verdict = '최소허들 충족 · 1차목표 미달';
+  else if (totalActual > totalTarget2) verdict = '1차목표 달성 · 2차목표 미달';
+  else verdict = '2차목표(BHAG) 달성';
+  const r = v => Math.round(v * 10) / 10;
+  return {
+    totalGuest: Math.round(totalGuest), totalActual: r(totalActual), totalHurdle: r(totalHurdle),
+    totalTarget1: r(totalTarget1), totalTarget2: r(totalTarget2), totalKitchen: r(totalKitchen), totalHall: r(totalHall), verdict,
+  };
+}
+
+// ==================== 메인 진단 계산 ====================
+async function computeDiagnosis(kitchenSheet, standardSheet, hallSheet) {
+  const { actualCounts, actualNames, dateHeaders: allDateHeaders, layout } = computeActualCounts(kitchenSheet);
+  const excludedLabels = getExcludedDayLabels(kitchenSheet, layout, allDateHeaders);
+  const activeDateHeaders = allDateHeaders.filter(d => !excludedLabels.has(d));
+
+  const hallActualCountsBySlot = computeHallActualCounts(hallSheet);
+  const salesInputs = getSalesInputs(kitchenSheet, layout);
+  const kitchenSheetTotalHours = computeSheetDailyTotalHours(kitchenSheet, layout);
+  let hallSheetTotalHours = {};
+  if (hallSheet) {
+    const hallLayout = detectLayout(hallSheet);
+    hallSheetTotalHours = computeSheetDailyTotalHours(hallSheet, hallLayout);
+  }
+  const rawModels = parseStandardModels(standardSheet);
+  const slots = getTimeSlots();
+  const slotCount = slots.length;
+
+  const heatmap = {}, tierDiagnosis = {}, blockDiagnosis = {}, hallBlockDiagnosis = {};
+  const diagnosisList = [];
+
+  activeDateHeaders.forEach(label => {
+    const salesVal = salesInputs[label] || 0;
+    const price = isWeekendLabel(label) ? GUEST_UNIT_PRICE_WEEKEND : GUEST_UNIT_PRICE_WEEKDAY;
+    const guestCount = salesVal / price;
+
+    const kitchenSheetActual = kitchenSheetTotalHours[label] || 0;
+    const hallActualHours = hallSheetTotalHours[label] || 0;
+    const actualTotal = kitchenSheetActual + hallActualHours;
+
+    // 휴게시간 비례보정 배율 (인원수엔 미적용, 시간 합산에만 적용)
+    const hourPerSlot = SLOT_SIZE_MIN / 60;
+    let rawKitchenSlotSum = 0;
+    slots.forEach(s => { PARTS.forEach(p => { rawKitchenSlotSum += (actualCounts[label][s][p] || 0); }); });
+    rawKitchenSlotSum *= hourPerSlot;
+    const kitchenScaleFactor = rawKitchenSlotSum > 0 ? (kitchenSheetActual / rawKitchenSlotSum) : 1;
+
+    const hallSlotData = hallActualCountsBySlot[label] || {};
+    let rawHallSlotSum = 0;
+    slots.forEach(s => { rawHallSlotSum += (hallSlotData[s] || 0); });
+    rawHallSlotSum *= hourPerSlot;
+    const hallScaleFactor = rawHallSlotSum > 0 ? (hallActualHours / rawHallSlotSum) : 1;
+
+    const hurdle = tierHoursDaily(CURVE.TIERS['최소허들'], guestCount);
+    const target1 = tierHoursDaily(CURVE.TIERS['1차목표'], guestCount);
+    const target2 = tierHoursDaily(CURVE.TIERS['2차목표'], guestCount);
+
+    // 비중x목표 스케일링
+    const normalizedModels = rawModels.map(normalizeModelTable);
+    const shapeTable = interpolateStandard(normalizedModels, salesVal);
+    const targetSlotUnits = target1 / hourPerSlot;
+    const rawStandard = scaleShapeTable(shapeTable, targetSlotUnits);
+
+    if (salesVal <= FLAT_PART_SALES_THRESHOLD) {
+      Object.keys(rawStandard).forEach(slotIdx => {
+        FLAT_PARTS.forEach(part => {
+          if (rawStandard[slotIdx][part] > FLAT_PART_CAP_BELOW_THRESHOLD) rawStandard[slotIdx][part] = FLAT_PART_CAP_BELOW_THRESHOLD;
         });
       });
     }
 
-    days[label] = { guestCount, actualTotal, hurdle, target1, target2, blockActual, blockStandard };
+    // 히트맵 (주방 7파트) - slotIdx <-> slotMin 매핑
+    heatmap[label] = {};
+    slots.forEach((s, si) => {
+      heatmap[label][s] = {};
+      PARTS.forEach(part => {
+        const actual = (actualCounts[label][s] && actualCounts[label][s][part]) || 0;
+        const std = truncateHeadcount((rawStandard[si] && rawStandard[si][part]) || 0);
+        const diff = actual - std;
+        heatmap[label][s][part] = Math.round(diff * 10) / 10;
+        if (Math.abs(diff) >= 1) {
+          const namesHere = (actualNames[label][s] && actualNames[label][s][part]) || [];
+          diagnosisList.push({
+            date: label, time: minToLabel(s), part, actual, standard: Math.round(std * 10) / 10,
+            diff: Math.round(diff * 10) / 10, type: diff > 0 ? '과다' : '부족', names: namesHere,
+            action: diff > 0
+              ? `현재 배치(${namesHere.length ? namesHere.join(', ') : '(배치 인원 없음)'}) 중 ${Math.abs(diff)}명분 재배치 또는 계약시간 조정 검토`
+              : `${part} 인원 ${Math.abs(diff)}명 추가 배치 필요`,
+          });
+        }
+      });
+    });
+
+    // 홀 기준 = 데코이+폴리싱+홀 합산 후 1회 절삭
+    const hallStdAt = (si) => truncateHeadcount((rawStandard[si]['데코이'] || 0) + (rawStandard[si]['폴리싱'] || 0) + (rawStandard[si]['홀'] || 0));
+    slots.forEach((s, si) => {
+      const hallActual = hallSlotData[s] || 0;
+      heatmap[label][s]['홀'] = Math.round((hallActual - hallStdAt(si)) * 10) / 10;
+    });
+
+    hallBlockDiagnosis[label] = SHIFT_BLOCKS.map(block => {
+      let hActualCount = 0, hStdCount = 0;
+      slots.forEach((s, si) => {
+        if (s >= block.startMin && s < block.endMin) { hActualCount += (hallSlotData[s] || 0); hStdCount += hallStdAt(si); }
+      });
+      const hActualHours = Math.round(hActualCount * hourPerSlot * hallScaleFactor * 10) / 10;
+      const hStdHours = Math.round(hStdCount * hourPerSlot * 10) / 10;
+      const netDiff = Math.round((hActualHours - hStdHours) * 10) / 10;
+      const verdict = Math.abs(netDiff) < 0.5 ? '적정' : (netDiff > 0 ? '과다' : '부족');
+      return { name: block.name, timeLabel: minToLabel(block.startMin) + '~' + minToLabel(block.endMin), actualHours: hActualHours, standardHours: hStdHours, netDiffHours: netDiff, verdict };
+    });
+
+    blockDiagnosis[label] = computeBlockDiagnosis(actualCounts[label], heatmap[label], slots, kitchenScaleFactor);
+
+    let verdict;
+    if (actualTotal > hurdle) verdict = '최소허들 초과 (비효율)';
+    else if (actualTotal > target1) verdict = '최소허들 충족 · 1차목표 미달';
+    else if (actualTotal > target2) verdict = '1차목표 달성 · 2차목표 미달';
+    else verdict = '2차목표(BHAG) 달성';
+
+    tierDiagnosis[label] = {
+      guestCount: Math.round(guestCount), actualTotal: Math.round(actualTotal * 10) / 10,
+      hurdle: Math.round(hurdle * 10) / 10, target1: Math.round(target1 * 10) / 10, target2: Math.round(target2 * 10) / 10,
+      verdict, kitchenActualHours: Math.round(kitchenSheetActual * 10) / 10, hallActualHours: Math.round(hallActualHours * 10) / 10,
+    };
+  });
+
+  const priorityList = {};
+  activeDateHeaders.forEach(label => {
+    const items = diagnosisList.filter(d => d.date === label).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+    priorityList[label] = items.slice(0, 5).map((d, i) => Object.assign({ rank: i + 1 }, d));
+  });
+
+  const weeklySummary = computeWeeklySummary(tierDiagnosis, activeDateHeaders);
+  const weeklyBlockSummary = computeWeeklyBlockSummary(blockDiagnosis, activeDateHeaders);
+  const weeklyHallBlockSummary = computeWeeklyBlockSummary(hallBlockDiagnosis, activeDateHeaders);
+
+  return {
+    heatmap, diagnosisList, priorityList, tierDiagnosis, blockDiagnosis, hallBlockDiagnosis,
+    weeklySummary, weeklyBlockSummary, weeklyHallBlockSummary,
+    dateHeaders: activeDateHeaders, slots,
+  };
+}
+
+// ==================== 파일 업로드 처리 ====================
+document.getElementById('fileInput').addEventListener('change', handleFile);
+
+async function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('status');
+  statusEl.className = ''; statusEl.textContent = '읽는 중...';
+
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const kitchenSheet = wb.getWorksheet('주방');
+    const standardSheet = wb.getWorksheet('기준모델');
+    const hallSheet = wb.getWorksheet('홀') || null;
+    if (!kitchenSheet) throw new Error('"주방" 시트를 찾을 수 없습니다.');
+    if (!standardSheet) throw new Error('"기준모델" 시트를 찾을 수 없습니다.');
+
+    const result = await computeDiagnosis(kitchenSheet, standardSheet, hallSheet);
+    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ')';
+    document.getElementById('app').style.display = 'block';
+    renderApp(result);
+  } catch (err) {
+    statusEl.className = 'error';
+    statusEl.textContent = '오류: ' + err.message;
+    console.error(err);
   }
-
-  return { dateHeaders, days };
 }
 
-// ==================== 렌더링 ====================
-function diffPhrase(actual, standard, longForm) {
-  const diff = actual - standard;
-  const abs = Math.round(Math.abs(diff) * 10) / 10;
-  const pct = standard > 0 ? Math.round((standard / actual) * 1000) / 10 : null;
-  const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
-  const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
-  const pctText = pct !== null ? (' (' + pct + '%)') : '';
-  return (longForm ? '기준대비 ' : '') + core + pctText;
-}
-function blockDiffPhrase(actual, standard) {
-  const diff = actual - standard;
-  const abs = Math.round(Math.abs(diff) * 10) / 10;
-  const ratio = standard > 0 ? Math.round((actual / standard) * 1000) / 10 : null;
-  const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
-  const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
-  return core + (ratio !== null ? (' (배치율 ' + ratio + '%)') : '');
-}
-function blockDiffCompact(actual, standard) {
-  const ratio = standard > 0 ? Math.round((actual / standard) * 1000) / 10 : null;
-  return ratio !== null ? (ratio + '%') : '-';
-}
-function tierVerdict(actual, hurdle, target1, target2) {
-  if (actual > hurdle) return '최소허들 미달 수준';
-  if (actual > target1) return '최소허들 수준';
-  if (actual > target2) return '1차목표 수준';
-  return '2차목표(BHAG) 수준';
-}
-function verdictClass(v) {
-  if (v.indexOf('미달') !== -1) return 'verdict-미달';
-  if (v === '최소허들 수준') return 'verdict-충족';
-  if (v === '1차목표 수준') return 'verdict-2차';
-  return 'verdict-달성';
-}
-function blockVerdict(actual, standard) {
-  const diff = actual - standard;
-  if (Math.abs(diff) < 0.5) return '적정';
-  return diff > 0 ? '과다' : '부족';
-}
-function blockLevelPhrase(v) {
-  if (v === '과다') return '기준보다 넉넉하게 배치됐어요';
-  if (v === '부족') return '기준보다 적게 배치됐어요';
-  return '기준과 비슷하게 배치됐어요';
-}
+    function renderApp(data) {
+    const dateHeaders = data.dateHeaders;
+    const slots = data.slots;
+    const heatmap = data.heatmap;
+    const diagnosisList = data.diagnosisList;
+    const tierDiagnosis = data.tierDiagnosis || {};
+    const weeklySummary = data.weeklySummary || null;
+    const blockDiagnosis = data.blockDiagnosis || {};
+    const hallBlockDiagnosis = data.hallBlockDiagnosis || {};
+    const weeklyBlockSummary = data.weeklyBlockSummary || [];
+    const weeklyHallBlockSummary = data.weeklyHallBlockSummary || [];
 
-function renderAll(result) {
-  const { dateHeaders, days } = result;
+    function verdictClass(verdict) {
+      if (verdict.indexOf('초과') !== -1) return 'verdict-미달';       // 최소허들 초과 = 비효율(나쁨, 빨강)
+      if (verdict.indexOf('2차목표') !== -1 && verdict.indexOf('달성') !== -1 && verdict.indexOf('미달') === -1) return 'verdict-달성'; // BHAG 달성 = 최상(초록)
+      if (verdict.indexOf('1차목표 달성') !== -1) return 'verdict-2차'; // 1차달성·2차미달 = 양호(파랑)
+      if (verdict.indexOf('충족') !== -1) return 'verdict-충족';       // 허들충족·1차미달 = 보통(주황)
+      return 'verdict-충족';
+    }
 
-  // 주간 합계
-  let totalActual = 0, totalHurdle = 0, totalTarget1 = 0, totalTarget2 = 0, totalGuest = 0;
-  dateHeaders.forEach(d => {
-    totalActual += days[d].actualTotal; totalHurdle += days[d].hurdle;
-    totalTarget1 += days[d].target1; totalTarget2 += days[d].target2; totalGuest += days[d].guestCount;
-  });
-  const weeklyVerdict = tierVerdict(totalActual, totalHurdle, totalTarget1, totalTarget2);
+    function renderTrendTable() {
+      const table = document.getElementById('trendTable');
+      let html = '<tr><th>날짜</th><th>예상객수</th><th>주방 사용계획시간</th><th>홀 사용계획시간</th><th>매장전체 사용계획시간</th><th>목표</th><th>판정</th></tr>';
+      dateHeaders.forEach(d => {
+        const t = tierDiagnosis[d];
+        if (!t) return;
+        html += '<tr><td>' + d + '</td><td>' + t.guestCount + '명</td>' +
+          '<td>' + t.kitchenActualHours + 'h</td>' +
+          '<td>' + t.hallActualHours + 'h</td>' +
+          '<td>' + t.actualTotal + 'h</td>' +
+          '<td>' + t.target1 + 'h</td>' +
+          '<td><span class="verdict-badge ' + verdictClass(t.verdict) + '">' + levelPhrase(t.verdict) + '</span></td></tr>';
+      });
+      table.innerHTML = html;
+    }
 
-  const wb = document.getElementById('weeklyBanner');
-  wb.className = 'summary-banner ' + verdictClass(weeklyVerdict);
-  wb.innerHTML =
-    '<div class="summary-title">이번 주 전체 (7일 합계)</div>' +
-    '<div class="summary-verdict">' + diffPhrase(totalActual, totalHurdle, true) + ' · ' + weeklyVerdict + '입니다</div>' +
-    '<div class="summary-numbers">예상객수 합계 ' + Math.round(totalGuest) + '명<br>' +
-    '사용계획시간 <b>' + totalActual.toFixed(1) + 'h</b> (최소허들 ' + totalHurdle.toFixed(1) + 'h / 1차 ' + totalTarget1.toFixed(1) + 'h / 2차 ' + totalTarget2.toFixed(1) + 'h)</div>';
+    // 가장 심각한 시간대(순차이 절대값 최대)을 찾아 "자극적인 한마디" 헤드라인 문구를 만듦
+    // 헤드라인은 "더 쓰고 있음(과다)"만 문제로 취급 - "덜 쓰고 있음(부족)"은 문제로 안 봄
+    function findWorstBlock(blocks) {
+      let worst = null;
+      blocks.forEach(b => {
+        if (b.netDiffHours <= 0) return; // 과다(양수)만 후보로 고려
+        if (!worst || b.netDiffHours > worst.netDiffHours) worst = b;
+      });
+      return worst;
+    }
+    function headlineClassFor(absDiff) {
+      if (absDiff >= 2) return 'hl-critical';
+      if (absDiff >= 0.5) return 'hl-warning';
+      return 'hl-ok';
+    }
 
-  // 주간 블록 종합
-  const wbd = document.getElementById('weeklyBlockDiagnosis');
-  wbd.innerHTML = SHIFT_BLOCKS.map(b => {
-    let sumA = 0, sumS = 0;
-    dateHeaders.forEach(d => { sumA += days[d].blockActual[b.name]; sumS += days[d].blockStandard[b.name]; });
-    const v = blockVerdict(sumA, sumS);
-    return '<div class="block-card ' + v + '">' +
-      '<div class="block-name">' + b.name + '</div>' +
-      '<div class="block-time">주간 합계</div>' +
-      '<div class="block-verdict">' + blockDiffPhrase(sumA, sumS) + ' · ' + blockLevelPhrase(v) + '</div>' +
-      '<div class="block-numbers">실배치 ' + sumA.toFixed(1) + 'h / 기준 ' + sumS.toFixed(1) + 'h</div></div>';
-  }).join('');
+    function renderDailyHeadline(dateLabel) {
+      const el = document.getElementById('dailyHeadline');
+      const blocks = blockDiagnosis[dateLabel];
+      if (!blocks || !blocks.length) { el.innerHTML = ''; return; }
+      const worst = findWorstBlock(blocks);
+      if (!worst) {
+        el.className = 'headline-banner hl-ok';
+        el.innerHTML = '✅ ' + dateLabel + ', 과다 사용 블록 없이 무난합니다';
+        return;
+      }
+      const absDiff = worst.netDiffHours;
+      el.className = 'headline-banner ' + headlineClassFor(absDiff);
+      const culprit = worst.worstOver;
+      const partText = culprit ? culprit.part : '';
+      el.innerHTML =
+        '🚨 오늘 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
+        '에서 ' + absDiff + 'h 더 쓰고 있음' +
+        '<span class="headline-sub">' + worst.action + '</span>';
+    }
 
-  // 매트릭스
-  const matrix = document.getElementById('weekBlockMatrix');
-  let mhtml = '<tr><th>날짜</th>' + SHIFT_BLOCKS.map(b => '<th>' + b.name + '</th>').join('') + '</tr>';
-  dateHeaders.forEach(d => {
-    mhtml += '<tr><td>' + d + '</td>' + SHIFT_BLOCKS.map(b => {
-      const a = days[d].blockActual[b.name], s = days[d].blockStandard[b.name];
-      const v = blockVerdict(a, s);
-      return '<td><span class="matrix-badge ' + v + '">' + blockDiffCompact(a, s) + '</span></td>';
-    }).join('') + '</tr>';
-  });
-  matrix.innerHTML = mhtml;
+    function dayLabelToWeekday(label) {
+      const parts = label.trim().split(' ');
+      return parts[parts.length - 1]; // "8/17 월" -> "월"
+    }
 
-  // 추세표
-  const trend = document.getElementById('trendTable');
-  let thtml = '<tr><th>날짜</th><th>예상객수</th><th>사용계획시간</th><th>최소허들</th><th>1차목표</th><th>2차목표</th><th>판정</th></tr>';
-  dateHeaders.forEach(d => {
-    const t = days[d], v = tierVerdict(t.actualTotal, t.hurdle, t.target1, t.target2);
-    thtml += '<tr><td>' + d + '</td><td>' + Math.round(t.guestCount) + '명</td><td>' + t.actualTotal.toFixed(1) + 'h</td>' +
-      '<td>' + t.hurdle.toFixed(1) + 'h</td><td>' + t.target1.toFixed(1) + 'h</td><td>' + t.target2.toFixed(1) + 'h</td><td>' + v + '</td></tr>';
-  });
-  trend.innerHTML = thtml;
+    function renderWeeklyHeadline() {
+      const el = document.getElementById('weeklyHeadline');
+      if (!weeklyBlockSummary.length) { el.innerHTML = ''; return; }
+      const worst = findWorstBlock(weeklyBlockSummary);
+      if (!worst) {
+        el.className = 'headline-banner hl-ok';
+        el.innerHTML = '✅ 이번 주는 과다 사용 블록 없이 전반적으로 무난합니다';
+        return;
+      }
+      const absDiff = worst.netDiffHours;
+      el.className = 'headline-banner ' + headlineClassFor(absDiff);
+      const partText = worst.topOverPart;
+      const dayLabels = worst.topOverDayLabels;
+      const weekdaysStr = (dayLabels && dayLabels.length) ? dayLabels.map(dayLabelToWeekday).join(', ') : '';
 
-  // 일간 탭
-  const tabsDiv = document.getElementById('tabs');
-  tabsDiv.innerHTML = '';
-  dateHeaders.forEach((d, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
-    btn.textContent = d;
-    btn.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderDaily(d, days);
-    };
-    tabsDiv.appendChild(btn);
-  });
-  if (dateHeaders.length) renderDaily(dateHeaders[0], days);
+      el.innerHTML =
+        '🚨 이번 주 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
+        '에서 ' + absDiff + 'h 더 쓰고 있음' +
+        (weekdaysStr ? '<span class="headline-sub">요일: ' + weekdaysStr + '</span>' : '');
+    }
 
-  // 메인 탭 전환
-  document.querySelectorAll('.main-tab-btn').forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll('.main-tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-      document.getElementById('view-' + btn.dataset.view).classList.add('active');
-    };
-  });
-}
+    function renderTierBanner(dateLabel) {
+      const banner = document.getElementById('tierBanner');
+      const t = tierDiagnosis[dateLabel];
+      if (!t) { banner.innerHTML = ''; return; }
+      const cls = verdictClass(t.verdict);
+      banner.className = 'tier-banner ' + cls;
 
-function renderDaily(label, days) {
-  const t = days[label];
-  const v = tierVerdict(t.actualTotal, t.hurdle, t.target1, t.target2);
-  const banner = document.getElementById('tierBanner');
-  banner.className = 'tier-banner ' + verdictClass(v);
-  banner.innerHTML =
-    '<div class="verdict-text">' + label + ' — ' + diffPhrase(t.actualTotal, t.hurdle, true) + ' · ' + v + '입니다</div>' +
-    '<div class="tier-numbers">예상객수 ' + Math.round(t.guestCount) + '명 · 사용계획시간 <b>' + t.actualTotal.toFixed(1) + 'h</b> ' +
-    '(최소허들 ' + t.hurdle.toFixed(1) + 'h / 1차 ' + t.target1.toFixed(1) + 'h / 2차 ' + t.target2.toFixed(1) + 'h)</div>';
+      const headline = diffPhrase(t.actualTotal, t.target1, true) + ' · ' + levelPhrase(t.verdict);
 
-  const bd = document.getElementById('blockDiagnosis');
-  bd.innerHTML = SHIFT_BLOCKS.map(b => {
-    const a = t.blockActual[b.name], s = t.blockStandard[b.name];
-    const bv = blockVerdict(a, s);
-    return '<div class="block-card ' + bv + '">' +
-      '<div class="block-name">' + b.name + '</div>' +
-      '<div class="block-time">' + minToLabel(b.startMin) + '~' + minToLabel(b.endMin) + '</div>' +
-      '<div class="block-verdict">' + blockDiffPhrase(a, s) + ' · ' + blockLevelPhrase(bv) + '</div>' +
-      '<div class="block-numbers">실배치 ' + a.toFixed(1) + 'h / 기준 ' + s.toFixed(1) + 'h</div></div>';
-  }).join('');
-}
+      const improveHtml = t.verdictImproves
+        ? '<div style="margin-top:8px; padding:8px 12px; background:rgba(255,255,255,0.6); border-radius:6px; font-size:12px;">' +
+            '💡 주방 히트맵상 <b>과다로 잡힌 ' + t.kitchenWasteHours + 'h</b>를 줄이면 → ' +
+            '사용계획시간 ' + t.hypotheticalTotal + 'h, <b>' + t.hypotheticalVerdict + '</b>로 개선 가능' +
+          '</div>'
+        : (t.kitchenWasteHours > 0
+            ? '<div style="margin-top:8px; font-size:12px; color:#666;">주방 히트맵상 과다분 ' + t.kitchenWasteHours + 'h 있으나, 제거해도 등급 구간은 동일</div>'
+            : '');
 
-function minToLabel(min) {
-  const h = Math.floor(min / 60), m = min % 60;
-  return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
-}
-</script>
+      banner.innerHTML =
+        '<div class="verdict-text">' + dateLabel + ' — ' + headline + '</div>' +
+        '<div class="tier-numbers"><b>' + t.actualTotal + 'h</b> (목표 ' + t.target1 + 'h) · 주방' + t.kitchenActualHours + 'h · 홀' + t.hallActualHours + 'h' +
+        improveHtml + '</div>';
+    }
+
+    function renderBlockDiagnosis(dateLabel) {
+      const container = document.getElementById('blockDiagnosis');
+      const blocks = blockDiagnosis[dateLabel];
+      if (!blocks) { container.innerHTML = ''; return; }
+
+      container.innerHTML = blocks.map(b => {
+        const badgeText = blockDiffPhrase(b.actualHours, b.standardHours);
+        return (
+          '<div class="block-card verdict-' + b.verdict + '">' +
+            '<div class="block-name">' + b.name + '</div>' +
+            '<div class="block-time">' + b.timeLabel + '</div>' +
+            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
+            '<div class="block-numbers">' + b.action + ' · ' + b.actualHours + 'h/' + b.standardHours + 'h</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderHallBlockDiagnosis(dateLabel) {
+      const container = document.getElementById('hallBlockDiagnosis');
+      const blocks = hallBlockDiagnosis[dateLabel];
+      if (!blocks) { container.innerHTML = ''; return; }
+
+      container.innerHTML = blocks.map(b => {
+        const badgeText = blockDiffPhrase(b.actualHours, b.standardHours);
+        return (
+          '<div class="block-card verdict-' + b.verdict + '">' +
+            '<div class="block-name">' + b.name + '</div>' +
+            '<div class="block-time">' + b.timeLabel + '</div>' +
+            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
+            '<div class="block-numbers">' + b.actualHours + 'h/' + b.standardHours + 'h</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderCompareSection(dateLabel) {
+      const container = document.getElementById('compareSection');
+      const t = tierDiagnosis[dateLabel];
+      if (!t) { container.innerHTML = ''; return; }
+
+      const maxVal = Math.max(t.kitchenActualHours, t.hallActualHours, 1);
+      const kitchenPct = Math.round((t.kitchenActualHours / maxVal) * 100);
+      const hallPct = Math.round((t.hallActualHours / maxVal) * 100);
+
+      container.innerHTML =
+        '<div class="compare-row">' +
+          '<div class="compare-label">주방</div>' +
+          '<div class="compare-bar-bg"><div class="compare-bar-fill kitchen" style="width:' + kitchenPct + '%;">' +
+            t.kitchenActualHours + 'h</div></div>' +
+        '</div>' +
+        '<div class="compare-row">' +
+          '<div class="compare-label">홀</div>' +
+          '<div class="compare-bar-bg"><div class="compare-bar-fill hall" style="width:' + hallPct + '%;">' +
+            t.hallActualHours + 'h</div></div>' +
+        '</div>' +
+        (t.observedKitchenRatio !== null
+          ? '<div style="font-size:12px; color:#888;">실측 비중: 주방 ' + t.observedKitchenRatio + '% · 홀 ' + (100 - t.observedKitchenRatio).toFixed(1) + '%</div>'
+          : '');
+    }
+
+    // "기준대비 -5.5h (106%)" 형태의 숫자 델타
+    // 달성률 = 기준 ÷ 실배치 * 100 (100% 초과 = 기준보다 적게 계획해서 더 잘한 것, 회사 공통 정의와 통일)
+    function diffPhrase(actualHours, standardHours, longForm) {
+      const diff = actualHours - standardHours;
+      const abs = Math.round(Math.abs(diff) * 10) / 10;
+      const pct = standardHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null;
+      const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
+      const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
+      const pctText = pct !== null ? (' (' + pct + '%)') : '';
+      return (longForm ? '기준대비 ' : '') + core + pctText;
+    }
+    // 매트릭스 등 공간이 좁은 곳에 쓰는 압축형 - 달성률(%)만 표시
+    function diffPhraseCompact(actualHours, standardHours) {
+      const pct = standardHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null;
+      return pct !== null ? (pct + '%') : '-';
+    }
+
+    // 시간대 전용: "기준"이 상한선이 아니라 "딱 맞는 적정 인원"이라서
+    // 달성률(높을수록 좋음) 개념을 쓰면 안 됨 - 배치율(100%에 가까울수록 좋음)로 표시
+    function blockDiffPhrase(actualHours, standardHours) {
+      const diff = actualHours - standardHours;
+      const abs = Math.round(Math.abs(diff) * 10) / 10;
+      const ratio = standardHours > 0 ? Math.round((actualHours / standardHours) * 1000) / 10 : null;
+      const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
+      const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
+      const ratioText = ratio !== null ? (' (' + ratio + '%)') : '';
+      return core + ratioText;
+    }
+    function blockDiffCompact(actualHours, standardHours) {
+      const ratio = standardHours > 0 ? Math.round((actualHours / standardHours) * 1000) / 10 : null;
+      return ratio !== null ? (ratio + '%') : '-';
+    }
+
+    // 매장전체 3단계 verdict 문자열(최소허들/1차/2차) -> "~수준입니다" 짧은 상태문구
+    // 화면에는 1차목표만 통일된 기준으로 노출 (최소허들/2차목표는 내부계산용, 표시 안 함)
+    function levelPhrase(verdict) {
+      const achieved = verdict.indexOf('1차목표 달성') !== -1 || verdict.indexOf('2차목표(BHAG) 달성') !== -1;
+      return achieved ? '목표 달성입니다' : '목표 초과입니다';
+    }
+    // 시간대(단일기준) verdict -> 중립적 상태문구 (초과/미달처럼 합불 느낌 나는 단어 지양)
+    function blockLevelPhrase(verdict) {
+      if (verdict === '과다') return '기준보다 넉넉하게 배치됐어요';
+      if (verdict === '부족') return '기준보다 적게 배치됐어요';
+      return '기준과 비슷하게 배치됐어요';
+    }
+
+    function minToLabel(min) {
+      const h = Math.floor(min / 60), m = min % 60;
+      return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
+    }
+
+    function renderHeatmap(dateLabel) {
+      const container = document.getElementById('heatmapContainer');
+      container.innerHTML = '';
+      const dayData = heatmap[dateLabel];
+      if (!dayData) { container.textContent = '데이터 없음'; return; }
+
+      const parts = Object.keys(dayData[slots[0]] || {});
+      const table = document.createElement('table');
+      table.className = 'heatmap';
+
+      const thead = document.createElement('tr');
+      thead.innerHTML = '<th>시간</th>' + parts.map(p => '<th>' + p + '</th>').join('');
+      table.appendChild(thead);
+
+      slots.forEach(s => {
+        const tr = document.createElement('tr');
+        let rowHtml = '<td>' + minToLabel(s) + '</td>';
+        parts.forEach(p => {
+          const diff = dayData[s][p] || 0;
+          let cls = 'diff-zero';
+          if (diff >= 1) cls = 'diff-pos';
+          else if (diff <= -1) cls = 'diff-neg';
+          rowHtml += '<td class="' + cls + '">' + (diff !== 0 ? (diff > 0 ? '+' : '') + diff : '') + '</td>';
+        });
+        tr.innerHTML = rowHtml;
+        table.appendChild(tr);
+      });
+      container.appendChild(table);
+    }
+
+    function renderPriorityList(dateLabel) {
+      const container = document.getElementById('priorityList');
+      container.innerHTML = '';
+      const items = (data.priorityList && data.priorityList[dateLabel]) || [];
+
+      if (items.length === 0) {
+        container.innerHTML = '<div class="priority-empty">이 날짜엔 임계치를 넘는 과부족이 없습니다. 스케줄이 기준선에 잘 맞아요.</div>';
+        return;
+      }
+
+      items.forEach(d => {
+        const card = document.createElement('div');
+        card.className = 'priority-card';
+        const rankClass = d.rank === 1 ? 'rank-1' : (d.rank === 2 ? 'rank-2' : '');
+        const namesHtml = (d.names && d.names.length > 0)
+          ? '<div class="priority-names">현재 배치: <b>' + d.names.join(', ') + '</b></div>'
+          : '';
+        card.innerHTML =
+          '<div class="priority-rank ' + rankClass + '">' + d.rank + '</div>' +
+          '<div class="priority-body">' +
+            '<div class="priority-headline">' + d.time + ' · ' + d.part + ' — ' +
+              '<span class="type-' + d.type + '">' + d.type + ' ' + Math.abs(d.diff) + '명</span>' +
+            '</div>' +
+            '<div class="priority-detail">실배치 ' + d.actual + '명 / 기준 ' + d.standard + '명 · ' + d.action + '</div>' +
+            namesHtml +
+          '</div>';
+        container.appendChild(card);
+      });
+    }
+
+    function renderWeeklyBanner() {
+      const el = document.getElementById('weeklyBanner');
+      if (!weeklySummary) { el.innerHTML = ''; return; }
+      const w = weeklySummary;
+      el.className = 'summary-banner ' + verdictClass(w.verdict);
+      const headline = diffPhrase(w.totalActual, w.totalTarget1, true) + ' · ' + levelPhrase(w.verdict);
+      el.innerHTML =
+        '<div class="summary-title">이번 주 전체</div>' +
+        '<div class="summary-verdict">' + headline + '</div>' +
+        '<div class="summary-numbers"><b>' + w.totalActual + 'h</b> (목표 ' + w.totalTarget1 + 'h) · 주방' + w.totalKitchen + 'h · 홀' + w.totalHall + 'h</div>';
+    }
+
+    function renderWeeklyBlockDiagnosis() {
+      const container = document.getElementById('weeklyBlockDiagnosis');
+      if (!weeklyBlockSummary.length) { container.innerHTML = ''; return; }
+
+      container.innerHTML = weeklyBlockSummary.map(b => {
+        const badgeText = blockDiffPhrase(b.totalActualHours, b.totalStandardHours);
+        return (
+          '<div class="block-card verdict-' + b.verdict + '">' +
+            '<div class="block-name">' + b.name + '</div>' +
+            '<div class="block-time">많음' + b.overDays + '·적음' + b.underDays + '·적정' + b.okDays + '</div>' +
+            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
+            '<div class="block-numbers">' + b.action + ' · ' + b.totalActualHours + 'h/' + b.totalStandardHours + 'h</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderWeeklyHallBlockDiagnosis() {
+      const container = document.getElementById('weeklyHallBlockDiagnosis');
+      if (!weeklyHallBlockSummary.length) { container.innerHTML = ''; return; }
+
+      container.innerHTML = weeklyHallBlockSummary.map(b => {
+        const badgeText = blockDiffPhrase(b.totalActualHours, b.totalStandardHours);
+        return (
+          '<div class="block-card verdict-' + b.verdict + '">' +
+            '<div class="block-name">' + b.name + '</div>' +
+            '<div class="block-time">많음' + b.overDays + '·적음' + b.underDays + '·적정' + b.okDays + '</div>' +
+            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
+            '<div class="block-numbers">' + b.totalActualHours + 'h/' + b.totalStandardHours + 'h</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderWeekBlockMatrix() {
+      const table = document.getElementById('weekBlockMatrix');
+      if (!dateHeaders.length) { table.innerHTML = ''; return; }
+
+      const blockNames = weeklyBlockSummary.map(b => b.name);
+      let html = '<tr><th>날짜</th>' + blockNames.map(n => '<th>' + n + '</th>').join('') + '</tr>';
+
+      dateHeaders.forEach(d => {
+        const dayBlocks = blockDiagnosis[d] || [];
+        html += '<tr><td>' + d + '</td>' + blockNames.map(name => {
+          const b = dayBlocks.find(x => x.name === name);
+          if (!b) return '<td>-</td>';
+          const label = blockDiffCompact(b.actualHours, b.standardHours);
+          return '<td><span class="matrix-badge ' + b.verdict + '">' + label + '</span></td>';
+        }).join('') + '</tr>';
+      });
+      table.innerHTML = html;
+    }
+
+    // ==================== 한눈에(1페이지 요약) ====================
+    const GLANCE_BLOCKS = [
+      { name: '오픈조', start: 9*60, end: 11*60+30 },
+      { name: '런치피크', start: 11*60+30, end: 14*60+30 },
+      { name: '스윙', start: 14*60+30, end: 17*60 },
+      { name: '디너마감', start: 17*60, end: 21*60+30 },
+    ];
+    const GLANCE_PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO'];
+
+    function isWeekendDay(label) { return /[토일]\s*$/.test(label.trim()); }
+
+    function computeStoreCharacterization() {
+      const candidates = [];
+      weeklyBlockSummary.forEach(b => {
+        if (b.verdict === '과다') candidates.push({ source: '주방', block: b.name, part: b.topOverPart, diff: b.netDiffHours });
+      });
+      weeklyHallBlockSummary.forEach(b => {
+        if (b.verdict === '과다') candidates.push({ source: '홀', block: b.name, part: null, diff: b.netDiffHours });
+      });
+      if (!candidates.length) return '✅ 이번 주 뚜렷한 과다 문제가 없는 매장입니다';
+      candidates.sort((a, b) => b.diff - a.diff);
+      const top = candidates[0];
+      const partText = top.part ? (top.part + ' 파트 중심, ') : '';
+      return '이 매장은 <b>' + top.source + ' ' + top.block + '</b> 시간대 과다 인력 운용이 심한 매장입니다 (' + partText + '주간 +' + top.diff + 'h)';
+    }
+
+    function renderGlanceTop3() {
+      const el = document.getElementById('glanceTop3');
+      const characterization = '<div class="glance-character">' + computeStoreCharacterization() + '</div>';
+
+      const candidates = [];
+      dateHeaders.forEach(label => {
+        (blockDiagnosis[label] || []).forEach(b => {
+          if (b.verdict === '과다' && b.worstOver) {
+            candidates.push({ day: label, block: b.name, part: b.worstOver.part, diff: b.worstOver.diffHours, action: b.action });
+          }
+        });
+      });
+      candidates.sort((a, b) => b.diff - a.diff);
+      const top3 = candidates.slice(0, 3);
+
+      if (!top3.length) {
+        el.innerHTML = characterization + '<div class="rank1">✅ 이번 주 뚜렷한 과다 문제가 없습니다</div>';
+        return;
+      }
+      const fmt = (c, rank) => rank === 1
+        ? '<div class="rank1"><span class="rank-label">' + rank + '.</span>' + c.day + ' ' + c.block + ' → ' + c.action + '</div>'
+        : '<div class="rank' + rank + '"><span class="rank-label">' + rank + '.</span>' + c.day + ' ' + c.block + ' → ' + c.action + '</div>';
+      el.innerHTML = characterization + top3.map((c, i) => fmt(c, i + 1)).join('');
+    }
+
+    function aggregateBlockForGroup(gb, days, sourceDiagnosis) {
+      const source = sourceDiagnosis || blockDiagnosis;
+      let actual = 0, standard = 0;
+      days.forEach(d => {
+        const b = (source[d] || []).find(x => x.name === gb.name);
+        if (b) { actual += b.actualHours; standard += b.standardHours; }
+      });
+      const net = Math.round((actual - standard) * 10) / 10;
+      const verdict = Math.abs(net) < 0.5 ? '적정' : (net > 0 ? '과다' : '부족');
+      const score = standard > 0 ? Math.round((actual / standard) * 1000) / 10 : null; // 배치율(%) = 실배치/기준*100
+      return { actual, standard, net, verdict, score };
+    }
+
+    function renderGlanceScoreCardsInto(containerId, sourceDiagnosis) {
+      const el = document.getElementById(containerId);
+      const weekdayDays = dateHeaders.filter(d => !isWeekendDay(d));
+      const weekendDays = dateHeaders.filter(d => isWeekendDay(d));
+
+      const cardHtml = (gb, days) => {
+        const agg = aggregateBlockForGroup(gb, days, sourceDiagnosis);
+        const cls = agg.verdict === '과다' ? 'gd-over' : (agg.verdict === '부족' ? 'gd-under' : 'gd-ok');
+        const scoreText = agg.score === null ? '-' : agg.score + '%';
+        return '<div class="glance-day-card ' + cls + '"><div class="day-label">' + gb.name + ' 점수</div><div class="day-score">' + scoreText + '</div></div>';
+      };
+
+      el.innerHTML =
+        '<div class="glance-block-row">' +
+          '<div class="block-label">평일 (월~금)</div>' +
+          '<div class="glance-day-cards">' + GLANCE_BLOCKS.map(gb => cardHtml(gb, weekdayDays)).join('') + '</div>' +
+        '</div>' +
+        '<div class="glance-block-row">' +
+          '<div class="block-label">주말 (토~일)</div>' +
+          '<div class="glance-day-cards">' + GLANCE_BLOCKS.map(gb => cardHtml(gb, weekendDays)).join('') + '</div>' +
+        '</div>';
+    }
+
+    function renderGlanceScoreCards() {
+      renderGlanceScoreCardsInto('glanceScoreCards', blockDiagnosis);
+    }
+
+    function renderGlanceHallScoreCards() {
+      renderGlanceScoreCardsInto('glanceHallScoreCards', hallBlockDiagnosis);
+    }
+
+    function computeGlanceGroupMatrix(wantWeekend) {
+      const matrix = {};
+      GLANCE_BLOCKS.forEach(b => { matrix[b.name] = {}; GLANCE_PARTS.forEach(p => matrix[b.name][p] = 0); });
+      dateHeaders.forEach(label => {
+        if (isWeekendDay(label) !== wantWeekend) return;
+        const dayData = heatmap[label];
+        if (!dayData) return;
+        Object.keys(dayData).forEach(slotStr => {
+          const slot = parseInt(slotStr, 10);
+          GLANCE_BLOCKS.forEach(gb => {
+            if (slot >= gb.start && slot < gb.end) {
+              GLANCE_PARTS.forEach(p => {
+                const diff = (dayData[slot] && dayData[slot][p]) || 0;
+                if (diff > 0) matrix[gb.name][p] += diff * 0.5; // 30분=0.5h, 과다(양수)만 누적
+              });
+            }
+          });
+        });
+      });
+      return matrix;
+    }
+
+    function renderGlanceHeatmap(tableId, wantWeekend) {
+      const matrix = computeGlanceGroupMatrix(wantWeekend);
+      let maxVal = 0;
+      GLANCE_BLOCKS.forEach(b => GLANCE_PARTS.forEach(p => { maxVal = Math.max(maxVal, matrix[b.name][p]); }));
+
+      const table = document.getElementById(tableId);
+      let html = '<tr><th>블록\\파트</th>' + GLANCE_PARTS.map(p => '<th>' + p + '</th>').join('') + '</tr>';
+      GLANCE_BLOCKS.forEach(gb => {
+        html += '<tr><th>' + gb.name + '</th>' + GLANCE_PARTS.map(p => {
+          const v = Math.round(matrix[gb.name][p] * 10) / 10;
+          const alpha = maxVal > 0 ? Math.min(1, v / maxVal) : 0;
+          const bg = alpha > 0.02 ? ('rgba(231,76,60,' + (0.12 + alpha * 0.75).toFixed(2) + ')') : '#fafafa';
+          const color = alpha > 0.55 ? 'white' : '#444';
+          return '<td style="background:' + bg + '; color:' + color + ';">' + (v > 0.05 ? v + 'h' : '') + '</td>';
+        }).join('') + '</tr>';
+      });
+      table.innerHTML = html;
+    }
+
+    function renderGlanceAll() {
+      renderGlanceTop3();
+      renderGlanceScoreCards();
+      renderGlanceHallScoreCards();
+      renderGlanceHeatmap('glanceHeatmapWeekday', false);
+      renderGlanceHeatmap('glanceHeatmapWeekend', true);
+    }
+
+    function setupMainTabs() {
+      const btns = document.querySelectorAll('.main-tab-btn');
+      btns.forEach(btn => {
+        btn.onclick = () => {
+          btns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+          document.getElementById('view-' + btn.dataset.view).classList.add('active');
+        };
+      });
+    }
+
+    function setupTabs() {
+      const tabsDiv = document.getElementById('tabs');
+      dateHeaders.forEach((d, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+        btn.textContent = d;
+        btn.onclick = () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          renderDailyHeadline(d);
+          renderTierBanner(d);
+          renderBlockDiagnosis(d);
+          renderHallBlockDiagnosis(d);
+          renderCompareSection(d);
+          renderHeatmap(d);
+          renderPriorityList(d);
+        };
+        tabsDiv.appendChild(btn);
+      });
+    }
+
+    setupMainTabs();
+    setupTabs();
+    renderTrendTable();
+    renderGlanceAll();
+    renderWeeklyHeadline();
+    renderWeeklyBanner();
+    renderWeeklyBlockDiagnosis();
+    renderWeeklyHallBlockDiagnosis();
+    renderWeekBlockMatrix();
+    if (dateHeaders.length > 0) {
+      renderDailyHeadline(dateHeaders[0]);
+      renderTierBanner(dateHeaders[0]);
+      renderBlockDiagnosis(dateHeaders[0]);
+      renderHallBlockDiagnosis(dateHeaders[0]);
+      renderCompareSection(dateHeaders[0]);
+      renderHeatmap(dateHeaders[0]);
+      renderPriorityList(dateHeaders[0]);
+    }
+    }
+  </script>
 </body>
 </html>
