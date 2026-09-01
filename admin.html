@@ -13,21 +13,39 @@
   .toolbar input { flex: 1; max-width: 320px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
   .toolbar button { padding: 8px 16px; background: #4a6cf7; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
 
-  .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-  .store-card { border-radius: 12px; padding: 16px 18px; border: 1px solid #e2e2e2; background: white; }
-  .store-card.has-issue { background: #fdecea; border-color: #f1b0aa; }
-  .store-card.ok { background: #eafaf1; border-color: #a9dfbf; }
-  .store-name { font-size: 16px; font-weight: bold; color: #1c2733; margin-bottom: 6px; }
-  .store-headline { font-size: 13px; color: #444; margin-bottom: 10px; line-height: 1.4; }
-  .store-numbers { font-size: 11px; color: #888; border-top: 1px dashed #ccc; padding-top: 8px; }
-  .store-savedat { font-size: 10px; color: #aaa; margin-top: 4px; }
+  .store-list { display: flex; flex-direction: column; gap: 8px; }
+  .store-row {
+    display: flex; align-items: center; gap: 20px;
+    border-radius: 10px; padding: 14px 20px; border: 1px solid #e2e2e2; background: white;
+    text-decoration: none; color: inherit; cursor: pointer; transition: box-shadow 0.15s;
+  }
+  .store-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-color: #bbb; }
+  .store-row.has-issue { background: #fdecea; border-color: #f1b0aa; }
+  .store-row.ok { background: #eafaf1; border-color: #a9dfbf; }
+
+  .col-name { width: 180px; flex-shrink: 0; font-size: 15px; font-weight: bold; color: #1c2733; }
+  .col-headline { flex: 1.6; font-size: 13px; color: #444; line-height: 1.4; }
+  .col-numbers { flex: 1; font-size: 12px; color: #666; }
+  .col-savedat { width: 150px; flex-shrink: 0; font-size: 11px; color: #aaa; text-align: right; }
+  .col-arrow { width: 20px; flex-shrink: 0; color: #ccc; font-size: 16px; }
+
+  .list-header {
+    display: flex; align-items: center; gap: 20px; padding: 0 20px 8px 20px;
+    font-size: 11px; color: #999; font-weight: bold;
+  }
+  .list-header .col-name { width: 180px; }
+  .list-header .col-headline { flex: 1.6; }
+  .list-header .col-numbers { flex: 1; }
+  .list-header .col-savedat { width: 150px; text-align: right; }
+  .list-header .col-arrow { width: 20px; }
+
   .empty-msg { color: #888; font-size: 14px; padding: 40px 0; text-align: center; }
 </style>
 </head>
 <body>
 
 <h2>🗂️ 애슐리 스케줄링 진단 - 관리자 페이지</h2>
-<div class="sub">각 매장에서 저장한 진단 결과를 한 화면에서 모아봅니다.</div>
+<div class="sub">각 매장에서 저장한 진단 결과를 한 화면에서 모아봅니다. 매장을 클릭하면 상세 대시보드로 이동합니다.</div>
 <div id="status">불러오는 중...</div>
 
 <div class="toolbar">
@@ -35,7 +53,14 @@
   <button id="refreshBtn">🔄 새로고침</button>
 </div>
 
-<div class="store-grid" id="storeGrid"></div>
+<div class="list-header">
+  <div class="col-name">매장명</div>
+  <div class="col-headline">헤드라인</div>
+  <div class="col-numbers">사용시간 / 목표 / 판정</div>
+  <div class="col-savedat">저장일시</div>
+  <div class="col-arrow"></div>
+</div>
+<div class="store-list" id="storeList"></div>
 
 <script>
 let allStores = [];
@@ -49,38 +74,41 @@ async function loadStores() {
     if (!res.ok) throw new Error(data.error || '불러오기 실패');
     allStores = data.stores || [];
     statusEl.textContent = '총 ' + allStores.length + '개 매장 저장됨';
-    renderGrid(allStores);
+    renderList(allStores);
   } catch (err) {
     statusEl.textContent = '오류: ' + err.message;
   }
 }
 
-function renderGrid(stores) {
-  const grid = document.getElementById('storeGrid');
+function renderList(stores) {
+  const listEl = document.getElementById('storeList');
   if (!stores.length) {
-    grid.innerHTML = '<div class="empty-msg">아직 저장된 매장이 없습니다. 각 매장에서 진단 후 "결과 저장"을 눌러주세요.</div>';
+    listEl.innerHTML = '<div class="empty-msg">아직 저장된 매장이 없습니다. 각 매장에서 진단 후 "결과 저장"을 눌러주세요.</div>';
     return;
   }
-  grid.innerHTML = stores.map(s => {
+  listEl.innerHTML = stores.map(s => {
     const hasIssue = s.headline && s.headline.indexOf('✅') === -1;
     const cls = hasIssue ? 'has-issue' : 'ok';
     const w = s.weeklySummary || {};
     const savedDate = s.savedAt ? new Date(s.savedAt).toLocaleString('ko-KR') : '-';
-    return '<div class="store-card ' + cls + '">' +
-      '<div class="store-name">' + s.storeName + '</div>' +
-      '<div class="store-headline">' + (s.headline || '(요약 없음)') + '</div>' +
-      '<div class="store-numbers">' +
-        (w.totalActual !== undefined ? ('사용시간 ' + w.totalActual + 'h (목표 ' + w.totalTarget1 + 'h) · ' + (w.verdict || '')) : '') +
-      '</div>' +
-      '<div class="store-savedat">저장: ' + savedDate + '</div>' +
-    '</div>';
+    const numbersText = (w.totalActual !== undefined)
+      ? (w.totalActual + 'h / ' + w.totalTarget1 + 'h · ' + (w.verdict || ''))
+      : '-';
+    const href = 'index.html?store=' + encodeURIComponent(s.storeName);
+    return '<a class="store-row ' + cls + '" href="' + href + '">' +
+      '<div class="col-name">' + s.storeName + '</div>' +
+      '<div class="col-headline">' + (s.headline || '(요약 없음)') + '</div>' +
+      '<div class="col-numbers">' + numbersText + '</div>' +
+      '<div class="col-savedat">' + savedDate + '</div>' +
+      '<div class="col-arrow">›</div>' +
+    '</a>';
   }).join('');
 }
 
 document.getElementById('searchInput').addEventListener('input', (e) => {
   const q = e.target.value.trim();
   const filtered = q ? allStores.filter(s => s.storeName.indexOf(q) !== -1) : allStores;
-  renderGrid(filtered);
+  renderList(filtered);
 });
 document.getElementById('refreshBtn').addEventListener('click', loadStores);
 
