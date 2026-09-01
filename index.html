@@ -997,6 +997,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const dateHeaders = data.dateHeaders;
     const slots = data.slots;
     const heatmap = data.heatmap;
+    const standardSchedule = data.standardSchedule || {};
     const diagnosisList = data.diagnosisList;
     const tierDiagnosis = data.tierDiagnosis || {};
     const weeklySummary = data.weeklySummary || null;
