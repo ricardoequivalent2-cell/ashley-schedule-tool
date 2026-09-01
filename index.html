@@ -3,7 +3,7 @@
 <head>
   <base target="_top">
   <style>
-    body { font-family: 'Malgun Gothic', sans-serif; margin: 16px; color: #333; }
+    body { font-family: 'Malgun Gothic', sans-serif; margin: 0 auto; padding: 16px; color: #333; max-width: 880px; }
     h2 { margin-top: 0; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn {
@@ -200,7 +200,7 @@
     <div class="section-title">시간대별 요일 점수 (홀, 파트구분 없음)</div>
     <div id="glanceHallScoreCards"></div>
 
-    <div class="section-title">평일 히트맵 (세로=시간대 · 가로=파트, 진할수록 문제 심각)</div>
+    <div class="section-title">평일 히트맵 (세로=시간대 · 가로=파트 · <span style="color:#e74c3c;">빨강=과다</span> / <span style="color:#3478f6;">파랑=부족</span>, 진할수록 큼)</div>
     <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
 
     <div class="section-title">주말 히트맵</div>
@@ -1446,7 +1446,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
             if (slot >= gb.start && slot < gb.end) {
               GLANCE_PARTS.forEach(p => {
                 const diff = (dayData[slot] && dayData[slot][p]) || 0;
-                if (diff > 0) matrix[gb.name][p] += diff * 0.5; // 30분=0.5h, 과다(양수)만 누적
+                matrix[gb.name][p] += diff * 0.5; // 30분=0.5h, 과다(+)/부족(-) 부호 그대로 누적
               });
             }
           });
@@ -1457,18 +1457,26 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     function renderGlanceHeatmap(tableId, wantWeekend) {
       const matrix = computeGlanceGroupMatrix(wantWeekend);
-      let maxVal = 0;
-      GLANCE_BLOCKS.forEach(b => GLANCE_PARTS.forEach(p => { maxVal = Math.max(maxVal, matrix[b.name][p]); }));
+      let maxAbs = 0;
+      GLANCE_BLOCKS.forEach(b => GLANCE_PARTS.forEach(p => { maxAbs = Math.max(maxAbs, Math.abs(matrix[b.name][p])); }));
 
       const table = document.getElementById(tableId);
       let html = '<tr><th>블록\\파트</th>' + GLANCE_PARTS.map(p => '<th>' + p + '</th>').join('') + '</tr>';
       GLANCE_BLOCKS.forEach(gb => {
         html += '<tr><th>' + gb.name + '</th>' + GLANCE_PARTS.map(p => {
           const v = Math.round(matrix[gb.name][p] * 10) / 10;
-          const alpha = maxVal > 0 ? Math.min(1, v / maxVal) : 0;
-          const bg = alpha > 0.02 ? ('rgba(231,76,60,' + (0.12 + alpha * 0.75).toFixed(2) + ')') : '#fafafa';
-          const color = alpha > 0.55 ? 'white' : '#444';
-          return '<td style="background:' + bg + '; color:' + color + ';">' + (v > 0.05 ? v + 'h' : '') + '</td>';
+          const alpha = maxAbs > 0 ? Math.min(1, Math.abs(v) / maxAbs) : 0;
+          let bg = '#fafafa', color = '#444';
+          if (alpha > 0.02) {
+            if (v > 0) {
+              bg = 'rgba(231,76,60,' + (0.12 + alpha * 0.75).toFixed(2) + ')'; // 과다: 빨강
+            } else {
+              bg = 'rgba(52,120,246,' + (0.12 + alpha * 0.75).toFixed(2) + ')'; // 부족: 파랑
+            }
+            color = alpha > 0.55 ? 'white' : '#444';
+          }
+          const label = Math.abs(v) > 0.05 ? ((v > 0 ? '+' : '') + v + 'h') : '';
+          return '<td style="background:' + bg + '; color:' + color + ';">' + label + '</td>';
         }).join('') + '</tr>';
       });
       table.innerHTML = html;
