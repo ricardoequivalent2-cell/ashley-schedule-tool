@@ -164,7 +164,12 @@
   <h2>📊 애슐리 스케줄링 진단 대시보드</h2>
   <div class="sub" style="color:#888; font-size:13px; margin-bottom:20px;">파일만 올리면 바로 진단됩니다. 계산은 브라우저 안에서 처리되며, "결과 저장"을 누른 경우에만 요약 결과가 중앙 관리자 페이지로 전송됩니다.</div>
 
-  <div class="upload-box">
+  <div id="viewingStoreBar" style="display:none; background:#eaf2fb; border-radius:8px; padding:12px 18px; margin-bottom:16px; font-size:13px;">
+    <a href="admin.html" style="color:#4a6cf7; text-decoration:none; font-weight:bold;">← 관리자 페이지로</a>
+    <span style="color:#555;"> · 저장된 결과를 보고 있습니다: <b id="viewingStoreName"></b></span>
+  </div>
+
+  <div class="upload-box" id="uploadBox">
     <div>진단할 스케줄 파일(.xlsx)을 선택하세요</div>
     <div style="font-size:12px;color:#999;margin-top:4px;">파일 안에 <b>"주방"</b> 시트가 있어야 합니다. <b>"홀"</b> 시트는 있으면 함께 진단됩니다. (기준모델은 이미 내장되어 있어 별도로 필요 없습니다)</div>
     <input type="file" id="fileInput" accept=".xlsx">
@@ -1529,6 +1534,34 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       renderPriorityList(dateHeaders[0]);
     }
     }
+
+    // ==================== 관리자 페이지에서 넘어온 경우(?store=매장명) 저장된 결과 자동 로드 ====================
+    (async function initFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const storeName = params.get('store');
+      if (!storeName) return; // 일반 업로드 모드로 그대로 둠
+
+      document.getElementById('uploadBox').style.display = 'none';
+      document.getElementById('viewingStoreBar').style.display = 'block';
+      document.getElementById('viewingStoreName').textContent = storeName;
+
+      try {
+        const res = await fetch('/api/list');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '불러오기 실패');
+        const record = (data.stores || []).find(s => s.storeName === storeName);
+        if (!record || !record.result) {
+          document.getElementById('viewingStoreBar').innerHTML =
+            '<a href="admin.html" style="color:#4a6cf7;">← 관리자 페이지로</a> · 저장된 결과를 찾을 수 없습니다: ' + storeName;
+          return;
+        }
+        document.getElementById('app').style.display = 'block';
+        renderApp(record.result);
+      } catch (err) {
+        document.getElementById('viewingStoreBar').innerHTML =
+          '<a href="admin.html" style="color:#4a6cf7;">← 관리자 페이지로</a> · 오류: ' + err.message;
+      }
+    })();
   </script>
 </body>
 </html>
