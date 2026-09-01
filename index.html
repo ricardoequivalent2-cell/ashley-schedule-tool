@@ -188,6 +188,7 @@
     <button class="main-tab-btn active" data-view="glance">🎯 한눈에</button>
     <button class="main-tab-btn" data-view="weekly">📅 주간(상세)</button>
     <button class="main-tab-btn" data-view="daily">📆 일간(상세)</button>
+    <button class="main-tab-btn" data-view="standard">📐 정석 시간표</button>
   </div>
 
   <!-- ===================== 한눈에 (1페이지 요약) ===================== -->
@@ -248,6 +249,15 @@
     <div style="font-size:11px; color:#999; margin-bottom:16px;">
       ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림)
     </div>
+  </div>
+
+  <!-- ===================== 정석 시간표 ===================== -->
+  <div class="view-panel" id="view-standard">
+    <div class="tabs" id="standardTabs"></div>
+    <div style="font-size:13px; color:#666; margin-bottom:14px;">
+      선택한 날짜의 예상매출(객수)을 기준으로 계산된 "정석" 배치입니다. 실제 배치와 무관하게, 이 매장 이 매출구간이라면 이렇게 배치하는 게 표준시간표상 맞다는 참고표입니다.
+    </div>
+    <div id="standardScheduleContainer"></div>
   </div>
   </div>
 
@@ -785,7 +795,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
   const slots = getTimeSlots();
   const slotCount = slots.length;
 
-  const heatmap = {}, tierDiagnosis = {}, blockDiagnosis = {}, hallBlockDiagnosis = {};
+  const heatmap = {}, standardSchedule = {}, tierDiagnosis = {}, blockDiagnosis = {}, hallBlockDiagnosis = {};
   const diagnosisList = [];
 
   activeDateHeaders.forEach(label => {
@@ -830,13 +840,16 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
 
     // 히트맵 (주방 7파트) - slotIdx <-> slotMin 매핑
     heatmap[label] = {};
+    standardSchedule[label] = {};
     slots.forEach((s, si) => {
       heatmap[label][s] = {};
+      standardSchedule[label][s] = {};
       PARTS.forEach(part => {
         const actual = (actualCounts[label][s] && actualCounts[label][s][part]) || 0;
         const std = truncateHeadcount((rawStandard[si] && rawStandard[si][part]) || 0);
         const diff = actual - std;
         heatmap[label][s][part] = Math.round(diff * 10) / 10;
+        standardSchedule[label][s][part] = std;
         if (Math.abs(diff) >= 1) {
           const namesHere = (actualNames[label][s] && actualNames[label][s][part]) || [];
           diagnosisList.push({
@@ -855,6 +868,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
     slots.forEach((s, si) => {
       const hallActual = hallSlotData[s] || 0;
       heatmap[label][s]['홀'] = Math.round((hallActual - hallStdAt(si)) * 10) / 10;
+      standardSchedule[label][s]['홀'] = hallStdAt(si);
     });
 
     hallBlockDiagnosis[label] = SHIFT_BLOCKS.map(block => {
@@ -895,7 +909,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
   const weeklyHallBlockSummary = computeWeeklyBlockSummary(hallBlockDiagnosis, activeDateHeaders);
 
   return {
-    heatmap, diagnosisList, priorityList, tierDiagnosis, blockDiagnosis, hallBlockDiagnosis,
+    heatmap, standardSchedule, diagnosisList, priorityList, tierDiagnosis, blockDiagnosis, hallBlockDiagnosis,
     weeklySummary, weeklyBlockSummary, weeklyHallBlockSummary,
     dateHeaders: activeDateHeaders, slots,
   };
@@ -1490,6 +1504,45 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       renderGlanceHeatmap('glanceHeatmapWeekend', true);
     }
 
+    function setupStandardTabs() {
+      const tabsDiv = document.getElementById('standardTabs');
+      dateHeaders.forEach((d, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+        btn.textContent = d;
+        btn.onclick = () => {
+          document.querySelectorAll('#standardTabs .tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          renderStandardSchedule(d);
+        };
+        tabsDiv.appendChild(btn);
+      });
+    }
+
+    function renderStandardSchedule(dateLabel) {
+      const container = document.getElementById('standardScheduleContainer');
+      const daySchedule = standardSchedule[dateLabel];
+      if (!daySchedule) { container.innerHTML = ''; return; }
+      const cols = PARTS.concat(['홀']); // 스시~DMO(7) + 홀
+
+      let maxVal = 0;
+      slots.forEach(s => cols.forEach(p => { maxVal = Math.max(maxVal, (daySchedule[s] && daySchedule[s][p]) || 0); }));
+
+      let html = '<table class="glance-heatmap"><tr><th>시간</th>' + cols.map(p => '<th>' + p + '</th>').join('') + '</tr>';
+      slots.forEach(s => {
+        html += '<tr><th>' + minToLabel(s) + '</th>' + cols.map(p => {
+          const v = (daySchedule[s] && daySchedule[s][p]) || 0;
+          const alpha = maxVal > 0 ? Math.min(1, v / maxVal) : 0;
+          const bg = alpha > 0.02 ? ('rgba(74,108,247,' + (0.10 + alpha * 0.6).toFixed(2) + ')') : '#fafafa';
+          const color = alpha > 0.6 ? 'white' : '#333';
+          return '<td style="background:' + bg + '; color:' + color + ';">' + (v > 0 ? v + '명' : '') + '</td>';
+        }).join('') + '</tr>';
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    }
+
+
     function setupMainTabs() {
       const btns = document.querySelectorAll('.main-tab-btn');
       btns.forEach(btn => {
@@ -1525,6 +1578,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     setupMainTabs();
     setupTabs();
+    setupStandardTabs();
+    if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }
     renderTrendTable();
     renderGlanceAll();
     renderWeeklyHeadline();
