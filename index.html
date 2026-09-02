@@ -336,6 +336,9 @@
       <div class="exec-hero-right" id="execContext"></div>
     </div>
 
+    <div class="kpi-row-5" id="glanceKpiRow"></div>
+    <div class="headline-banner" id="glanceHeadlineBanner"></div>
+
     <div class="dashboard-grid-main">
       <div class="section-card">
         <div class="part-gap-header-row">
@@ -1891,6 +1894,16 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     // 주간 전체 KPI 5카드 - 요약/주간진단 공용 (일간 KPI카드와 동일 스타일, 값만 주간합계)
     // 요약 화면 전용 - Gap을 Primary로, 목표->실제 관계, 매출/객수는 작은 컨텍스트로 (정제된 라인아이콘 사용)
+    // 요약 화면 - 헤드라인 판단 한 줄 (기존 diffPhrase/levelPhrase 그대로 재사용)
+    function renderGlanceHeadlineBanner() {
+      const el = document.getElementById('glanceHeadlineBanner');
+      const w = weeklySummary;
+      if (!w) { el.innerHTML = ''; return; }
+      const achieved = w.verdict.indexOf('1차목표 달성') !== -1 || w.verdict.indexOf('2차목표(BHAG) 달성') !== -1;
+      el.className = 'headline-banner ' + (achieved ? 'hl-ok' : 'hl-critical');
+      el.innerHTML = diffPhrase(w.totalActual, w.totalTarget1, true) + ' · ' + levelPhrase(w.verdict);
+    }
+
     function renderGlanceHero() {
       const w = weeklySummary;
       if (!w) return;
@@ -2661,6 +2674,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }
     renderTrendTable();
     renderGlanceHero();
+    renderWeekKPIRowInto('glanceKpiRow');
+    renderGlanceHeadlineBanner();
     renderGlancePartGapSummary();
     renderGlanceComments();
     renderGlanceAll();
