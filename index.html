@@ -3,38 +3,94 @@
 <head>
   <base target="_top">
   <style>
-    body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; color: #333; }
+    body { font-family: -apple-system, 'Malgun Gothic', sans-serif; margin: 0; padding: 0; color: #2A2F3A; }
     .app-shell { display: flex; min-height: 100vh; }
     .sidebar {
       width: 230px; flex-shrink: 0; box-sizing: border-box;
-      background: linear-gradient(180deg, #2A1F4D 0%, #1E1640 100%);
+      background: #141B2D;
       padding: 24px 16px; display: flex; flex-direction: column;
     }
-    .sidebar-brand { color: #fff; font-size: 17px; font-weight: bold; margin-bottom: 2px; padding: 0 6px; letter-spacing: 0.01em; }
-    .sidebar-sub { color: rgba(255,255,255,0.4); font-size: 10px; margin-bottom: 20px; padding: 0 6px; }
-    .sidebar-section-label { color: rgba(255,255,255,0.35); font-size: 10px; font-weight: bold; letter-spacing: 0.06em; margin: 4px 6px 8px; text-transform: uppercase; }
+    .sidebar-brand { color: #fff; font-size: 15px; font-weight: 800; margin-bottom: 2px; padding: 0 6px; letter-spacing: 0.02em; }
+    .sidebar-sub { color: rgba(255,255,255,0.35); font-size: 10px; margin-bottom: 20px; padding: 0 6px; }
+    .sidebar-section-label { color: rgba(255,255,255,0.3); font-size: 10px; font-weight: bold; letter-spacing: 0.06em; margin: 4px 6px 8px; text-transform: uppercase; }
     .sidebar .nav-btn {
       display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none;
-      color: rgba(255,255,255,0.55); padding: 11px 12px; border-radius: 10px; font-size: 13.5px; cursor: pointer; margin-bottom: 4px;
+      color: rgba(255,255,255,0.5); padding: 11px 12px; border-radius: 10px; font-size: 13.5px; cursor: pointer; margin-bottom: 4px;
     }
-    .sidebar .nav-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
-    .sidebar .nav-btn.active { background: rgba(255,255,255,0.14); color: #fff; font-weight: bold; }
+    .sidebar .nav-btn:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.85); }
+    .sidebar .nav-btn.active { background: #3B5BFF; color: #fff; font-weight: bold; }
     .sidebar-spacer { flex: 1; }
     .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 6px; }
-    .main-content { flex: 1; padding: 24px 32px; max-width: 900px; box-sizing: border-box; background: #f7f7f9; }
+    .main-content { flex: 1; padding: 28px 36px; max-width: 1360px; box-sizing: border-box; background: #F6F7FB; }
     h2 { margin-top: 0; }
+
+    .daily-page-title { font-size: 21px; font-weight: 800; color: #1A2233; margin-bottom: 4px; }
+    .daily-page-sub { font-size: 13px; color: #8B93A5; margin-bottom: 18px; }
+
+    .kpi-row-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 20px; }
+    .kpi-card-5 {
+      background: #fff; border: 1px solid #EEF0F4; border-radius: 14px; padding: 16px 18px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .kpi-card-5 .kpi-icon {
+      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 17px;
+    }
+    .kpi-card-5 .kpi-label { font-size: 11.5px; color: #8B93A5; margin-bottom: 2px; }
+    .kpi-card-5 .kpi-value { font-size: 18px; font-weight: 800; color: #1A2233; }
+    .kpi-card-5 .kpi-sub { font-size: 10.5px; color: #A7AEBD; margin-top: 2px; }
+    .kpi-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 6px; }
+
+    .dashboard-grid-main { display: grid; grid-template-columns: 2.1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
+    .dashboard-grid-sub { display: grid; grid-template-columns: 2.1fr 1fr; gap: 16px; margin-bottom: 0; align-items: start; }
+    @media (max-width: 1100px) {
+      .dashboard-grid-main, .dashboard-grid-sub { grid-template-columns: 1fr; }
+      .kpi-row-5 { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .section-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .section-title-row .section-title { margin-bottom: 0; }
+    .heatmap-legend { display: flex; gap: 10px; font-size: 11px; color: #8B93A5; flex-wrap: wrap; }
+    .heatmap-legend .legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+
+    .donut-wrap { display: flex; align-items: center; justify-content: center; margin: 8px 0 18px; }
+    .donut-center-label { font-size: 20px; font-weight: 800; }
+    .donut-center-sub { font-size: 11px; color: #8B93A5; margin-top: 2px; }
+    .donut-legend-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #F3F4F7; }
+    .donut-legend-row:last-child { border-bottom: none; }
+
+    .comment-card { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid #F3F4F7; }
+    .comment-card:first-child { border-top: none; }
+    .comment-icon { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; margin-top: 1px; }
+    .comment-text { font-size: 12.5px; line-height: 1.55; color: #444; }
+
+    table.compare-table-v2 { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+    table.compare-table-v2 th, table.compare-table-v2 td { padding: 8px 6px; text-align: center; border-bottom: 1px solid #F0F1F5; }
+    table.compare-table-v2 th { color: #8B93A5; font-weight: 600; font-size: 11.5px; }
+    table.compare-table-v2 td:first-child, table.compare-table-v2 th:first-child { text-align: left; }
+    table.compare-table-v2 tr.row-standard td { color: #8B93A5; }
+    table.compare-table-v2 tr.row-actual td { color: #1A2233; font-weight: 600; }
+    table.compare-table-v2 tr.row-diff td { font-weight: 700; }
+    table.compare-table-v2 tr.row-diff { background: #FAFAFC; }
+    table.compare-table-v2 tr.group-start td { border-top: 2px solid #EDEFF3; }
+
+    .part-rank-row { padding: 9px 0; border-top: 1px solid #F3F4F7; }
+    .part-rank-row:first-child { border-top: none; }
+    .part-rank-head { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
+    .part-rank-bar-bg { background: #F0F0F5; border-radius: 5px; height: 7px; overflow: hidden; }
+    .part-rank-bar-fill { height: 100%; border-radius: 5px; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn {
       padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
       background: #f5f5f5; cursor: pointer; font-size: 13px;
     }
     .tab-btn.active { background: #4a6cf7; color: white; border-color: #4a6cf7; }
-    table.heatmap { border-collapse: collapse; font-size: 11px; margin-bottom: 24px; }
+    table.heatmap { border-collapse: collapse; font-size: 12.5px; margin-bottom: 4px; width: 100%; }
     table.heatmap th, table.heatmap td {
-      border: 1px solid #ddd; padding: 3px 6px; text-align: center; min-width: 40px;
+      padding: 9px 6px; text-align: center; border: 1px solid #F0F1F5;
     }
-    table.heatmap th { background: #333; color: white; position: sticky; top: 0; }
-    .diff-pos { background: #ffd1d1; } /* 과다 */
+    table.heatmap th { background: #F7F8FA; color: #6B7280; position: sticky; top: 0; font-weight: 600; }
+    .diff-pos { background: #ffd1d1; } /* 과다 (구버전 호환용, 현재는 diffTierColor 인라인색 사용) */
     .diff-neg { background: #cfe0ff; } /* 부족 */
     .diff-zero { background: #ffffff; }
     .diagnosis-list { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -65,9 +121,9 @@
 
     .block-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
     .block-card { border-radius: 12px; padding: 14px 16px; border: 1px solid #e2e2e2; }
-    .block-card.verdict-과다 { background: #fdecea; border-color: #f1b0aa; }
-    .block-card.verdict-부족 { background: #eaf2fb; border-color: #a9c6e8; }
-    .block-card.verdict-적정 { background: #eafaf1; border-color: #a9dfbf; }
+    .block-card.verdict-과다 { background: #F7E3E3; border-color: #E8C4C4; }
+    .block-card.verdict-부족 { background: #DCEEFB; border-color: #BFDCF0; }
+    .block-card.verdict-적정 { background: #E3F1E8; border-color: #C3E3D0; }
     .block-name { font-size: 16px; font-weight: bold; color: #222; margin-bottom: 2px; }
     .block-time { font-size: 11px; color: #999; margin-bottom: 8px; }
     .block-verdict { font-size: 15px; font-weight: bold; margin-bottom: 6px; line-height: 1.35; }
@@ -89,20 +145,20 @@
       border-radius: 12px; padding: 18px 22px; margin-bottom: 16px;
       font-size: 22px; font-weight: 800; line-height: 1.4;
     }
-    .headline-banner .headline-sub { display:block; font-size: 13px; font-weight: 500; margin-top: 6px; opacity: 0.85; }
-    .headline-banner.hl-critical { background: linear-gradient(135deg, #e74c3c, #c0392b); color: white; }
-    .headline-banner.hl-warning { background: linear-gradient(135deg, #f39c12, #e67e22); color: white; }
-    .headline-banner.hl-ok { background: #eafaf1; color: #1e8449; }
+    .headline-banner .headline-sub { display:block; font-size: 13px; font-weight: 500; margin-top: 6px; opacity: 0.8; }
+    .headline-banner.hl-critical { background: #F7E3E3; color: #A34848; }
+    .headline-banner.hl-warning { background: #F8ECDA; color: #A67A3A; }
+    .headline-banner.hl-ok { background: #E3F1E8; color: #3D8361; }
 
     .glance-top3 {
-      background: #1c2733; color: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px;
+      background: #EDE9F9; color: #4A3F73; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px;
     }
     .glance-character {
-      font-size: 16px; font-weight: 600; color: #ffd166; margin-bottom: 14px;
-      padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.2);
+      font-size: 16px; font-weight: 600; color: #5B3FA0; margin-bottom: 14px;
+      padding-bottom: 14px; border-bottom: 1px solid rgba(90,63,160,0.15);
     }
-    .glance-top3 .rank1 { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
-    .glance-top3 .rank2, .glance-top3 .rank3 { font-size: 14px; color: #cbd3da; margin-bottom: 4px; }
+    .glance-top3 .rank1 { font-size: 20px; font-weight: 800; margin-bottom: 8px; color: #4A3F73; }
+    .glance-top3 .rank2, .glance-top3 .rank3 { font-size: 14px; color: #6E6289; margin-bottom: 4px; }
     .glance-top3 .rank-label { display:inline-block; width: 20px; }
 
     .glance-block-row { margin-bottom: 14px; }
@@ -114,9 +170,9 @@
     }
     .glance-day-card .day-label { font-size: 11px; color: #888; margin-bottom: 2px; }
     .glance-day-card .day-score { font-weight: bold; font-size: 14px; }
-    .glance-day-card.gd-over { background: #fdecea; }
-    .glance-day-card.gd-under { background: #eaf2fb; }
-    .glance-day-card.gd-ok { background: #f7f7f7; }
+    .glance-day-card.gd-over { background: #F7E3E3; }
+    .glance-day-card.gd-under { background: #DCEEFB; }
+    .glance-day-card.gd-ok { background: #F3F2F6; }
     .glance-weekend-sep { width: 1px; background: #ddd; margin: 0 4px; }
 
     table.glance-heatmap { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 22px; }
@@ -130,10 +186,10 @@
     .verdict-badge {
       display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;
     }
-    .verdict-미달 { background: #fadbd8; color: #c0392b; }
-    .verdict-충족 { background: #fdebd0; color: #b9770e; }
-    .verdict-달성 { background: #d5f5e3; color: #1e8449; }
-    .verdict-2차 { background: #d6eaf8; color: #21618c; }
+    .verdict-미달 { background: #F7E3E3; color: #A34848; }
+    .verdict-충족 { background: #F8ECDA; color: #A67A3A; }
+    .verdict-달성 { background: #E3F1E8; color: #3D8361; }
+    .verdict-2차 { background: #DCEEFB; color: #2C6690; }
 
     .tier-banner {
       border-radius: 10px; padding: 14px 18px; margin-bottom: 16px;
@@ -184,9 +240,9 @@
     <div class="sidebar-brand">애슐리 진단</div>
     <div class="sidebar-sub">스케줄링 사전 피드백</div>
     <div class="sidebar-section-label">General</div>
-    <button class="nav-btn active" data-view="glance">한눈에</button>
-    <button class="nav-btn" data-view="weekly">주간(상세)</button>
-    <button class="nav-btn" data-view="daily">일간(상세)</button>
+    <button class="nav-btn active" data-view="glance">요약</button>
+    <button class="nav-btn" data-view="weekly">주간진단</button>
+    <button class="nav-btn" data-view="daily">일간진단</button>
     <button class="nav-btn" data-view="standard">정석 시간표</button>
     <div class="sidebar-spacer"></div>
     <div class="sidebar-divider"></div>
@@ -279,9 +335,43 @@
 
   <!-- ===================== 일간 ===================== -->
   <div class="view-panel" id="view-daily">
+    <div class="daily-page-title">스케줄 진단 대시보드</div>
+    <div class="daily-page-sub">매출/객수 기반 정석 스케줄과 실제 스케줄을 비교하여 인력 과다/부족을 진단합니다.</div>
     <div class="tabs" id="tabs"></div>
+
     <div class="headline-banner" id="dailyHeadline"></div>
     <div class="tier-banner" id="tierBanner"></div>
+
+    <div class="kpi-row-5" id="dailyKpiRow"></div>
+
+    <div class="dashboard-grid-main">
+      <div class="section-card">
+        <div class="section-title-row">
+          <div class="section-title">시간대별 파트 진단 히트맵</div>
+          <div class="heatmap-legend" id="dailyHeatmapLegend"></div>
+        </div>
+        <div id="heatmapContainer"></div>
+        <div style="font-size:11px; color:#999; margin-top:10px;">
+          ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림) · 단위: 인시
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">진단 요약</div>
+        <div id="dailyDonut"></div>
+        <div id="dailyComments"></div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid-sub">
+      <div class="section-card">
+        <div class="section-title">시간대별 인원 비교 상세</div>
+        <div id="compareTableContainer"></div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">파트별 일일 진단 요약 (인시)</div>
+        <div id="dailyPartRanking"></div>
+      </div>
+    </div>
 
     <div class="section-card">
       <div class="section-title">시간대별 진단 (주방)</div>
@@ -301,14 +391,6 @@
     <div class="section-card">
       <div class="section-title">세부 우선순위 조치 (Top 5)</div>
       <div class="priority-list" id="priorityList"></div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">30분 단위 상세 히트맵 (참고, 원자료)</div>
-      <div id="heatmapContainer"></div>
-      <div style="font-size:11px; color:#999; margin-top:10px;">
-        ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림)
-      </div>
     </div>
   </div>
 
@@ -1064,6 +1146,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
       guestCount: Math.round(guestCount), actualTotal: Math.round(actualTotal * 10) / 10,
       hurdle: Math.round(hurdle * 10) / 10, target1: Math.round(target1 * 10) / 10, target2: Math.round(target2 * 10) / 10,
       verdict, kitchenActualHours: Math.round(kitchenSheetActual * 10) / 10, hallActualHours: Math.round(hallActualHours * 10) / 10,
+      salesVal: Math.round(salesVal),
     };
   });
 
@@ -1435,10 +1518,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         let rowHtml = '<td>' + minToLabel(s) + '</td>';
         parts.forEach(p => {
           const diff = dayData[s][p] || 0;
-          let cls = 'diff-zero';
-          if (diff >= 1) cls = 'diff-pos';
-          else if (diff <= -1) cls = 'diff-neg';
-          rowHtml += '<td class="' + cls + '">' + (diff !== 0 ? (diff > 0 ? '+' : '') + diff : '') + '</td>';
+          const color = diffTierColor(diff);
+          const style = color ? ('background:' + color + '; color:' + (Math.abs(diff) >= 3 ? '#fff' : '#333') + ';') : '';
+          rowHtml += '<td style="' + style + '">' + (diff !== 0 ? (diff > 0 ? '+' : '') + diff : '') + '</td>';
         });
         tr.innerHTML = rowHtml;
         table.appendChild(tr);
@@ -1474,6 +1556,228 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           '</div>';
         container.appendChild(card);
       });
+    }
+
+    // ==================== 신규 일간 대시보드 컴포넌트 (레퍼런스 디자인) ====================
+    // 기존 계산 로직(tierDiagnosis/heatmap/standardSchedule/blockDiagnosis)을 그대로 재사용, 시각화만 추가
+
+    function renderDailyKPIRow(dateLabel) {
+      const el = document.getElementById('dailyKpiRow');
+      const t = tierDiagnosis[dateLabel];
+      if (!t) { el.innerHTML = ''; return; }
+      const gap = Math.round((t.actualTotal - t.target1) * 10) / 10;
+      const gapAbs = Math.abs(gap);
+      const isOver = gap > 0.5, isUnder = gap < -0.5;
+      const gapLabel = isOver ? '과다' : (isUnder ? '부족' : '적정');
+      const gapBg = isOver ? '#F7E3E3' : (isUnder ? '#DCEEFB' : '#E3F1E8');
+      const gapFg = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#3D8361');
+
+      const cards = [
+        { icon: '₩', bg: '#EDE9F9', fg: '#5B3FA0', label: '예상 매출', value: (t.salesVal || 0).toLocaleString() + '원' },
+        { icon: '人', bg: '#DCEEFB', fg: '#2C6690', label: '예상 객수', value: t.guestCount + '명' },
+        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '1차 목표 총인시', value: t.target1 + 'h' },
+        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: t.actualTotal + 'h' },
+      ];
+      let html = cards.map(c =>
+        '<div class="kpi-card-5">' +
+          '<div class="kpi-icon" style="background:' + c.bg + '; color:' + c.fg + ';">' + c.icon + '</div>' +
+          '<div><div class="kpi-label">' + c.label + '</div><div class="kpi-value">' + c.value + '</div></div>' +
+        '</div>'
+      ).join('');
+      html +=
+        '<div class="kpi-card-5">' +
+          '<div class="kpi-icon" style="background:' + gapBg + '; color:' + gapFg + ';">!</div>' +
+          '<div><div class="kpi-label">진단 결과 (종합)</div>' +
+          '<div class="kpi-value">' + (gap > 0 ? '+' : '') + gap + 'h' +
+          '<span class="kpi-badge" style="background:' + gapBg + '; color:' + gapFg + ';">' + gapLabel + '</span></div></div>' +
+        '</div>';
+      el.innerHTML = html;
+    }
+
+    function renderDailyHeatmapLegend() {
+      const el = document.getElementById('dailyHeatmapLegend');
+      const items = [
+        { c: '#B03A3A', t: '-3h 이하' }, { c: '#E79B9B', t: '-3h ~ -1h' },
+        { c: '#D8D8DE', t: '-1h ~ +1h' }, { c: '#9FC1E0', t: '+1h ~ +3h' }, { c: '#3478C4', t: '+3h 이상' },
+      ];
+      el.innerHTML = '(단위: 인시) ' + items.map(i => '<span><span class="legend-dot" style="background:' + i.c + ';"></span>' + i.t + '</span>').join('');
+    }
+
+    // 히트맵 diff값을 5단계 색상으로 매핑 (기존 diff 계산은 그대로, 색상표현만 5단계로 세분화)
+    function diffTierColor(diff) {
+      if (diff <= -3) return '#B03A3A';
+      if (diff <= -1) return '#E79B9B';
+      if (diff < 1) return null; // 적정: 무색 처리(테이블 기본색 사용)
+      if (diff < 3) return '#9FC1E0';
+      return '#3478C4';
+    }
+
+    function renderDailyDonut(dateLabel) {
+      const el = document.getElementById('dailyDonut');
+      const kBlocks = blockDiagnosis[dateLabel] || [];
+      const hBlocks = hallBlockDiagnosis[dateLabel] || [];
+      const all = kBlocks.concat(hBlocks); // 이 날의 8개 시간대(주방4+홀4)
+      let overHours = 0, underHours = 0;
+      let overCnt = 0, midOverCnt = 0, okCnt = 0, midUnderCnt = 0, underCnt = 0;
+      all.forEach(b => {
+        const d = b.netDiffHours;
+        if (d >= 3) overCnt++;
+        else if (d >= 1) midOverCnt++;
+        else if (d > -1) okCnt++;
+        else if (d > -3) midUnderCnt++;
+        else underCnt++;
+        if (d > 0) overHours += d; else underHours += -d;
+      });
+      const net = Math.round((overHours - underHours) * 10) / 10;
+      const netLabel = Math.abs(net) < 0.5 ? '종합 적정' : (net > 0 ? '종합 과다' : '종합 부족');
+      const netColor = Math.abs(net) < 0.5 ? '#3D8361' : (net > 0 ? '#A34848' : '#2C6690');
+
+      const segs = [
+        { n: overCnt, c: '#B03A3A', label: '과다 (+3h 이상)' },
+        { n: midOverCnt, c: '#E79B9B', label: '소폭 과다 (+1h ~ +3h)' },
+        { n: okCnt, c: '#D8D8DE', label: '적정 (-1h ~ +1h)' },
+        { n: midUnderCnt, c: '#9FC1E0', label: '소폭 부족 (-3h ~ -1h)' },
+        { n: underCnt, c: '#3478C4', label: '과소 (-3h 이하)' },
+      ];
+      const total = Math.max(1, all.length);
+      let acc = 0;
+      const gradParts = segs.map(s => {
+        const start = acc / total * 360; acc += s.n; const end = acc / total * 360;
+        return s.c + ' ' + start + 'deg ' + end + 'deg';
+      }).join(', ');
+
+      el.innerHTML =
+        '<div class="donut-wrap">' +
+          '<div style="width:130px; height:130px; border-radius:50%; background: conic-gradient(' + gradParts + '); display:flex; align-items:center; justify-content:center;">' +
+            '<div style="width:82px; height:82px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">' +
+              '<div class="donut-center-label" style="color:' + netColor + ';">' + (net > 0 ? '+' : '') + net + 'h</div>' +
+              '<div class="donut-center-sub">' + netLabel + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        segs.map(s => (
+          '<div class="donut-legend-row">' +
+            '<span><span class="legend-dot" style="background:' + s.c + ';"></span>' + s.label + '</span>' +
+            '<b>' + s.n + '개 시간대</b>' +
+          '</div>'
+        )).join('');
+    }
+
+    function renderDailyComments(dateLabel) {
+      const el = document.getElementById('dailyComments');
+      const kBlocks = blockDiagnosis[dateLabel] || [];
+      const comments = [];
+
+      const worst = findWorstBlock(kBlocks);
+      if (worst && worst.netDiffHours > 0.5) {
+        comments.push({
+          icon: '!', bg: '#F7E3E3', fg: '#A34848',
+          text: worst.timeLabel + ' 시간대에 과다가 집중되어 있습니다. ' + (worst.worstOver ? worst.worstOver.part + '파트' : '') + ' 인력 효율이 떨어집니다.',
+        });
+      }
+      const partTally = {};
+      kBlocks.forEach(b => { if (b.verdict === '과다' && b.worstOver) partTally[b.worstOver.part] = (partTally[b.worstOver.part] || 0) + 1; });
+      const topPart = Object.keys(partTally).sort((a, b) => partTally[b] - partTally[a])[0];
+      if (topPart) {
+        comments.push({
+          icon: '●', bg: '#F8ECDA', fg: '#A67A3A',
+          text: topPart + ' 파트의 과다 배치가 지속적으로 발생합니다. CAP 룰을 재검토하거나 다른 파트로 조정하세요.',
+        });
+      }
+      const okBlock = kBlocks.find(b => b.verdict === '적정') || [].concat(hallBlockDiagnosis[dateLabel] || []).find(b => b.verdict === '적정');
+      if (okBlock) {
+        comments.push({
+          icon: '✓', bg: '#E3F1E8', fg: '#3D8361',
+          text: okBlock.timeLabel + ' 이후 홀/주방 인원은 적정 수준입니다. 마감 시간 운영 효율이 양호합니다.',
+        });
+      }
+      if (!comments.length) {
+        comments.push({ icon: '✓', bg: '#E3F1E8', fg: '#3D8361', text: '이 날짜는 시간대별 과다/부족 없이 전반적으로 기준에 부합합니다.' });
+      }
+
+      el.innerHTML = comments.slice(0, 3).map(c =>
+        '<div class="comment-card">' +
+          '<div class="comment-icon" style="background:' + c.bg + '; color:' + c.fg + ';">' + c.icon + '</div>' +
+          '<div class="comment-text">' + c.text + '</div>' +
+        '</div>'
+      ).join('');
+    }
+
+    // 시간대별 인원 비교 상세 - 정석/실제/차이 (기존 heatmap[diff] + standardSchedule[std] 재사용, actual = diff+std로 역산)
+    let compareTablePage = 1;
+    function renderDailyComparisonTable(dateLabel) {
+      const container = document.getElementById('compareTableContainer');
+      const dayHeatmap = heatmap[dateLabel], dayStd = standardSchedule[dateLabel];
+      if (!dayHeatmap || !dayStd) { container.innerHTML = ''; return; }
+      const cols = PARTS.concat(['홀']);
+      const PAGE_SIZE = 8;
+      const totalPages = Math.max(1, Math.ceil(slots.length / PAGE_SIZE));
+      if (compareTablePage > totalPages) compareTablePage = 1;
+      const pageSlots = slots.slice((compareTablePage - 1) * PAGE_SIZE, compareTablePage * PAGE_SIZE);
+
+      let html = '<table class="compare-table-v2"><tr><th>시간</th><th>구분</th>' + cols.map(p => '<th>' + p + '</th>').join('') + '<th>합계</th></tr>';
+      pageSlots.forEach(s => {
+        const stdRow = cols.map(p => (dayStd[s] && dayStd[s][p]) || 0);
+        const diffRow = cols.map(p => (dayHeatmap[s] && dayHeatmap[s][p]) || 0);
+        const actualRow = cols.map((p, i) => Math.round((stdRow[i] + diffRow[i]) * 10) / 10);
+        const stdTotal = Math.round(stdRow.reduce((a, b) => a + b, 0) * 10) / 10;
+        const actualTotal = Math.round(actualRow.reduce((a, b) => a + b, 0) * 10) / 10;
+        const diffTotal = Math.round((actualTotal - stdTotal) * 10) / 10;
+
+        html += '<tr class="row-standard group-start"><td rowspan="3">' + minToLabel(s) + '</td><td>정석</td>' +
+          stdRow.map(v => '<td>' + v + '</td>').join('') + '<td>' + stdTotal + '</td></tr>';
+        html += '<tr class="row-actual"><td>실제</td>' + actualRow.map(v => '<td>' + v + '</td>').join('') + '<td>' + actualTotal + '</td></tr>';
+        html += '<tr class="row-diff"><td>차이(실제-정석)</td>' +
+          diffRow.map(v => {
+            const color = v > 0.05 ? '#A34848' : (v < -0.05 ? '#2C6690' : '#999');
+            return '<td style="color:' + color + ';">' + (v > 0 ? '+' : '') + v + '</td>';
+          }).join('') + '<td style="color:' + (diffTotal > 0.05 ? '#A34848' : (diffTotal < -0.05 ? '#2C6690' : '#999')) + ';">' + (diffTotal > 0 ? '+' : '') + diffTotal + '</td></tr>';
+      });
+      html += '</table>';
+
+      const pager = '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px; color:#8B93A5;">' +
+        '<span>총 ' + slots.length + '개 시간대</span>' +
+        '<span>' + Array.from({ length: totalPages }, (_, i) => i + 1).map(p =>
+          '<button class="page-btn" data-page="' + p + '" style="border:none; background:' + (p === compareTablePage ? '#3B5BFF' : '#F0F1F5') + '; color:' + (p === compareTablePage ? '#fff' : '#555') + '; border-radius:6px; padding:4px 10px; margin-left:4px; cursor:pointer; font-size:12px;">' + p + '</button>'
+        ).join('') + '</span>' +
+      '</div>';
+
+      container.innerHTML = html + pager;
+      container.querySelectorAll('.page-btn').forEach(btn => {
+        btn.onclick = () => { compareTablePage = parseInt(btn.dataset.page, 10); renderDailyComparisonTable(dateLabel); };
+      });
+    }
+
+    // 파트별 일일 진단 요약 - 이 날짜 하루 기준 파트별 순합(diff 합산) 순위
+    function renderDailyPartRanking(dateLabel) {
+      const el = document.getElementById('dailyPartRanking');
+      const dayHeatmap = heatmap[dateLabel];
+      if (!dayHeatmap) { el.innerHTML = ''; return; }
+      const cols = PARTS.concat(['홀']);
+      const totals = {};
+      cols.forEach(p => { totals[p] = 0; });
+      slots.forEach(s => { cols.forEach(p => { totals[p] += (dayHeatmap[s] && dayHeatmap[s][p]) || 0; }); });
+
+      const ranked = cols.map(p => ({ part: p, diff: Math.round(totals[p] * 10) / 10 }))
+        .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+      const maxAbs = Math.max(1, ...ranked.map(r => Math.abs(r.diff)));
+
+      el.innerHTML = ranked.map(r => {
+        const isOver = r.diff > 0.05, isUnder = r.diff < -0.05;
+        const barColor = isOver ? '#E79B9B' : (isUnder ? '#9FC1E0' : '#D8D8DE');
+        const verdictLabel = isOver ? '과다' : (isUnder ? '소폭 부족' : '적정');
+        const verdictColor = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#8B93A5');
+        const pct = Math.round((Math.abs(r.diff) / maxAbs) * 100);
+        return (
+          '<div class="part-rank-row">' +
+            '<div class="part-rank-head">' +
+              '<span style="font-weight:600;">' + r.part + '</span>' +
+              '<span>' + (r.diff > 0 ? '+' : '') + r.diff + 'h &nbsp; <b style="color:' + verdictColor + ';">' + verdictLabel + '</b></span>' +
+            '</div>' +
+            '<div class="part-rank-bar-bg"><div class="part-rank-bar-fill" style="width:' + pct + '%; background:' + barColor + ';"></div></div>' +
+          '</div>'
+        );
+      }).join('');
     }
 
     function renderWeeklyBanner() {
@@ -1610,44 +1914,46 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         const prevOverHours = computeOverHoursFromSummaries(previousSnapshot.weeklyBlockSummary, previousSnapshot.weeklyHallBlockSummary);
         const diff = Math.round((overHours - prevOverHours) * 10) / 10;
         const improved = diff <= 0;
+        const bg = improved ? '#E3F1E8' : '#F7E3E3';
+        const fg = improved ? '#3D8361' : '#A34848';
         trendCardHtml =
-          '<div style="flex:1; background:' + (improved ? '#66BB6A' : '#EF5350') + '; border-radius:6px; padding:14px 16px;">' +
-            '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">지난 저장 대비</p>' +
-            '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">과다시간 ' + prevOverHours + 'h → ' + overHours + 'h' + (improved ? ' · 개선' : ' · 악화') + '</p>' +
+          '<div style="flex:1; background:' + bg + '; border-radius:10px; padding:16px 18px;">' +
+            '<p style="font-size:13px; color:' + fg + '; margin:0 0 6px; font-weight:600;">지난 저장 대비</p>' +
+            '<p style="font-size:12.5px; color:' + fg + '; opacity:0.85; margin:0;">과다시간 ' + prevOverHours + 'h → ' + overHours + 'h' + (improved ? ' · 개선' : ' · 악화') + '</p>' +
           '</div>';
       } else {
         trendCardHtml =
-          '<div style="flex:1; background:#9AA0A8; border-radius:6px; padding:14px 16px;">' +
-            '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">지난 저장 대비</p>' +
-            '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">비교할 이전 저장 기록이 없습니다</p>' +
+          '<div style="flex:1; background:#EDECF3; border-radius:10px; padding:16px 18px;">' +
+            '<p style="font-size:13px; color:#4A4560; margin:0 0 6px; font-weight:600;">지난 저장 대비</p>' +
+            '<p style="font-size:12.5px; color:#6E6A80; margin:0;">비교할 이전 저장 기록이 없습니다</p>' +
           '</div>';
       }
 
       container.innerHTML =
-        '<div style="background:#F5F6F8; padding:18px; border-radius:8px; margin-bottom:20px;">' +
+        '<div style="margin-bottom:20px;">' +
           '<div style="display:flex; gap:14px; margin-bottom:14px;">' +
             trendCardHtml +
-            '<div style="flex:1; background:#FFA726; border-radius:6px; padding:14px 16px;">' +
-              '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">우리 매장 반복 문제</p>' +
-              '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">' + worstPartText + '</p>' +
+            '<div style="flex:1; background:#EDE9F9; border-radius:10px; padding:16px 18px;">' +
+              '<p style="font-size:13px; color:#5B3FA0; margin:0 0 6px; font-weight:600;">우리 매장 반복 문제</p>' +
+              '<p style="font-size:12.5px; color:#5B3FA0; opacity:0.85; margin:0;">' + worstPartText + '</p>' +
             '</div>' +
-            '<div style="flex:1; background:#26C6DA; border-radius:6px; padding:14px 16px;">' +
-              '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">정상 시간대 비율</p>' +
-              '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">8개 중 ' + okCount + '개 적정 (' + okRatio + '%)</p>' +
+            '<div style="flex:1; background:#DCEEFB; border-radius:10px; padding:16px 18px;">' +
+              '<p style="font-size:13px; color:#2C6690; margin:0 0 6px; font-weight:600;">정상 시간대 비율</p>' +
+              '<p style="font-size:12.5px; color:#2C6690; opacity:0.85; margin:0;">8개 중 ' + okCount + '개 적정 (' + okRatio + '%)</p>' +
             '</div>' +
           '</div>' +
           '<div style="display:flex; gap:14px;">' +
-            '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">이번주 초과시간</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + overHours + 'h</p></div>' +
+            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
+              '<p style="font-size:11px; color:#9A94A8; margin:0;">이번주 초과시간</p><p style="font-size:16px; color:#2A2740; margin:2px 0 0; font-weight:600;">' + overHours + 'h</p>' +
             '</div>' +
-            '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">가장 심한 파트</p><p style="font-size:13px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + worstPartText + '</p></div>' +
+            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
+              '<p style="font-size:11px; color:#9A94A8; margin:0;">가장 심한 파트</p><p style="font-size:14px; color:#2A2740; margin:2px 0 0; font-weight:600;">' + worstPartText + '</p>' +
             '</div>' +
-            '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">목표 대비</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + targetRatio + '점</p></div>' +
+            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
+              '<p style="font-size:11px; color:#9A94A8; margin:0;">목표 대비</p><p style="font-size:16px; color:#2A2740; margin:2px 0 0; font-weight:600;">' + targetRatio + '점</p>' +
             '</div>' +
-            '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">재배치시 절감</p><p style="font-size:13px; color:#3C4858; margin:1px 0 0; font-weight:500;">약 ' + savingWon.toLocaleString() + '원/주</p></div>' +
+            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
+              '<p style="font-size:11px; color:#9A94A8; margin:0;">재배치시 절감</p><p style="font-size:14px; color:#2A2740; margin:2px 0 0; font-weight:600;">약 ' + savingWon.toLocaleString() + '원/주</p>' +
             '</div>' +
           '</div>' +
         '</div>';
@@ -1934,6 +2240,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           btn.classList.add('active');
           renderDailyHeadline(d);
           renderTierBanner(d);
+          renderDailyKPIRow(d);
+          renderDailyDonut(d);
+          renderDailyComments(d);
+          compareTablePage = 1;
+          renderDailyComparisonTable(d);
+          renderDailyPartRanking(d);
           renderBlockDiagnosis(d);
           renderHallBlockDiagnosis(d);
           renderCompareSection(d);
@@ -1959,6 +2271,13 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (dateHeaders.length > 0) {
       renderDailyHeadline(dateHeaders[0]);
       renderTierBanner(dateHeaders[0]);
+      renderDailyKPIRow(dateHeaders[0]);
+      renderDailyHeatmapLegend();
+      renderDailyDonut(dateHeaders[0]);
+      renderDailyComments(dateHeaders[0]);
+      compareTablePage = 1;
+      renderDailyComparisonTable(dateHeaders[0]);
+      renderDailyPartRanking(dateHeaders[0]);
       renderBlockDiagnosis(dateHeaders[0]);
       renderHallBlockDiagnosis(dateHeaders[0]);
       renderCompareSection(dateHeaders[0]);
