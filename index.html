@@ -79,6 +79,18 @@
     .part-rank-head { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
     .part-rank-bar-bg { background: #F0F0F5; border-radius: 5px; height: 7px; overflow: hidden; }
     .part-rank-bar-fill { height: 100%; border-radius: 5px; }
+
+    .week-gap-headline { text-align: center; padding: 6px 0 22px; }
+    .week-gap-headline .gap-number { font-size: 34px; font-weight: 800; line-height: 1.1; }
+    .week-gap-headline .gap-sub { font-size: 12.5px; color: #8B93A5; margin-top: 4px; }
+    .diverge-row { padding: 10px 0; border-top: 1px solid #F3F4F7; }
+    .diverge-row:first-child { border-top: none; }
+    .diverge-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; margin-bottom: 6px; }
+    .diverge-part-name { font-weight: 700; color: #1A2233; }
+    .diverge-action { font-size: 11.5px; color: #8B93A5; }
+    .diverge-track { position: relative; height: 10px; background: #F0F0F5; border-radius: 5px; }
+    .diverge-center-line { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: #D6D8E0; }
+    .diverge-fill { position: absolute; top: 0; height: 100%; border-radius: 4px; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn {
       padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
@@ -282,7 +294,7 @@
 
     <div class="dashboard-grid-main">
       <div class="section-card">
-        <div class="section-title">이번 주 진단 요약</div>
+        <div class="section-title">어느 파트를 조정해야 하나</div>
         <div id="glanceDonut"></div>
       </div>
       <div class="section-card">
@@ -1189,6 +1201,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
       hurdle: Math.round(hurdle * 10) / 10, target1: Math.round(target1 * 10) / 10, target2: Math.round(target2 * 10) / 10,
       verdict, kitchenActualHours: Math.round(kitchenSheetActual * 10) / 10, hallActualHours: Math.round(hallActualHours * 10) / 10,
       salesVal: Math.round(salesVal),
+      kitchenScaleFactor: kitchenScaleFactor, hallScaleFactor: hallScaleFactor,
     };
   });
 
@@ -1878,40 +1891,68 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       return { overHours, underHours, overCnt, midOverCnt, okCnt, midUnderCnt, underCnt, total };
     }
 
-    function renderGlanceDonut() {
+    // 파트별 주간 누적 Gap - 실제(raw)를 diff+standard로 역산한 뒤, 그날의 휴게시간 보정계수를 적용해
+    // 전체 헤드라인(actualTotal-target1, 이미 보정된 값)과 기준을 통일함. standard는 이미 정확하므로 보정 불필요.
+    function computeWeekPartGaps() {
+      const cols = PARTS.concat(['홀']);
+      const totals = {};
+      cols.forEach(p => { totals[p] = 0; });
+      dateHeaders.forEach(d => {
+        const dayHeatmap = heatmap[d], dayStd = standardSchedule[d], t = tierDiagnosis[d];
+        if (!dayHeatmap || !dayStd || !t) return;
+        slots.forEach(s => {
+          cols.forEach(p => {
+            const stdCount = (dayStd[s] && dayStd[s][p]) || 0;
+            const diffRaw = (dayHeatmap[s] && dayHeatmap[s][p]) || 0;
+            const actualRawCount = diffRaw + stdCount; // 원본 raw 실배치 인원(보정 전) 역산
+            const scale = (p === '홀') ? (t.hallScaleFactor || 1) : (t.kitchenScaleFactor || 1);
+            const actualHours = actualRawCount * 0.5 * scale;
+            const stdHours = stdCount * 0.5;
+            totals[p] += (actualHours - stdHours);
+          });
+        });
+      });
+      return cols.map(p => ({ part: p, gap: Math.round(totals[p] * 10) / 10 }));
+    }
+
+    function renderGlancePartGapSummary() {
       const el = document.getElementById('glanceDonut');
-      const c = computeWeekTierCounts();
-      const net = Math.round((c.overHours - c.underHours) * 10) / 10;
-      const netLabel = Math.abs(net) < 0.5 ? '종합 적정' : (net > 0 ? '종합 과다' : '종합 부족');
-      const netColor = Math.abs(net) < 0.5 ? '#3D8361' : (net > 0 ? '#A34848' : '#2C6690');
-      const segs = [
-        { n: c.overCnt, col: '#B03A3A', label: '과다 (+3h 이상)' },
-        { n: c.midOverCnt, col: '#E79B9B', label: '소폭 과다 (+1h ~ +3h)' },
-        { n: c.okCnt, col: '#D8D8DE', label: '적정 (-1h ~ +1h)' },
-        { n: c.midUnderCnt, col: '#9FC1E0', label: '소폭 부족 (-3h ~ -1h)' },
-        { n: c.underCnt, col: '#3478C4', label: '과소 (-3h 이하)' },
-      ];
-      const total = Math.max(1, c.total);
-      let acc = 0;
-      const gradParts = segs.map(s => {
-        const start = acc / total * 360; acc += s.n; const end = acc / total * 360;
-        return s.col + ' ' + start + 'deg ' + end + 'deg';
-      }).join(', ');
-      el.innerHTML =
-        '<div class="donut-wrap">' +
-          '<div style="width:150px; height:150px; border-radius:50%; background: conic-gradient(' + gradParts + '); display:flex; align-items:center; justify-content:center;">' +
-            '<div style="width:96px; height:96px; border-radius:50%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">' +
-              '<div class="donut-center-label" style="font-size:24px; color:' + netColor + ';">' + (net > 0 ? '+' : '') + net + 'h</div>' +
-              '<div class="donut-center-sub">' + netLabel + '</div>' +
+      const gaps = computeWeekPartGaps();
+      const totalGap = Math.round(gaps.reduce((s, g) => s + g.gap, 0) * 10) / 10;
+      const totalLabel = Math.abs(totalGap) < 0.5 ? '전체 적정' : (totalGap > 0 ? '전체 과다' : '전체 부족');
+      const totalColor = Math.abs(totalGap) < 0.5 ? '#3D8361' : (totalGap > 0 ? '#A34848' : '#2C6690');
+
+      const ranked = gaps.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+      const maxAbs = Math.max(1, ...ranked.map(g => Math.abs(g.gap)));
+
+      const headline =
+        '<div class="week-gap-headline">' +
+          '<div class="gap-number" style="color:' + totalColor + ';">' + (totalGap > 0 ? '+' : '') + totalGap + 'h</div>' +
+          '<div class="gap-sub">' + totalLabel + ' · 이번 주 전체 Actual - Standard</div>' +
+        '</div>';
+
+      const bars = ranked.map(g => {
+        const isOver = g.gap > 0.05, isUnder = g.gap < -0.05;
+        const color = isOver ? '#B03A3A' : (isUnder ? '#3478C4' : '#D8D8DE');
+        const action = isOver ? '축소 검토' : (isUnder ? '보강 검토' : '적정');
+        const widthPct = Math.round((Math.abs(g.gap) / maxAbs) * 50); // 중심(50%) 기준 좌우 최대 50%
+        const style = isOver
+          ? ('left:50%; width:' + widthPct + '%;')
+          : ('left:' + (50 - widthPct) + '%; width:' + widthPct + '%;');
+        return (
+          '<div class="diverge-row">' +
+            '<div class="diverge-head">' +
+              '<span class="diverge-part-name">' + g.part + '</span>' +
+              '<span>' + (g.gap > 0 ? '+' : '') + g.gap + 'h &nbsp; <span class="diverge-action">' + action + '</span></span>' +
             '</div>' +
-          '</div>' +
-        '</div>' +
-        segs.map(s => (
-          '<div class="donut-legend-row">' +
-            '<span><span class="legend-dot" style="background:' + s.col + ';"></span>' + s.label + '</span>' +
-            '<b>' + s.n + '개 시간대</b>' +
+            '<div class="diverge-track"><div class="diverge-center-line"></div>' +
+              '<div class="diverge-fill" style="' + style + ' background:' + color + ';"></div>' +
+            '</div>' +
           '</div>'
-        )).join('');
+        );
+      }).join('');
+
+      el.innerHTML = headline + bars;
     }
 
     // 이번 주 가장 문제 큰 요일/시간대/파트 - 요약 화면의 핵심 코멘트
@@ -2554,7 +2595,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }
     renderTrendTable();
     renderWeekKPIRowInto('glanceKpiRow');
-    renderGlanceDonut();
+    renderGlancePartGapSummary();
     renderGlanceComments();
     renderGlanceAll();
     renderWeekKPIRowInto('weeklyKpiRow');
