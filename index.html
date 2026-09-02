@@ -178,6 +178,7 @@
     <button class="nav-btn" data-view="weekly">📅 주간(상세)</button>
     <button class="nav-btn" data-view="daily">📆 일간(상세)</button>
     <button class="nav-btn" data-view="standard">📐 정석 시간표</button>
+    <a id="reuploadLink" href="#" style="display:none; margin-top:18px; padding:10px 10px; font-size:12px; color:#8A93A3; text-decoration:none; border-top:1px solid rgba(255,255,255,0.1);">📤 다른 파일 업로드</a>
   </nav>
   <main class="main-content">
 
@@ -934,6 +935,10 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
 
 // ==================== 파일 업로드 처리 ====================
 document.getElementById('fileInput').addEventListener('change', handleFile);
+document.getElementById('reuploadLink').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('uploadBox').style.display = 'block';
+});
 
 let lastResult = null; // 저장 버튼에서 사용
 let previousSnapshot = null; // 같은 매장의 직전 저장 결과 (지난 저장 대비 추세용)
@@ -971,6 +976,8 @@ async function handleFile(e) {
     } catch (e) { /* 조회 실패시 그냥 비교 없이 진행 */ }
 
     document.getElementById('app').style.display = 'block';
+    document.getElementById('uploadBox').style.display = 'none';
+    document.getElementById('reuploadLink').style.display = 'inline-block';
     renderApp(result);
 
     document.getElementById('saveBox').style.display = 'block';
@@ -1719,6 +1726,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       if (!storeName) return; // 일반 업로드 모드로 그대로 둠
 
       document.getElementById('uploadBox').style.display = 'none';
+      document.getElementById('reuploadLink').style.display = 'inline-block';
       document.getElementById('viewingStoreBar').style.display = 'block';
       document.getElementById('viewingStoreName').textContent = storeName;
 
