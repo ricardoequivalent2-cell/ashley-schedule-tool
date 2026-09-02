@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>애슐리 스케줄링 진단 - 관리자 페이지</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
   body { font-family: 'Malgun Gothic', sans-serif; margin: 24px; color: #333; background: #fafaf7; }
   h2 { margin-bottom: 4px; }
@@ -141,19 +140,15 @@ function renderBrandKPICards(stores) {
       '</div>' +
       '<div style="display:flex; gap:14px;">' +
         '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-          '<div style="width:36px; height:36px; border-radius:6px; background:#EF5350; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-alert-triangle" style="color:#fff; font-size:17px;"></i></div>' +
           '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">문제 매장</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + problemCount + '개</p></div>' +
         '</div>' +
         '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-          '<div style="width:36px; height:36px; border-radius:6px; background:#FFA726; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-flame" style="color:#fff; font-size:17px;"></i></div>' +
           '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">가장 심각한 매장</p><p style="font-size:13px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + (worstStore ? worstStore.storeName + ' +' + worstOverHours + 'h' : '-') + '</p></div>' +
         '</div>' +
         '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-          '<div style="width:36px; height:36px; border-radius:6px; background:#66BB6A; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-circle-check" style="color:#fff; font-size:17px;"></i></div>' +
           '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">정상 매장 비율</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + okRatio + '%</p></div>' +
         '</div>' +
         '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-          '<div style="width:36px; height:36px; border-radius:6px; background:#9AA0A8; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-history" style="color:#fff; font-size:17px;"></i></div>' +
           '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">전주 대비</p><p style="font-size:12px; color:#3C4858; margin:1px 0 0;">데이터 축적 중</p></div>' +
         '</div>' +
       '</div>' +
