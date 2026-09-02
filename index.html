@@ -41,6 +41,39 @@
     .kpi-card-5 .kpi-sub { font-size: 10.5px; color: #A7AEBD; margin-top: 2px; }
     .kpi-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 6px; }
 
+    /* ==================== 요약 화면 Executive Hero ==================== */
+    .exec-hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 2px 22px; }
+    .exec-eyebrow { font-size: 11.5px; font-weight: 700; color: #9AA1B0; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
+    .exec-gap-row { display: flex; align-items: baseline; gap: 10px; }
+    .exec-gap-number { font-size: 46px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .exec-gap-word { font-size: 15px; font-weight: 700; padding: 3px 10px; border-radius: 6px; }
+    .exec-relation { margin-top: 10px; font-size: 14px; color: #5B6272; font-variant-numeric: tabular-nums; }
+    .exec-relation b { color: #1A2233; font-weight: 700; }
+    .exec-relation .arrow { color: #C2C6D1; margin: 0 8px; }
+    .exec-hero-right { text-align: right; font-size: 12.5px; color: #9AA1B0; line-height: 1.8; font-variant-numeric: tabular-nums; }
+    .exec-hero-right b { color: #4A505E; font-weight: 600; }
+
+    .icon-sq { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .icon-sq svg { width: 16px; height: 16px; }
+
+    .compact-rank-card .section-title-row { margin-bottom: 10px; }
+    .drill-link-sub { font-size: 11.5px; color: #B7BCC8; }
+    .drill-link-sub span { cursor: pointer; color: #6B7280; font-weight: 600; }
+    .drill-link-sub span:hover { color: #3B5BFF; }
+    .compact-rank-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 12.5px; }
+    .compact-rank-num { flex: 0 0 16px; color: #C2C6D1; font-weight: 700; font-size: 11px; }
+    .compact-rank-meta { flex: 1; color: #6B7280; }
+    .compact-rank-meta b { color: #1A2233; }
+    .compact-rank-val { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    .insight-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #F3F4F7; }
+    .insight-row:first-child { border-top: none; }
+    .insight-rank { flex: 0 0 22px; font-size: 12px; font-weight: 800; color: #C2C6D1; }
+    .insight-part { flex: 0 0 46px; font-size: 13.5px; font-weight: 700; color: #1A2233; }
+    .insight-val { flex: 0 0 68px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .insight-meaning { flex: 1; font-size: 12px; color: #9AA1B0; }
+
+
     .dashboard-grid-main { display: grid; grid-template-columns: 2.1fr 1fr; gap: 16px; margin-bottom: 16px; align-items: start; }
     .dashboard-grid-sub { display: grid; grid-template-columns: 2.1fr 1fr; gap: 16px; margin-bottom: 0; align-items: start; }
     @media (max-width: 1100px) {
@@ -87,14 +120,14 @@
 
     .diverge-axis-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: #A7AEBD; padding: 0 0 4px; }
     .diverge-chart { position: relative; }
-    .diverge-chart .diverge-baseline { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: #DCDEE6; z-index: 1; }
 
     .diverge-row { display: flex; align-items: center; gap: 10px; height: 27px; }
     .diverge-part-name { flex: 0 0 46px; font-size: 12.5px; font-weight: 700; color: #1A2233; }
     .diverge-gap-num { flex: 0 0 64px; font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
     .diverge-track { flex: 1; position: relative; height: 12px; }
     .diverge-fill { position: absolute; top: 1px; height: 10px; border-radius: 3px; z-index: 2; }
-    .diverge-badge { flex: 0 0 58px; font-size: 10.5px; text-align: left; padding: 2px 6px; border-radius: 5px; font-weight: 600; }
+    .diverge-badge { flex: 0 0 50px; font-size: 10.5px; text-align: left; font-weight: 600; }
+    .diverge-chart .diverge-baseline { position: absolute; top: 0; bottom: 0; left: 50%; width: 1.5px; background: #C8CCD6; z-index: 1; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn {
       padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
@@ -291,10 +324,17 @@
 
   <!-- ===================== 한눈에 (1페이지 요약) ===================== -->
   <div class="view-panel active" id="view-glance">
-    <div class="daily-page-title">이번 주 요약</div>
-    <div class="daily-page-sub">이번 주 스케줄이 전체적으로 괜찮은지, 5초 안에 확인하세요.</div>
-
-    <div class="kpi-row-5" id="glanceKpiRow"></div>
+    <div class="exec-hero">
+      <div class="exec-hero-left">
+        <div class="exec-eyebrow">이번 주 인력 진단</div>
+        <div class="exec-gap-row">
+          <span class="exec-gap-number" id="execGapNumber">-</span>
+          <span class="exec-gap-word" id="execGapWord"></span>
+        </div>
+        <div class="exec-relation" id="execRelation"></div>
+      </div>
+      <div class="exec-hero-right" id="execContext"></div>
+    </div>
 
     <div class="dashboard-grid-main">
       <div class="section-card">
@@ -307,14 +347,19 @@
       <div class="section-card">
         <div class="section-title">주요 진단</div>
         <div id="glanceComments"></div>
-        <div style="margin-top:14px; padding-top:14px; border-top:1px solid #F3F4F7; font-size:12px; color:#8B93A5;">
-          어느 요일·시간대가 반복되는지는 <b style="color:#3B5BFF; cursor:pointer;" onclick="document.querySelector('[data-view=weekly]').click();">주간진단</b>에서,
-          특정 하루의 원인은 <b style="color:#3B5BFF; cursor:pointer;" onclick="document.querySelector('[data-view=daily]').click();">일간진단</b>에서 자세히 볼 수 있어요.
-        </div>
       </div>
     </div>
 
-    <div class="glance-top3" id="glanceTop3"></div>
+    <div class="section-card compact-rank-card">
+      <div class="section-title-row">
+        <div class="section-title">반복 과다 TOP 3</div>
+        <div class="drill-link-sub">
+          <span onclick="document.querySelector('[data-view=weekly]').click();">주간진단</span> ·
+          <span onclick="document.querySelector('[data-view=daily]').click();">일간진단</span>
+        </div>
+      </div>
+      <div id="glanceTop3"></div>
+    </div>
 
     <div class="section-card">
       <div class="section-title">시간대별 요일 점수 (주방)</div>
@@ -1845,6 +1890,36 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     // ==================== 요약 / 주간진단 공용 컴포넌트 (일간진단과 동일 디자인 시스템 재사용) ====================
 
     // 주간 전체 KPI 5카드 - 요약/주간진단 공용 (일간 KPI카드와 동일 스타일, 값만 주간합계)
+    // 요약 화면 전용 - Gap을 Primary로, 목표->실제 관계, 매출/객수는 작은 컨텍스트로 (정제된 라인아이콘 사용)
+    function renderGlanceHero() {
+      const w = weeklySummary;
+      if (!w) return;
+      const totalSales = dateHeaders.reduce((s, d) => s + ((tierDiagnosis[d] && tierDiagnosis[d].salesVal) || 0), 0);
+      const gap = Math.round((w.totalActual - w.totalTarget1) * 10) / 10;
+      const isOver = gap > 0.5, isUnder = gap < -0.5;
+      const word = isOver ? '과다' : (isUnder ? '부족' : '적정');
+      const color = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#3D8361');
+      const bg = isOver ? '#F7E3E3' : (isUnder ? '#DCEEFB' : '#E3F1E8');
+
+      const numEl = document.getElementById('execGapNumber');
+      numEl.textContent = (gap > 0 ? '+' : '') + gap + 'h';
+      numEl.style.color = color;
+      const wordEl = document.getElementById('execGapWord');
+      wordEl.textContent = word;
+      wordEl.style.background = bg;
+      wordEl.style.color = color;
+
+      document.getElementById('execRelation').innerHTML =
+        '목표 <b>' + w.totalTarget1 + 'h</b><span class="arrow">→</span>실제 <b>' + w.totalActual + 'h</b>';
+
+      const walletIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>';
+      const usersIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+
+      document.getElementById('execContext').innerHTML =
+        '<div>' + walletIcon + '예상매출 <b>' + totalSales.toLocaleString() + '원</b></div>' +
+        '<div>' + usersIcon + '예상객수 <b>' + w.totalGuest + '명</b></div>';
+    }
+
     function renderWeekKPIRowInto(containerId) {
       const el = document.getElementById(containerId);
       if (!weeklySummary) { el.innerHTML = ''; return; }
@@ -1938,8 +2013,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         const isOver = g.gap > 0.05, isUnder = g.gap < -0.05;
         const color = isOver ? '#B03A3A' : (isUnder ? '#3478C4' : '#D8D8DE');
         const action = isOver ? '축소 검토' : (isUnder ? '보강 검토' : '적정');
-        const badgeBg = isOver ? '#F7E3E3' : (isUnder ? '#DCEEFB' : '#F0F0F5');
-        const badgeFg = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#8B93A5');
+        const badgeFg = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#B7BCC8');
         const halfWidthPct = (Math.abs(g.gap) / maxAbs) * 50; // 중심 기준 좌우 최대 50%
         const style = isOver
           ? ('left:50%; width:' + halfWidthPct + '%;')
@@ -1949,7 +2023,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
             '<div class="diverge-part-name">' + g.part + '</div>' +
             '<div class="diverge-gap-num" style="color:' + color + ';">' + (g.gap > 0 ? '+' : '') + g.gap + 'h</div>' +
             '<div class="diverge-track"><div class="diverge-fill" style="' + style + ' background:' + color + ';"></div></div>' +
-            '<div class="diverge-badge" style="background:' + badgeBg + '; color:' + badgeFg + ';">' + action + '</div>' +
+            '<div class="diverge-badge" style="color:' + badgeFg + ';">' + action + '</div>' +
           '</div>'
         );
       }).join('');
@@ -1968,49 +2042,32 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     // 이번 주 가장 문제 큰 요일/시간대/파트 - 요약 화면의 핵심 코멘트
     function renderGlanceComments() {
       const el = document.getElementById('glanceComments');
-      const comments = [];
+      const gaps = computeWeekPartGaps();
+      const ranked = gaps.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap)).slice(0, 3);
 
-      // 가장 문제 큰 요일 (하루 총 Gap = actualTotal-target1 최대인 날)
-      let worstDay = null, worstDayGap = -Infinity;
-      dateHeaders.forEach(d => {
-        const t = tierDiagnosis[d]; if (!t) return;
-        const gap = t.actualTotal - t.target1;
-        if (gap > worstDayGap) { worstDayGap = gap; worstDay = d; }
-      });
-      if (worstDay && worstDayGap > 0.5) {
-        comments.push({ bg: '#F7E3E3', fg: '#A34848', text: worstDay + '의 기준 대비 Gap이 이번 주 가장 큽니다 (+' + Math.round(worstDayGap * 10) / 10 + 'h).' });
+      if (!ranked.length) {
+        el.innerHTML = '<div style="font-size:12.5px; color:#9AA1B0; padding:6px 0;">이번 주는 뚜렷한 과다/부족 없이 전반적으로 안정적입니다.</div>';
+        return;
       }
-
-      // 가장 문제 큰 시간대(블록)
-      const worstBlock = findWorstBlock(weeklyBlockSummary.concat(weeklyHallBlockSummary));
-      if (worstBlock) {
-        comments.push({ bg: '#F8ECDA', fg: '#A67A3A', text: worstBlock.name + ' 시간대에 과다가 반복됩니다 (주간 +' + worstBlock.netDiffHours + 'h).' });
-      }
-
-      // 가장 문제 큰 파트
-      const tally = {};
-      dateHeaders.forEach(label => {
-        (blockDiagnosis[label] || []).forEach(b => {
-          if (b.verdict === '과다' && b.worstOver) {
-            const p = b.worstOver.part;
-            tally[p] = (tally[p] || 0) + b.worstOver.diffHours;
-          }
-        });
-      });
-      const topPart = Object.keys(tally).sort((a, b) => tally[b] - tally[a])[0];
-      if (topPart) {
-        comments.push({ bg: '#EDE9F9', fg: '#5B3FA0', text: topPart + ' 파트의 과다 배치가 이번 주 가장 두드러집니다 (누적 +' + Math.round(tally[topPart] * 10) / 10 + 'h).' });
-      }
-
-      if (!comments.length) {
-        comments.push({ bg: '#E3F1E8', fg: '#3D8361', text: '이번 주는 뚜렷한 과다 문제 없이 전반적으로 안정적입니다.' });
-      }
-      el.innerHTML = comments.map(c =>
-        '<div class="comment-card">' +
-          '<div class="comment-icon" style="background:' + c.bg + '; color:' + c.fg + ';">●</div>' +
-          '<div class="comment-text">' + c.text + '</div>' +
-        '</div>'
-      ).join('');
+      const ordinalKo = ['', '', '두 번째로', '세 번째로', '네 번째로', '다섯 번째로'];
+      const seenCount = { '과다': 0, '부족': 0 };
+      el.innerHTML = ranked.map((g, i) => {
+        const dir = g.gap > 0 ? '과다' : '부족';
+        seenCount[dir]++;
+        const ord = seenCount[dir];
+        const meaning = ord === 1
+          ? '가장 큰 인력 ' + dir
+          : ordinalKo[ord] + ' 큰 ' + (dir === '과다' ? '축소' : '보강') + ' 필요 파트';
+        const color = g.gap > 0 ? '#A34848' : '#2C6690';
+        return (
+          '<div class="insight-row">' +
+            '<div class="insight-rank">0' + (i + 1) + '</div>' +
+            '<div class="insight-part">' + g.part + '</div>' +
+            '<div class="insight-val" style="color:' + color + ';">' + (g.gap > 0 ? '+' : '') + g.gap + 'h</div>' +
+            '<div class="insight-meaning">' + meaning + '</div>' +
+          '</div>'
+        );
+      }).join('');
     }
 
     // 주간진단 - 요일별 진단 테이블 (월~일: 예상매출/목표/실제/Gap/상태)
@@ -2289,13 +2346,11 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     function renderGlanceTop3() {
       const el = document.getElementById('glanceTop3');
-      const characterization = '<div class="glance-character">' + computeStoreCharacterization() + '</div>';
-
       const candidates = [];
       dateHeaders.forEach(label => {
         (blockDiagnosis[label] || []).forEach(b => {
           if (b.verdict === '과다' && b.worstOver) {
-            candidates.push({ day: label, block: b.name, part: b.worstOver.part, diff: b.worstOver.diffHours, action: b.action });
+            candidates.push({ day: label, block: b.name, part: b.worstOver.part, diff: b.worstOver.diffHours });
           }
         });
       });
@@ -2303,15 +2358,16 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const top3 = candidates.slice(0, 3);
 
       if (!top3.length) {
-        el.innerHTML = characterization + '<div class="rank1">이번 주 뚜렷한 과다 문제가 없습니다</div>';
+        el.innerHTML = '<div style="font-size:12.5px; color:#9AA1B0; padding:6px 0;">이번 주 뚜렷하게 반복되는 과다 문제가 없습니다.</div>';
         return;
       }
-      const fmt = (c, rank) => {
-        const isOver = c.diff > 0;
-        const text = c.day + ' ' + c.block + ' ' + c.part + '파트 ' + Math.abs(c.diff) + '시간 ' + (isOver ? '많습니다' : '부족합니다');
-        return '<div class="rank' + rank + '"><span class="rank-label">' + rank + '.</span>' + text + '</div>';
-      };
-      el.innerHTML = characterization + top3.map((c, i) => fmt(c, i + 1)).join('');
+      el.innerHTML = top3.map((c, i) => (
+        '<div class="compact-rank-row">' +
+          '<div class="compact-rank-num">0' + (i + 1) + '</div>' +
+          '<div class="compact-rank-meta">' + c.day + ' · ' + c.block + ' · <b>' + c.part + '</b></div>' +
+          '<div class="compact-rank-val" style="color:#A34848;">+' + c.diff + 'h</div>' +
+        '</div>'
+      )).join('');
     }
 
     function aggregateBlockForGroup(gb, days, sourceDiagnosis) {
@@ -2604,7 +2660,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     setupStandardTabs();
     if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }
     renderTrendTable();
-    renderWeekKPIRowInto('glanceKpiRow');
+    renderGlanceHero();
     renderGlancePartGapSummary();
     renderGlanceComments();
     renderGlanceAll();
