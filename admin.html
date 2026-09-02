@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>애슐리 스케줄링 진단 - 관리자 페이지</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
   body { font-family: 'Malgun Gothic', sans-serif; margin: 24px; color: #333; background: #fafaf7; }
   h2 { margin-bottom: 4px; }
@@ -48,6 +49,8 @@
 <div class="sub">각 매장에서 저장한 진단 결과를 한 화면에서 모아봅니다. 매장을 클릭하면 상세 대시보드로 이동합니다.</div>
 <div id="status">불러오는 중...</div>
 
+<div id="brandKpiCards"></div>
+
 <div class="toolbar">
   <input type="text" id="searchInput" placeholder="매장명으로 검색...">
   <button id="refreshBtn">🔄 새로고침</button>
@@ -74,10 +77,87 @@ async function loadStores() {
     if (!res.ok) throw new Error(data.error || '불러오기 실패');
     allStores = data.stores || [];
     statusEl.textContent = '총 ' + allStores.length + '개 매장 저장됨';
+    renderBrandKPICards(allStores);
     renderList(allStores);
   } catch (err) {
     statusEl.textContent = '오류: ' + err.message;
   }
+}
+
+function computeOverHours(r) {
+  if (!r) return 0;
+  let total = 0;
+  (r.weeklyBlockSummary || []).forEach(b => { if (b.verdict === '과다') total += b.netDiffHours; });
+  (r.weeklyHallBlockSummary || []).forEach(b => { if (b.verdict === '과다') total += b.netDiffHours; });
+  return Math.round(total * 10) / 10;
+}
+
+function renderBrandKPICards(stores) {
+  const container = document.getElementById('brandKpiCards');
+  if (!stores.length) { container.innerHTML = ''; return; }
+
+  const withResult = stores.filter(s => s.result);
+  const problemStores = withResult.filter(s => computeOverHours(s.result) > 0);
+  const problemCount = problemStores.length;
+  const okRatio = withResult.length ? Math.round((withResult.length - problemCount) / withResult.length * 100) : 0;
+
+  // 매장별 목표대비 비율 평균
+  const ratios = withResult.map(s => (s.weeklySummary ? s.weeklySummary.totalActual / s.weeklySummary.totalTarget1 * 100 : null)).filter(v => v !== null);
+  const avgRatio = ratios.length ? Math.round(ratios.reduce((a, b) => a + b, 0) / ratios.length * 10) / 10 : 0;
+
+  // 가장 심각한 매장 (과다시간 최대)
+  let worstStore = null, worstOverHours = -Infinity;
+  withResult.forEach(s => { const oh = computeOverHours(s.result); if (oh > worstOverHours) { worstOverHours = oh; worstStore = s; } });
+
+  // 문제 몰린 시간대 (매장별 가장 심한 블록명 집계)
+  const blockCount = {};
+  withResult.forEach(s => {
+    const cands = [];
+    (s.result.weeklyBlockSummary || []).forEach(b => { if (b.verdict === '과다') cands.push({ block: b.name, diff: b.netDiffHours }); });
+    (s.result.weeklyHallBlockSummary || []).forEach(b => { if (b.verdict === '과다') cands.push({ block: b.name, diff: b.netDiffHours }); });
+    if (!cands.length) return;
+    cands.sort((a, b) => b.diff - a.diff);
+    const top = cands[0].block;
+    blockCount[top] = (blockCount[top] || 0) + 1;
+  });
+  let topBlockName = '-', topBlockCount = 0;
+  Object.keys(blockCount).forEach(k => { if (blockCount[k] > topBlockCount) { topBlockCount = blockCount[k]; topBlockName = k; } });
+
+  container.innerHTML =
+    '<div style="background:#F5F6F8; padding:18px; border-radius:8px; margin-bottom:20px;">' +
+      '<div style="display:flex; gap:14px; margin-bottom:14px;">' +
+        '<div style="flex:1; background:#EF5350; border-radius:6px; padding:14px 16px;">' +
+          '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">문제 매장</p>' +
+          '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">' + problemCount + '개 / ' + withResult.length + '개 매장</p>' +
+        '</div>' +
+        '<div style="flex:1; background:#FFA726; border-radius:6px; padding:14px 16px;">' +
+          '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">문제 몰린 시간대</p>' +
+          '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">' + topBlockName + ' · ' + topBlockCount + '개 매장에서 반복</p>' +
+        '</div>' +
+        '<div style="flex:1; background:#66BB6A; border-radius:6px; padding:14px 16px;">' +
+          '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">전체 평균 목표대비</p>' +
+          '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">' + avgRatio + '%</p>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex; gap:14px;">' +
+        '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
+          '<div style="width:36px; height:36px; border-radius:6px; background:#EF5350; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-alert-triangle" style="color:#fff; font-size:17px;"></i></div>' +
+          '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">문제 매장</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + problemCount + '개</p></div>' +
+        '</div>' +
+        '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
+          '<div style="width:36px; height:36px; border-radius:6px; background:#FFA726; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-flame" style="color:#fff; font-size:17px;"></i></div>' +
+          '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">가장 심각한 매장</p><p style="font-size:13px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + (worstStore ? worstStore.storeName + ' +' + worstOverHours + 'h' : '-') + '</p></div>' +
+        '</div>' +
+        '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
+          '<div style="width:36px; height:36px; border-radius:6px; background:#66BB6A; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-circle-check" style="color:#fff; font-size:17px;"></i></div>' +
+          '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">정상 매장 비율</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + okRatio + '%</p></div>' +
+        '</div>' +
+        '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
+          '<div style="width:36px; height:36px; border-radius:6px; background:#9AA0A8; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-history" style="color:#fff; font-size:17px;"></i></div>' +
+          '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">전주 대비</p><p style="font-size:12px; color:#3C4858; margin:1px 0 0;">데이터 축적 중</p></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
 }
 
 function renderList(stores) {
