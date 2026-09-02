@@ -102,7 +102,7 @@ function renderBrandKPICards(stores) {
   const okRatio = withResult.length ? Math.round((withResult.length - problemCount) / withResult.length * 100) : 0;
 
   // 매장별 목표대비 비율 평균
-  const ratios = withResult.map(s => (s.weeklySummary ? s.weeklySummary.totalActual / s.weeklySummary.totalTarget1 * 100 : null)).filter(v => v !== null);
+  const ratios = withResult.map(s => (s.weeklySummary && s.weeklySummary.totalActual > 0 ? s.weeklySummary.totalTarget1 / s.weeklySummary.totalActual * 100 : null)).filter(v => v !== null);
   const avgRatio = ratios.length ? Math.round(ratios.reduce((a, b) => a + b, 0) / ratios.length * 10) / 10 : 0;
 
   // 가장 심각한 매장 (과다시간 최대)
@@ -136,7 +136,7 @@ function renderBrandKPICards(stores) {
         '</div>' +
         '<div style="flex:1; background:#66BB6A; border-radius:6px; padding:14px 16px;">' +
           '<p style="font-size:13px; color:#fff; margin:0 0 6px; font-weight:500;">전체 평균 목표대비</p>' +
-          '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">' + avgRatio + '%</p>' +
+          '<p style="font-size:12px; color:rgba(255,255,255,0.85); margin:0;">' + avgRatio + '점</p>' +
         '</div>' +
       '</div>' +
       '<div style="display:flex; gap:14px;">' +
