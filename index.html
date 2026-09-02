@@ -54,12 +54,12 @@
     .priority-detail { font-size: 12px; color: #666; }
     .priority-empty { color: #888; font-size: 13px; padding: 12px 0; }
 
-    .block-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .block-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
     .block-card { border-radius: 12px; padding: 14px 16px; border: 1px solid #e2e2e2; }
     .block-card.verdict-과다 { background: #fdecea; border-color: #f1b0aa; }
     .block-card.verdict-부족 { background: #eaf2fb; border-color: #a9c6e8; }
     .block-card.verdict-적정 { background: #eafaf1; border-color: #a9dfbf; }
-    .block-name { font-size: 13px; color: #666; margin-bottom: 2px; }
+    .block-name { font-size: 16px; font-weight: bold; color: #222; margin-bottom: 2px; }
     .block-time { font-size: 11px; color: #999; margin-bottom: 8px; }
     .block-verdict { font-size: 15px; font-weight: bold; margin-bottom: 6px; line-height: 1.35; }
     .block-verdict .badge-과다 { color: #c0392b; }
@@ -212,9 +212,11 @@
 
     <div class="section-title" style="margin-top:0;">시간대별 요일 점수 (주방)</div>
     <div id="glanceScoreCards"></div>
+    <div id="glanceBlockChart"></div>
 
-    <div class="section-title">시간대별 요일 점수 (홀, 파트구분 없음)</div>
+    <div class="section-title">시간대별 요일 점수 (홀)</div>
     <div id="glanceHallScoreCards"></div>
+    <div id="glanceHallBlockChart"></div>
 
     <div class="section-title">평일 히트맵 (세로=시간대 · 가로=파트 · <span style="color:#e74c3c;">빨강=과다</span> / <span style="color:#3478f6;">파랑=부족</span>, 진할수록 큼)</div>
     <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
@@ -231,7 +233,7 @@
     <div class="section-title" style="margin-top:0;">🕓 이번 주 시간대 종합진단 (주방)</div>
     <div class="block-grid" id="weeklyBlockDiagnosis"></div>
 
-    <div class="section-title">🕓 이번 주 시간대 종합진단 (홀, 파트구분 없음)</div>
+    <div class="section-title">🕓 이번 주 시간대 종합진단 (홀)</div>
     <div class="block-grid" id="weeklyHallBlockDiagnosis"></div>
 
     <div class="section-title">🗓️ 요일 × 시간대 한눈에 보기</div>
@@ -250,7 +252,7 @@
     <div class="section-title" style="margin-top:0;">🕓 시간대별 진단 (주방)</div>
     <div class="block-grid" id="blockDiagnosis"></div>
 
-    <div class="section-title">🕓 시간대별 진단 (홀, 파트구분 없음)</div>
+    <div class="section-title">🕓 시간대별 진단 (홀)</div>
     <div class="block-grid" id="hallBlockDiagnosis"></div>
 
     <div class="section-title">🍳 주방 vs 🙋 홀 사용계획시간 비교</div>
@@ -726,6 +728,7 @@ function computeWeeklyBlockSummary(blockDiagnosisAll, dateHeaders) {
     let overDays = 0, underDays = 0, okDays = 0;
     const overPartCount = {}, underPartCount = {};
     const overPartDayLabels = {}, underPartDayLabels = {};
+    const allOverDayLabels = [], allUnderDayLabels = [];
 
     dateHeaders.forEach(label => {
       const dayBlocks = blockDiagnosisAll[label];
@@ -735,6 +738,7 @@ function computeWeeklyBlockSummary(blockDiagnosisAll, dateHeaders) {
       totalActual += b.actualHours; totalStandard += b.standardHours;
       if (b.verdict === '과다') {
         overDays++;
+        allOverDayLabels.push(label);
         if (b.worstOver) {
           const part = b.worstOver.part;
           overPartCount[part] = (overPartCount[part] || 0) + 1;
@@ -742,6 +746,7 @@ function computeWeeklyBlockSummary(blockDiagnosisAll, dateHeaders) {
         }
       } else if (b.verdict === '부족') {
         underDays++;
+        allUnderDayLabels.push(label);
         if (b.worstUnder) {
           const part = b.worstUnder.part;
           underPartCount[part] = (underPartCount[part] || 0) + 1;
@@ -768,6 +773,7 @@ function computeWeeklyBlockSummary(blockDiagnosisAll, dateHeaders) {
       name: blockDef.name,
       totalActualHours: Math.round(totalActual * 10) / 10, totalStandardHours: Math.round(totalStandard * 10) / 10,
       netDiffHours, verdict, overDays, underDays, okDays, action,
+      allOverDayLabels, allUnderDayLabels,
       topOverPart: topOver ? topOver[0] : null, topOverCount: topOver ? topOver[1] : 0,
       topOverDayLabels: topOver ? overPartDayLabels[topOver[0]] : [],
       topUnderPart: topUnder ? topUnder[0] : null, topUnderCount: topUnder ? topUnder[1] : 0,
@@ -1222,13 +1228,13 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const pct = standardHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null;
       const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
       const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
-      const pctText = pct !== null ? (' (' + pct + '%)') : '';
+      const pctText = pct !== null ? (' (' + pct + '점)') : '';
       return (longForm ? '기준대비 ' : '') + core + pctText;
     }
-    // 매트릭스 등 공간이 좁은 곳에 쓰는 압축형 - 달성률(%)만 표시
+    // 매트릭스 등 공간이 좁은 곳에 쓰는 압축형 - 달성률(점)만 표시
     function diffPhraseCompact(actualHours, standardHours) {
       const pct = standardHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null;
-      return pct !== null ? (pct + '%') : '-';
+      return pct !== null ? (pct + '점') : '-';
     }
 
     // 시간대 전용: "기준"이 상한선이 아니라 "딱 맞는 적정 인원"이라서
@@ -1239,12 +1245,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const ratio = actualHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null; // 기준÷실제: 적게 쓸수록 100 초과(효율)
       const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
       const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
-      const ratioText = ratio !== null ? (' (' + ratio + '%)') : '';
+      const ratioText = ratio !== null ? (' (' + ratio + '점)') : '';
       return core + ratioText;
     }
     function blockDiffCompact(actualHours, standardHours) {
       const ratio = actualHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null; // 기준÷실제: 적게 쓸수록 100 초과(효율)
-      return ratio !== null ? (ratio + '%') : '-';
+      return ratio !== null ? (ratio + '점') : '-';
     }
 
     // 매장전체 3단계 verdict 문자열(최소허들/1차/2차) -> "~수준입니다" 짧은 상태문구
@@ -1337,16 +1343,22 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         '<div class="summary-numbers"><b>' + w.totalActual + 'h</b> (목표 ' + w.totalTarget1 + 'h) · 주방' + w.totalKitchen + 'h · 홀' + w.totalHall + 'h</div>';
     }
 
+    function dayTokens(labels) {
+      return (labels || []).map(l => l.trim().split(' ').pop()).join(',');
+    }
+
     function renderWeeklyBlockDiagnosis() {
       const container = document.getElementById('weeklyBlockDiagnosis');
       if (!weeklyBlockSummary.length) { container.innerHTML = ''; return; }
 
       container.innerHTML = weeklyBlockSummary.map(b => {
         const badgeText = blockDiffPhrase(b.totalActualHours, b.totalStandardHours);
+        const overText = '많음' + b.overDays + (b.overDays >= 1 ? '(' + dayTokens(b.allOverDayLabels) + ')' : '');
+        const underText = '적음' + b.underDays + (b.underDays >= 1 ? '(' + dayTokens(b.allUnderDayLabels) + ')' : '');
         return (
           '<div class="block-card verdict-' + b.verdict + '">' +
             '<div class="block-name">' + b.name + '</div>' +
-            '<div class="block-time">많음' + b.overDays + '·적음' + b.underDays + '·적정' + b.okDays + '</div>' +
+            '<div class="block-time">' + overText + '·' + underText + '·적정' + b.okDays + '</div>' +
             '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
             '<div class="block-numbers">' + b.action + ' · ' + b.totalActualHours + 'h/' + b.totalStandardHours + 'h</div>' +
           '</div>'
@@ -1360,10 +1372,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
       container.innerHTML = weeklyHallBlockSummary.map(b => {
         const badgeText = blockDiffPhrase(b.totalActualHours, b.totalStandardHours);
+        const overText = '많음' + b.overDays + (b.overDays >= 1 ? '(' + dayTokens(b.allOverDayLabels) + ')' : '');
+        const underText = '적음' + b.underDays + (b.underDays >= 1 ? '(' + dayTokens(b.allUnderDayLabels) + ')' : '');
         return (
           '<div class="block-card verdict-' + b.verdict + '">' +
             '<div class="block-name">' + b.name + '</div>' +
-            '<div class="block-time">많음' + b.overDays + '·적음' + b.underDays + '·적정' + b.okDays + '</div>' +
+            '<div class="block-time">' + overText + '·' + underText + '·적정' + b.okDays + '</div>' +
             '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
             '<div class="block-numbers">' + b.totalActualHours + 'h/' + b.totalStandardHours + 'h</div>' +
           '</div>'
@@ -1431,7 +1445,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const allBlocks = weeklyBlockSummary.concat(weeklyHallBlockSummary); // 8개(주방4+홀4)
       const okCount = allBlocks.filter(b => b.verdict === '적정').length;
       const okRatio = allBlocks.length ? Math.round(okCount / allBlocks.length * 100) : 0;
-      const targetRatio = weeklySummary ? Math.round(weeklySummary.totalActual / weeklySummary.totalTarget1 * 1000) / 10 : 0;
+      const targetRatio = (weeklySummary && weeklySummary.totalActual > 0) ? Math.round(weeklySummary.totalTarget1 / weeklySummary.totalActual * 1000) / 10 : 0;
       const savingWon = Math.round(overHours * AVG_WAGE);
 
       // 가장 심한 파트(반복일수 포함) - computeStoreCharacterization과 동일 후보군 재사용
@@ -1488,7 +1502,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
             '</div>' +
             '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
               '<div style="width:36px; height:36px; border-radius:6px; background:#26C6DA; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-target-arrow" style="color:#fff; font-size:17px;"></i></div>' +
-              '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">목표 대비</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + targetRatio + '%</p></div>' +
+              '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">목표 대비</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + targetRatio + '점</p></div>' +
             '</div>' +
             '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
               '<div style="width:36px; height:36px; border-radius:6px; background:#66BB6A; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-coin" style="color:#fff; font-size:17px;"></i></div>' +
@@ -1517,9 +1531,11 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         el.innerHTML = characterization + '<div class="rank1">✅ 이번 주 뚜렷한 과다 문제가 없습니다</div>';
         return;
       }
-      const fmt = (c, rank) => rank === 1
-        ? '<div class="rank1"><span class="rank-label">' + rank + '.</span>' + c.day + ' ' + c.block + ' → ' + c.action + '</div>'
-        : '<div class="rank' + rank + '"><span class="rank-label">' + rank + '.</span>' + c.day + ' ' + c.block + ' → ' + c.action + '</div>';
+      const fmt = (c, rank) => {
+        const isOver = c.diff > 0;
+        const text = c.day + ' ' + c.block + ' ' + c.part + '파트 ' + Math.abs(c.diff) + '시간 ' + (isOver ? '많습니다' : '부족합니다');
+        return '<div class="rank' + rank + '"><span class="rank-label">' + rank + '.</span>' + text + '</div>';
+      };
       el.innerHTML = characterization + top3.map((c, i) => fmt(c, i + 1)).join('');
     }
 
@@ -1536,6 +1552,39 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       return { actual, standard, net, verdict, score };
     }
 
+    function renderGlanceBlockChart(containerId, sourceDiagnosis) {
+      const el = document.getElementById(containerId);
+      const weekdayDays = dateHeaders.filter(d => !isWeekendDay(d));
+      const weekendDays = dateHeaders.filter(d => isWeekendDay(d));
+
+      const buildChart = (days) => {
+        const data = GLANCE_BLOCKS.map(gb => Object.assign({ name: gb.name }, aggregateBlockForGroup(gb, days, sourceDiagnosis)));
+        const maxVal = Math.max(1, ...data.map(d => Math.max(d.actual, d.standard)));
+        const W = 640, H = 150, groupW = W / data.length, barW = 34;
+        let svg = '<svg viewBox="0 0 ' + W + ' ' + (H + 20) + '" style="width:100%; height:auto;">';
+        data.forEach((d, i) => {
+          const cx = groupW * i + groupW / 2;
+          const actualH = Math.round((d.actual / maxVal) * H);
+          const stdH = Math.round((d.standard / maxVal) * H);
+          const color = d.verdict === '과다' ? '#e74c3c' : (d.verdict === '부족' ? '#3478f6' : '#9aa0a8');
+          const barX = cx - barW / 2;
+          svg += '<rect x="' + barX + '" y="' + (H - actualH) + '" width="' + barW + '" height="' + actualH + '" fill="' + color + '" opacity="0.8"></rect>';
+          svg += '<line x1="' + (barX - 6) + '" x2="' + (barX + barW + 6) + '" y1="' + (H - stdH) + '" y2="' + (H - stdH) + '" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="4,3"></line>';
+          svg += '<text x="' + cx + '" y="' + (H + 16) + '" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">' + d.name + '</text>';
+          svg += '<text x="' + cx + '" y="' + (H - actualH - 6) + '" text-anchor="middle" font-size="10" fill="' + color + '">' + Math.round(d.actual * 10) / 10 + 'h</text>';
+        });
+        svg += '</svg>';
+        return svg;
+      };
+
+      el.innerHTML =
+        '<div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:16px;">' +
+          '<div style="flex:1; min-width:280px;"><div class="block-label">평일 (월~금)</div>' + buildChart(weekdayDays) + '</div>' +
+          '<div style="flex:1; min-width:280px;"><div class="block-label">주말 (토~일)</div>' + buildChart(weekendDays) + '</div>' +
+        '</div>' +
+        '<div style="font-size:11px; color:#999; margin-bottom:12px;">막대=실제 사용시간 · 점선=기준선(목표). 막대가 점선보다 높으면 과다(빨강), 낮으면 부족(파랑)</div>';
+    }
+
     function renderGlanceScoreCardsInto(containerId, sourceDiagnosis) {
       const el = document.getElementById(containerId);
       const weekdayDays = dateHeaders.filter(d => !isWeekendDay(d));
@@ -1544,7 +1593,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const cardHtml = (gb, days) => {
         const agg = aggregateBlockForGroup(gb, days, sourceDiagnosis);
         const cls = agg.verdict === '과다' ? 'gd-over' : (agg.verdict === '부족' ? 'gd-under' : 'gd-ok');
-        const scoreText = agg.score === null ? '-' : agg.score + '%';
+        const scoreText = agg.score === null ? '-' : agg.score + '점';
         return '<div class="glance-day-card ' + cls + '"><div class="day-label">' + gb.name + ' 점수</div><div class="day-score">' + scoreText + '</div></div>';
       };
 
@@ -1595,7 +1644,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       GLANCE_BLOCKS.forEach(b => GLANCE_PARTS.forEach(p => { maxAbs = Math.max(maxAbs, Math.abs(matrix[b.name][p])); }));
 
       const table = document.getElementById(tableId);
-      let html = '<tr><th>블록\\파트</th>' + GLANCE_PARTS.map(p => '<th>' + p + '</th>').join('') + '</tr>';
+      let html = '<tr><th>시간대 × 파트</th>' + GLANCE_PARTS.map(p => '<th>' + p + '</th>').join('') + '</tr>';
       GLANCE_BLOCKS.forEach(gb => {
         html += '<tr><th>' + gb.name + '</th>' + GLANCE_PARTS.map(p => {
           const v = Math.round(matrix[gb.name][p] * 10) / 10;
@@ -1619,7 +1668,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     function renderGlanceAll() {
       renderGlanceTop3();
       renderGlanceScoreCards();
+      renderGlanceBlockChart('glanceBlockChart', blockDiagnosis);
       renderGlanceHallScoreCards();
+      renderGlanceBlockChart('glanceHallBlockChart', hallBlockDiagnosis);
       renderGlanceHeatmap('glanceHeatmapWeekday', false);
       renderGlanceHeatmap('glanceHeatmapWeekend', true);
     }
