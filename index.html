@@ -21,7 +21,7 @@
     .sidebar .nav-btn.active { background: rgba(255,255,255,0.14); color: #fff; font-weight: bold; }
     .sidebar-spacer { flex: 1; }
     .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 6px; }
-    .main-content { flex: 1; padding: 24px 32px; max-width: 900px; box-sizing: border-box; }
+    .main-content { flex: 1; padding: 24px 32px; max-width: 900px; box-sizing: border-box; background: #f7f7f9; }
     h2 { margin-top: 0; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn {
@@ -42,7 +42,8 @@
     .diagnosis-list th { background: #eee; }
     .type-과다 { color: #c0392b; font-weight: bold; }
     .type-부족 { color: #2980b9; font-weight: bold; }
-    .section-title { margin-top: 24px; font-size: 15px; font-weight: bold; }
+    .section-title { margin-top: 0; margin-bottom: 14px; font-size: 15px; font-weight: bold; }
+    .section-card { background: #fff; border: 1px solid #eaeaea; border-radius: 14px; padding: 20px 22px; margin-bottom: 18px; }
 
     .priority-list { display: flex; flex-direction: column; gap: 10px; }
     .priority-card {
@@ -176,22 +177,21 @@
     #app { display: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 </head>
 <body>
 <div class="app-shell">
   <nav class="sidebar">
-    <div class="sidebar-brand">📊 애슐리 진단</div>
+    <div class="sidebar-brand">애슐리 진단</div>
     <div class="sidebar-sub">스케줄링 사전 피드백</div>
     <div class="sidebar-section-label">General</div>
-    <button class="nav-btn active" data-view="glance">🎯 한눈에</button>
-    <button class="nav-btn" data-view="weekly">📅 주간(상세)</button>
-    <button class="nav-btn" data-view="daily">📆 일간(상세)</button>
-    <button class="nav-btn" data-view="standard">📐 정석 시간표</button>
+    <button class="nav-btn active" data-view="glance">한눈에</button>
+    <button class="nav-btn" data-view="weekly">주간(상세)</button>
+    <button class="nav-btn" data-view="daily">일간(상세)</button>
+    <button class="nav-btn" data-view="standard">정석 시간표</button>
     <div class="sidebar-spacer"></div>
     <div class="sidebar-divider"></div>
-    <a id="reuploadLink" href="#" style="display:none; padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px;">📤 다른 파일 업로드</a>
-    <a href="admin.html" style="padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px; display:block;">🗂️ 관리자 페이지</a>
+    <a id="reuploadLink" href="#" style="display:none; padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px;">다른 파일 업로드</a>
+    <a href="admin.html" style="padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px; display:block;">관리자 페이지</a>
   </nav>
   <main class="main-content">
 
@@ -210,7 +210,7 @@
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
       <label style="font-size:13px; color:#555;">매장명: </label>
       <input type="text" id="storeNameInput" style="padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; width:200px;">
-      <button id="saveBtn" style="margin-left:8px; padding:7px 16px; background:#4a6cf7; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">📤 결과 저장 (관리자 페이지에 반영)</button>
+      <button id="saveBtn" style="margin-left:8px; padding:7px 16px; background:#4a6cf7; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">결과 저장 (관리자 페이지에 반영)</button>
       <div id="saveStatus" style="font-size:12px; color:#666; margin-top:8px;"></div>
     </div>
   </div>
@@ -223,22 +223,32 @@
 
     <div class="glance-top3" id="glanceTop3"></div>
 
-    <div class="section-title" style="margin-top:0;">시간대별 요일 점수 (주방)</div>
-    <div id="glanceScoreCards"></div>
-    <div id="glanceBlockChart"></div>
+    <div class="section-card">
+      <div class="section-title">시간대별 요일 점수 (주방)</div>
+      <div id="glanceScoreCards"></div>
+      <div id="glanceBlockChart"></div>
+    </div>
 
-    <div class="section-title">🏆 파트별 반복 문제 순위 (이번 주)</div>
-    <div id="partRanking"></div>
+    <div class="section-card">
+      <div class="section-title">파트별 반복 문제 순위 (이번 주)</div>
+      <div id="partRanking"></div>
+    </div>
 
-    <div class="section-title">시간대별 요일 점수 (홀)</div>
-    <div id="glanceHallScoreCards"></div>
-    <div id="glanceHallBlockChart"></div>
+    <div class="section-card">
+      <div class="section-title">시간대별 요일 점수 (홀)</div>
+      <div id="glanceHallScoreCards"></div>
+      <div id="glanceHallBlockChart"></div>
+    </div>
 
-    <div class="section-title">평일 히트맵 (세로=시간대 · 가로=파트 · <span style="color:#e74c3c;">빨강=과다</span> / <span style="color:#3478f6;">파랑=부족</span>, 진할수록 큼)</div>
-    <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
+    <div class="section-card">
+      <div class="section-title">평일 히트맵 (세로=시간대 · 가로=파트 · <span style="color:#e74c3c;">빨강=과다</span> / <span style="color:#3478f6;">파랑=부족</span>, 진할수록 큼)</div>
+      <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
+    </div>
 
-    <div class="section-title">주말 히트맵</div>
-    <table class="glance-heatmap" id="glanceHeatmapWeekend"></table>
+    <div class="section-card">
+      <div class="section-title">주말 히트맵</div>
+      <table class="glance-heatmap" id="glanceHeatmapWeekend"></table>
+    </div>
   </div>
 
   <!-- ===================== 주간 ===================== -->
@@ -246,17 +256,25 @@
     <div class="headline-banner" id="weeklyHeadline"></div>
     <div class="summary-banner" id="weeklyBanner"></div>
 
-    <div class="section-title" style="margin-top:0;">🕓 이번 주 시간대 종합진단 (주방)</div>
-    <div class="block-grid" id="weeklyBlockDiagnosis"></div>
+    <div class="section-card">
+      <div class="section-title">이번 주 시간대 종합진단 (주방)</div>
+      <div class="block-grid" id="weeklyBlockDiagnosis"></div>
+    </div>
 
-    <div class="section-title">🕓 이번 주 시간대 종합진단 (홀)</div>
-    <div class="block-grid" id="weeklyHallBlockDiagnosis"></div>
+    <div class="section-card">
+      <div class="section-title">이번 주 시간대 종합진단 (홀)</div>
+      <div class="block-grid" id="weeklyHallBlockDiagnosis"></div>
+    </div>
 
-    <div class="section-title">🗓️ 요일 × 시간대 한눈에 보기</div>
-    <table class="matrix-table" id="weekBlockMatrix"></table>
+    <div class="section-card">
+      <div class="section-title">요일 × 시간대 한눈에 보기</div>
+      <table class="matrix-table" id="weekBlockMatrix"></table>
+    </div>
 
-    <div class="section-title">📅 이번 주 총사용시간 추세</div>
-    <table class="trend-table" id="trendTable"></table>
+    <div class="section-card">
+      <div class="section-title">이번 주 총사용시간 추세</div>
+      <table class="trend-table" id="trendTable"></table>
+    </div>
   </div>
 
   <!-- ===================== 일간 ===================== -->
@@ -265,32 +283,44 @@
     <div class="headline-banner" id="dailyHeadline"></div>
     <div class="tier-banner" id="tierBanner"></div>
 
-    <div class="section-title" style="margin-top:0;">🕓 시간대별 진단 (주방)</div>
-    <div class="block-grid" id="blockDiagnosis"></div>
+    <div class="section-card">
+      <div class="section-title">시간대별 진단 (주방)</div>
+      <div class="block-grid" id="blockDiagnosis"></div>
+    </div>
 
-    <div class="section-title">🕓 시간대별 진단 (홀)</div>
-    <div class="block-grid" id="hallBlockDiagnosis"></div>
+    <div class="section-card">
+      <div class="section-title">시간대별 진단 (홀)</div>
+      <div class="block-grid" id="hallBlockDiagnosis"></div>
+    </div>
 
-    <div class="section-title">🍳 주방 vs 🙋 홀 사용계획시간 비교</div>
-    <div class="compare-section" id="compareSection"></div>
+    <div class="section-card">
+      <div class="section-title">주방 vs 홀 사용계획시간 비교</div>
+      <div class="compare-section" id="compareSection"></div>
+    </div>
 
-    <div class="section-title">🎯 세부 우선순위 조치 (Top 5)</div>
-    <div class="priority-list" id="priorityList"></div>
+    <div class="section-card">
+      <div class="section-title">세부 우선순위 조치 (Top 5)</div>
+      <div class="priority-list" id="priorityList"></div>
+    </div>
 
-    <div class="section-title">🔥 30분 단위 상세 히트맵 (참고, 원자료)</div>
-    <div id="heatmapContainer"></div>
-    <div style="font-size:11px; color:#999; margin-bottom:16px;">
-      ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림)
+    <div class="section-card">
+      <div class="section-title">30분 단위 상세 히트맵 (참고, 원자료)</div>
+      <div id="heatmapContainer"></div>
+      <div style="font-size:11px; color:#999; margin-top:10px;">
+        ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림)
+      </div>
     </div>
   </div>
 
   <!-- ===================== 정석 시간표 ===================== -->
   <div class="view-panel" id="view-standard">
     <div class="tabs" id="standardTabs"></div>
-    <div style="font-size:13px; color:#666; margin-bottom:14px;">
-      선택한 날짜의 예상매출(객수)을 기준으로 계산된 "정석" 배치입니다. 실제 배치와 무관하게, 이 매장 이 매출구간이라면 이렇게 배치하는 게 표준시간표상 맞다는 참고표입니다.
+    <div class="section-card">
+      <div style="font-size:13px; color:#666; margin-bottom:14px;">
+        선택한 날짜의 예상매출(객수)을 기준으로 계산된 "정석" 배치입니다. 실제 배치와 무관하게, 이 매장 이 매출구간이라면 이렇게 배치하는 게 표준시간표상 맞다는 참고표입니다.
+      </div>
+      <div id="standardScheduleContainer"></div>
     </div>
-    <div id="standardScheduleContainer"></div>
   </div>
   </div>
 
@@ -1119,7 +1149,7 @@ function buildHeadlineSummary(result) {
   (result.weeklyHallBlockSummary || []).forEach(b => {
     if (b.verdict === '과다') candidates.push({ source: '홀', block: b.name, part: null, diff: b.netDiffHours });
   });
-  if (!candidates.length) return '✅ 이번 주 뚜렷한 과다 문제가 없는 매장';
+  if (!candidates.length) return '이번 주 뚜렷한 과다 문제가 없는 매장';
   candidates.sort((a, b) => b.diff - a.diff);
   const top = candidates[0];
   const partText = top.part ? (top.part + ' 파트 중심, ') : '';
@@ -1145,7 +1175,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '저장 실패');
-    saveStatusEl.textContent = '✅ 저장 완료 (' + new Date().toLocaleString('ko-KR') + ')';
+    saveStatusEl.textContent = '저장 완료 (' + new Date().toLocaleString('ko-KR') + ')';
   } catch (err) {
     saveStatusEl.textContent = '❌ 저장 실패: ' + err.message;
   }
@@ -1211,7 +1241,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const worst = findWorstBlock(blocks);
       if (!worst) {
         el.className = 'headline-banner hl-ok';
-        el.innerHTML = '✅ ' + dateLabel + ', 과다 사용 블록 없이 무난합니다';
+        el.innerHTML = '' + dateLabel + ', 과다 사용 블록 없이 무난합니다';
         return;
       }
       const absDiff = worst.netDiffHours;
@@ -1219,7 +1249,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const culprit = worst.worstOver;
       const partText = culprit ? culprit.part : '';
       el.innerHTML =
-        '🚨 오늘 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
+        '오늘 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
         '에서 ' + absDiff + 'h 더 쓰고 있음' +
         '<span class="headline-sub">' + worst.action + '</span>';
     }
@@ -1235,7 +1265,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const worst = findWorstBlock(weeklyBlockSummary);
       if (!worst) {
         el.className = 'headline-banner hl-ok';
-        el.innerHTML = '✅ 이번 주는 과다 사용 블록 없이 전반적으로 무난합니다';
+        el.innerHTML = '이번 주는 과다 사용 블록 없이 전반적으로 무난합니다';
         return;
       }
       const absDiff = worst.netDiffHours;
@@ -1245,7 +1275,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const weekdaysStr = (dayLabels && dayLabels.length) ? dayLabels.map(dayLabelToWeekday).join(', ') : '';
 
       el.innerHTML =
-        '🚨 이번 주 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
+        '이번 주 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
         '에서 ' + absDiff + 'h 더 쓰고 있음' +
         (weekdaysStr ? '<span class="headline-sub">요일: ' + weekdaysStr + '</span>' : '');
     }
@@ -1538,7 +1568,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       weeklyHallBlockSummary.forEach(b => {
         if (b.verdict === '과다') candidates.push({ source: '홀', block: b.name, part: null, diff: b.netDiffHours });
       });
-      if (!candidates.length) return '✅ 이번 주 뚜렷한 과다 문제가 없는 매장입니다';
+      if (!candidates.length) return '이번 주 뚜렷한 과다 문제가 없는 매장입니다';
       candidates.sort((a, b) => b.diff - a.diff);
       const top = candidates[0];
       const partText = top.part ? (top.part + ' 파트 중심, ') : '';
@@ -1608,19 +1638,15 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           '</div>' +
           '<div style="display:flex; gap:14px;">' +
             '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div style="width:36px; height:36px; border-radius:6px; background:#EF5350; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-clock-exclamation" style="color:#fff; font-size:17px;"></i></div>' +
               '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">이번주 초과시간</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + overHours + 'h</p></div>' +
             '</div>' +
             '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div style="width:36px; height:36px; border-radius:6px; background:#FFA726; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-chef-hat" style="color:#fff; font-size:17px;"></i></div>' +
               '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">가장 심한 파트</p><p style="font-size:13px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + worstPartText + '</p></div>' +
             '</div>' +
             '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div style="width:36px; height:36px; border-radius:6px; background:#26C6DA; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-target-arrow" style="color:#fff; font-size:17px;"></i></div>' +
               '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">목표 대비</p><p style="font-size:15px; color:#3C4858; margin:1px 0 0; font-weight:500;">' + targetRatio + '점</p></div>' +
             '</div>' +
             '<div style="flex:1; background:#fff; border-radius:6px; padding:12px 14px; display:flex; gap:10px; align-items:center;">' +
-              '<div style="width:36px; height:36px; border-radius:6px; background:#66BB6A; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><i class="ti ti-coin" style="color:#fff; font-size:17px;"></i></div>' +
               '<div><p style="font-size:10px; color:#9AA0A8; margin:0;">재배치시 절감</p><p style="font-size:13px; color:#3C4858; margin:1px 0 0; font-weight:500;">약 ' + savingWon.toLocaleString() + '원/주</p></div>' +
             '</div>' +
           '</div>' +
@@ -1643,7 +1669,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const top3 = candidates.slice(0, 3);
 
       if (!top3.length) {
-        el.innerHTML = characterization + '<div class="rank1">✅ 이번 주 뚜렷한 과다 문제가 없습니다</div>';
+        el.innerHTML = characterization + '<div class="rank1">이번 주 뚜렷한 과다 문제가 없습니다</div>';
         return;
       }
       const fmt = (c, rank) => {
@@ -1722,7 +1748,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         const toPath = (pts) => pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
         const areaPath = toPath(actualPts) + ' L' + xOf(data.length - 1) + ',' + (H - PAD) + ' L' + xOf(0) + ',' + (H - PAD) + ' Z';
 
-        let svg = '<svg viewBox="0 0 ' + W + ' ' + (H + 22) + '" style="width:100%; height:auto;">';
+        let svg = '<svg viewBox="0 0 ' + W + ' ' + (H + 28) + '" style="width:100%; height:auto;">';
         svg += '<defs><linearGradient id="grad-' + containerId + '" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.35"/><stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/></linearGradient></defs>';
         // 보조 가로 점선(그리드)
@@ -1738,7 +1764,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         data.forEach((d, i) => {
           svg += '<circle cx="' + actualPts[i][0] + '" cy="' + actualPts[i][1] + '" r="4" fill="#8B5CF6"></circle>';
           svg += '<circle cx="' + stdPts[i][0] + '" cy="' + stdPts[i][1] + '" r="3.5" fill="#fff" stroke="#EC4899" stroke-width="2"></circle>';
-          svg += '<text x="' + xOf(i) + '" y="' + (H + 14) + '" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">' + d.name + '</text>';
+          svg += '<text x="' + xOf(i) + '" y="' + (H + 18) + '" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">' + d.name + '</text>';
         });
         svg += '</svg>';
         return svg;
@@ -1749,9 +1775,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           '<div style="flex:1; min-width:280px;"><div class="block-label">평일 (월~금)</div>' + buildChart(weekdayDays) + '</div>' +
           '<div style="flex:1; min-width:280px;"><div class="block-label">주말 (토~일)</div>' + buildChart(weekendDays) + '</div>' +
         '</div>' +
-        '<div style="font-size:11px; color:#999; margin-bottom:12px; display:flex; gap:14px; align-items:center;">' +
-          '<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#8B5CF6; margin-right:4px;"></span>실제 사용시간</span>' +
-          '<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fff; border:2px solid #EC4899; margin-right:4px;"></span>기준선(목표)</span>' +
+        '<div style="font-size:14px; color:#555; margin-bottom:14px; display:flex; gap:18px; align-items:center;">' +
+          '<span><span style="display:inline-block; width:11px; height:11px; border-radius:50%; background:#8B5CF6; margin-right:5px;"></span>실제 사용시간</span>' +
+          '<span><span style="display:inline-block; width:11px; height:11px; border-radius:50%; background:#fff; border:2px solid #EC4899; margin-right:5px;"></span>기준선(목표)</span>' +
         '</div>';
     }
 
