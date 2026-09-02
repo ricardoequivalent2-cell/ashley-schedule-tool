@@ -5,14 +5,22 @@
   <style>
     body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; color: #333; }
     .app-shell { display: flex; min-height: 100vh; }
-    .sidebar { width: 210px; flex-shrink: 0; background: #1B2028; padding: 22px 14px; box-sizing: border-box; }
-    .sidebar-brand { color: #fff; font-size: 15px; font-weight: bold; margin-bottom: 22px; padding: 0 8px; }
-    .sidebar .nav-btn {
-      display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: none;
-      color: #8A93A3; padding: 10px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-bottom: 3px;
+    .sidebar {
+      width: 230px; flex-shrink: 0; box-sizing: border-box;
+      background: linear-gradient(180deg, #2A1F4D 0%, #1E1640 100%);
+      padding: 24px 16px; display: flex; flex-direction: column;
     }
-    .sidebar .nav-btn:hover { background: rgba(255,255,255,0.05); color: #C4CAD3; }
-    .sidebar .nav-btn.active { background: #12151B; color: #fff; font-weight: bold; }
+    .sidebar-brand { color: #fff; font-size: 17px; font-weight: bold; margin-bottom: 2px; padding: 0 6px; letter-spacing: 0.01em; }
+    .sidebar-sub { color: rgba(255,255,255,0.4); font-size: 10px; margin-bottom: 20px; padding: 0 6px; }
+    .sidebar-section-label { color: rgba(255,255,255,0.35); font-size: 10px; font-weight: bold; letter-spacing: 0.06em; margin: 4px 6px 8px; text-transform: uppercase; }
+    .sidebar .nav-btn {
+      display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none;
+      color: rgba(255,255,255,0.55); padding: 11px 12px; border-radius: 10px; font-size: 13.5px; cursor: pointer; margin-bottom: 4px;
+    }
+    .sidebar .nav-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
+    .sidebar .nav-btn.active { background: rgba(255,255,255,0.14); color: #fff; font-weight: bold; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 6px; }
     .main-content { flex: 1; padding: 24px 32px; max-width: 900px; box-sizing: border-box; }
     h2 { margin-top: 0; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -174,11 +182,16 @@
 <div class="app-shell">
   <nav class="sidebar">
     <div class="sidebar-brand">📊 애슐리 진단</div>
+    <div class="sidebar-sub">스케줄링 사전 피드백</div>
+    <div class="sidebar-section-label">General</div>
     <button class="nav-btn active" data-view="glance">🎯 한눈에</button>
     <button class="nav-btn" data-view="weekly">📅 주간(상세)</button>
     <button class="nav-btn" data-view="daily">📆 일간(상세)</button>
     <button class="nav-btn" data-view="standard">📐 정석 시간표</button>
-    <a id="reuploadLink" href="#" style="display:none; margin-top:18px; padding:10px 10px; font-size:12px; color:#8A93A3; text-decoration:none; border-top:1px solid rgba(255,255,255,0.1);">📤 다른 파일 업로드</a>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-divider"></div>
+    <a id="reuploadLink" href="#" style="display:none; padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px;">📤 다른 파일 업로드</a>
+    <a href="admin.html" style="padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px; display:block;">🗂️ 관리자 페이지</a>
   </nav>
   <main class="main-content">
 
@@ -213,6 +226,9 @@
     <div class="section-title" style="margin-top:0;">시간대별 요일 점수 (주방)</div>
     <div id="glanceScoreCards"></div>
     <div id="glanceBlockChart"></div>
+
+    <div class="section-title">🏆 파트별 반복 문제 순위 (이번 주)</div>
+    <div id="partRanking"></div>
 
     <div class="section-title">시간대별 요일 점수 (홀)</div>
     <div id="glanceHallScoreCards"></div>
@@ -1651,6 +1667,43 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       return { actual, standard, net, verdict, score };
     }
 
+    function renderPartRanking() {
+      const el = document.getElementById('partRanking');
+      const tally = {}; // part -> { days: n, totalDiff: h }
+      dateHeaders.forEach(label => {
+        (blockDiagnosis[label] || []).forEach(b => {
+          if (b.verdict === '과다' && b.worstOver) {
+            const p = b.worstOver.part;
+            tally[p] = tally[p] || { days: 0, totalDiff: 0 };
+            tally[p].days += 1;
+            tally[p].totalDiff += b.worstOver.diffHours;
+          }
+        });
+      });
+      const ranked = Object.keys(tally).map(p => ({ part: p, days: tally[p].days, totalDiff: Math.round(tally[p].totalDiff * 10) / 10 }))
+        .sort((a, b) => b.totalDiff - a.totalDiff).slice(0, 5);
+
+      if (!ranked.length) {
+        el.innerHTML = '<div style="color:#888; font-size:13px; padding:12px 0;">이번 주 반복적으로 과다한 파트가 없습니다.</div>';
+        return;
+      }
+      const maxDiff = Math.max(...ranked.map(r => r.totalDiff));
+      el.innerHTML = ranked.map(r => {
+        const pct = Math.round((r.totalDiff / maxDiff) * 100);
+        return (
+          '<div style="margin-bottom:14px;">' +
+            '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px;">' +
+              '<span style="font-weight:bold; font-size:13.5px; color:#222;">' + r.part + '</span>' +
+              '<span style="font-size:12px; color:#888;">' + r.days + '일 반복 (' + r.totalDiff + 'h 과다)</span>' +
+            '</div>' +
+            '<div style="background:#f0eef7; border-radius:6px; height:8px; overflow:hidden;">' +
+              '<div style="background:#8B5CF6; height:100%; width:' + pct + '%; border-radius:6px;"></div>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
     function renderGlanceBlockChart(containerId, sourceDiagnosis) {
       const el = document.getElementById(containerId);
       const weekdayDays = dateHeaders.filter(d => !isWeekendDay(d));
@@ -1658,30 +1711,48 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
       const buildChart = (days) => {
         const data = GLANCE_BLOCKS.map(gb => Object.assign({ name: gb.name }, aggregateBlockForGroup(gb, days, sourceDiagnosis)));
-        const maxVal = Math.max(1, ...data.map(d => Math.max(d.actual, d.standard)));
-        const W = 640, H = 150, groupW = W / data.length, barW = 34;
-        let svg = '<svg viewBox="0 0 ' + W + ' ' + (H + 20) + '" style="width:100%; height:auto;">';
+        const maxVal = Math.max(1, ...data.map(d => Math.max(d.actual, d.standard))) * 1.15;
+        const W = 640, H = 160, PAD = 18;
+        const stepX = (W - PAD * 2) / (data.length - 1);
+        const yOf = (v) => PAD + (H - PAD * 2) * (1 - v / maxVal);
+        const xOf = (i) => PAD + stepX * i;
+
+        const actualPts = data.map((d, i) => [xOf(i), yOf(d.actual)]);
+        const stdPts = data.map((d, i) => [xOf(i), yOf(d.standard)]);
+        const toPath = (pts) => pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
+        const areaPath = toPath(actualPts) + ' L' + xOf(data.length - 1) + ',' + (H - PAD) + ' L' + xOf(0) + ',' + (H - PAD) + ' Z';
+
+        let svg = '<svg viewBox="0 0 ' + W + ' ' + (H + 22) + '" style="width:100%; height:auto;">';
+        svg += '<defs><linearGradient id="grad-' + containerId + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.35"/><stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/></linearGradient></defs>';
+        // 보조 가로 점선(그리드)
+        for (let g = 0; g <= 2; g++) {
+          const gy = PAD + (H - PAD * 2) * g / 2;
+          svg += '<line x1="' + PAD + '" x2="' + (W - PAD) + '" y1="' + gy + '" y2="' + gy + '" stroke="#eee" stroke-dasharray="3,3"></line>';
+        }
+        // 실제(보라 영역+실선)
+        svg += '<path d="' + areaPath + '" fill="url(#grad-' + containerId + ')" stroke="none"></path>';
+        svg += '<path d="' + toPath(actualPts) + '" fill="none" stroke="#8B5CF6" stroke-width="2.5"></path>';
+        // 기준선(핑크 점선)
+        svg += '<path d="' + toPath(stdPts) + '" fill="none" stroke="#EC4899" stroke-width="2" stroke-dasharray="5,4"></path>';
         data.forEach((d, i) => {
-          const cx = groupW * i + groupW / 2;
-          const actualH = Math.round((d.actual / maxVal) * H);
-          const stdH = Math.round((d.standard / maxVal) * H);
-          const color = d.verdict === '과다' ? '#e74c3c' : (d.verdict === '부족' ? '#3478f6' : '#9aa0a8');
-          const barX = cx - barW / 2;
-          svg += '<rect x="' + barX + '" y="' + (H - actualH) + '" width="' + barW + '" height="' + actualH + '" fill="' + color + '" opacity="0.8"></rect>';
-          svg += '<line x1="' + (barX - 6) + '" x2="' + (barX + barW + 6) + '" y1="' + (H - stdH) + '" y2="' + (H - stdH) + '" stroke="#1a1a1a" stroke-width="2" stroke-dasharray="4,3"></line>';
-          svg += '<text x="' + cx + '" y="' + (H + 16) + '" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">' + d.name + '</text>';
-          svg += '<text x="' + cx + '" y="' + (H - actualH - 6) + '" text-anchor="middle" font-size="10" fill="' + color + '">' + Math.round(d.actual * 10) / 10 + 'h</text>';
+          svg += '<circle cx="' + actualPts[i][0] + '" cy="' + actualPts[i][1] + '" r="4" fill="#8B5CF6"></circle>';
+          svg += '<circle cx="' + stdPts[i][0] + '" cy="' + stdPts[i][1] + '" r="3.5" fill="#fff" stroke="#EC4899" stroke-width="2"></circle>';
+          svg += '<text x="' + xOf(i) + '" y="' + (H + 14) + '" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">' + d.name + '</text>';
         });
         svg += '</svg>';
         return svg;
       };
 
       el.innerHTML =
-        '<div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:16px;">' +
+        '<div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:8px;">' +
           '<div style="flex:1; min-width:280px;"><div class="block-label">평일 (월~금)</div>' + buildChart(weekdayDays) + '</div>' +
           '<div style="flex:1; min-width:280px;"><div class="block-label">주말 (토~일)</div>' + buildChart(weekendDays) + '</div>' +
         '</div>' +
-        '<div style="font-size:11px; color:#999; margin-bottom:12px;">막대=실제 사용시간 · 점선=기준선(목표). 막대가 점선보다 높으면 과다(빨강), 낮으면 부족(파랑)</div>';
+        '<div style="font-size:11px; color:#999; margin-bottom:12px; display:flex; gap:14px; align-items:center;">' +
+          '<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#8B5CF6; margin-right:4px;"></span>실제 사용시간</span>' +
+          '<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#fff; border:2px solid #EC4899; margin-right:4px;"></span>기준선(목표)</span>' +
+        '</div>';
     }
 
     function renderGlanceScoreCardsInto(containerId, sourceDiagnosis) {
@@ -1766,6 +1837,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     function renderGlanceAll() {
       renderGlanceTop3();
+      renderPartRanking();
       renderGlanceScoreCards();
       renderGlanceBlockChart('glanceBlockChart', blockDiagnosis);
       renderGlanceHallScoreCards();
