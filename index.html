@@ -42,11 +42,17 @@
     .kpi-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 6px; }
 
     .status-strip {
-      display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600;
-      background: #fff; border: 1px solid #EAEAEA; border-radius: 8px; padding: 7px 14px; margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box;
+      font-size: 14px; font-weight: 650; background: #fff; border: 1px solid #E4E7EE; border-radius: 12px;
+      padding: 13px 16px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(20,27,45,0.03);
     }
-    .status-strip .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .status-strip .status-main { display:flex; align-items:center; gap:9px; min-width:0; }
+    .status-strip .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-strip .status-title { font-size:15px; font-weight:800; color:#1A2233; white-space:nowrap; }
+    .status-strip .status-detail { font-size:12.5px; color:#6B7280; font-weight:500; white-space:nowrap; }
+    .status-strip .status-rate { font-size:13px; font-weight:800; padding:6px 10px; border-radius:8px; white-space:nowrap; }
     .status-strip .status-sep { color: #D6D8E0; font-weight: 400; }
+    .glance-kpi-row { margin-bottom: 14px; }
 
     .exec-hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 2px 16px; }
     .exec-eyebrow { font-size: 11.5px; font-weight: 700; color: #9AA1B0; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
@@ -179,7 +185,7 @@
     .priority-detail { font-size: 12px; color: #666; }
     .priority-empty { color: #888; font-size: 13px; padding: 12px 0; }
 
-    .block-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+    .block-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 20px; }
     .block-card { border-radius: 12px; padding: 14px 16px; border: 1px solid #e2e2e2; }
     .block-card.verdict-과다 { background: #F7E3E3; border-color: #E8C4C4; }
     .block-card.verdict-부족 { background: #DCEEFB; border-color: #BFDCF0; }
@@ -349,6 +355,7 @@
       <div class="exec-hero-right" id="execContext"></div>
     </div>
 
+    <div class="kpi-row-5 glance-kpi-row" id="glanceKpiRow"></div>
     <div class="status-strip" id="glanceHeadlineBanner"></div>
 
     <div class="dashboard-grid-main">
@@ -377,13 +384,13 @@
     </div>
 
     <div class="section-card">
-      <div class="section-title">시간대별 요일 점수 (주방)</div>
+      <div class="section-title">시간대별 배치효율 (주방)</div>
       <div id="glanceScoreCards"></div>
       <div id="glanceBlockChart"></div>
     </div>
 
     <div class="section-card">
-      <div class="section-title">시간대별 요일 점수 (홀)</div>
+      <div class="section-title">시간대별 배치효율 (홀)</div>
       <div id="glanceHallScoreCards"></div>
       <div id="glanceHallBlockChart"></div>
     </div>
@@ -430,28 +437,6 @@
       <div id="weeklyComments"></div>
     </div>
 
-    <div class="headline-banner" id="weeklyHeadline"></div>
-    <div class="summary-banner" id="weeklyBanner"></div>
-
-    <div class="section-card">
-      <div class="section-title">이번 주 시간대 종합진단 (주방)</div>
-      <div class="block-grid" id="weeklyBlockDiagnosis"></div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">이번 주 시간대 종합진단 (홀)</div>
-      <div class="block-grid" id="weeklyHallBlockDiagnosis"></div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">요일 × 시간대 한눈에 보기 (참고, 원자료)</div>
-      <table class="matrix-table" id="weekBlockMatrix"></table>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">이번 주 총사용시간 추세</div>
-      <table class="trend-table" id="trendTable"></table>
-    </div>
   </div>
 
   <!-- ===================== 일간 ===================== -->
@@ -459,9 +444,6 @@
     <div class="daily-page-title">스케줄 진단 대시보드</div>
     <div class="daily-page-sub">매출/객수 기반 정석 스케줄과 실제 스케줄을 비교하여 인력 과다/부족을 진단합니다.</div>
     <div class="tabs" id="tabs"></div>
-
-    <div class="headline-banner" id="dailyHeadline"></div>
-    <div class="tier-banner" id="tierBanner"></div>
 
     <div class="kpi-row-5" id="dailyKpiRow"></div>
 
@@ -494,25 +476,6 @@
       </div>
     </div>
 
-    <div class="section-card">
-      <div class="section-title">시간대별 진단 (주방)</div>
-      <div class="block-grid" id="blockDiagnosis"></div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">시간대별 진단 (홀)</div>
-      <div class="block-grid" id="hallBlockDiagnosis"></div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">주방 vs 홀 사용계획시간 비교</div>
-      <div class="compare-section" id="compareSection"></div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title">세부 우선순위 조치 (Top 5)</div>
-      <div class="priority-list" id="priorityList"></div>
-    </div>
   </div>
 
   <!-- ===================== 정석 시간표 ===================== -->
@@ -596,10 +559,11 @@ const CURVE = {
 };
 
 const SHIFT_BLOCKS = [
-  { name: '오픈조',   startMin: 9*60,       endMin: 11*60+30 },
+  { name: '오픈',     startMin: 8*60+30,    endMin: 11*60+30 },
   { name: '런치피크', startMin: 11*60+30,   endMin: 14*60+30 },
   { name: '스윙',     startMin: 14*60+30,   endMin: 17*60 },
-  { name: '디너마감', startMin: 17*60,      endMin: 21*60+30 },
+  { name: '디너',     startMin: 17*60,      endMin: 20*60 },
+  { name: '마감',     startMin: 20*60,      endMin: 22*60 },
 ];
 
 const SLOT_START_MIN = 8*60+30, SLOT_END_MIN = 22*60, SLOT_SIZE_MIN = 30;
@@ -1706,37 +1670,37 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           : '');
     }
 
-    // "기준대비 -5.5h (106%)" 형태의 숫자 델타
-    // 달성률 = 기준 ÷ 실배치 * 100 (100% 초과 = 기준보다 적게 계획해서 더 잘한 것, 회사 공통 정의와 통일)
+    // 기준대비 Gap + 배치율(실제 ÷ 기준 × 100)을 함께 표시
+    // 100% 미만 = 기준보다 적게 배치, 100% 초과 = 기준보다 많이 배치
+    function placementRate(actualHours, standardHours) {
+      return standardHours > 0 ? Math.round((actualHours / standardHours) * 1000) / 10 : null;
+    }
     function diffPhrase(actualHours, standardHours, longForm) {
       const diff = actualHours - standardHours;
       const abs = Math.round(Math.abs(diff) * 10) / 10;
-      const pct = standardHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null;
+      const pct = placementRate(actualHours, standardHours);
       const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
       const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
-      const pctText = pct !== null ? (' (' + pct + '점)') : '';
+      const pctText = pct !== null ? (' · 배치율 ' + pct + '%') : '';
       return (longForm ? '기준대비 ' : '') + core + pctText;
     }
-    // 매트릭스 등 공간이 좁은 곳에 쓰는 압축형 - 달성률(점)만 표시
     function diffPhraseCompact(actualHours, standardHours) {
-      const pct = standardHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null;
-      return pct !== null ? (pct + '점') : '-';
+      const pct = placementRate(actualHours, standardHours);
+      return pct !== null ? (pct + '%') : '-';
     }
 
-    // 시간대 전용: "기준"이 상한선이 아니라 "딱 맞는 적정 인원"이라서
-    // 달성률(높을수록 좋음) 개념을 쓰면 안 됨 - 배치율(100%에 가까울수록 좋음)로 표시
     function blockDiffPhrase(actualHours, standardHours) {
       const diff = actualHours - standardHours;
       const abs = Math.round(Math.abs(diff) * 10) / 10;
-      const ratio = actualHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null; // 기준÷실제: 적게 쓸수록 100 초과(효율)
+      const ratio = placementRate(actualHours, standardHours);
       const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
       const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
-      const ratioText = ratio !== null ? (' (' + ratio + '점)') : '';
+      const ratioText = ratio !== null ? (' · 배치율 ' + ratio + '%') : '';
       return core + ratioText;
     }
     function blockDiffCompact(actualHours, standardHours) {
-      const ratio = actualHours > 0 ? Math.round((standardHours / actualHours) * 1000) / 10 : null; // 기준÷실제: 적게 쓸수록 100 초과(효율)
-      return ratio !== null ? (ratio + '점') : '-';
+      const ratio = placementRate(actualHours, standardHours);
+      return ratio !== null ? (ratio + '%') : '-';
     }
 
     // 매장전체 3단계 verdict 문자열(최소허들/1차/2차) -> "~수준입니다" 짧은 상태문구
@@ -1874,7 +1838,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const el = document.getElementById('dailyDonut');
       const kBlocks = blockDiagnosis[dateLabel] || [];
       const hBlocks = hallBlockDiagnosis[dateLabel] || [];
-      const all = kBlocks.concat(hBlocks); // 이 날의 8개 시간대(주방4+홀4)
+      const all = kBlocks.concat(hBlocks); // 이 날의 10개 시간대블록(주방5+홀5)
       let overHours = 0, underHours = 0;
       let overCnt = 0, midOverCnt = 0, okCnt = 0, midUnderCnt = 0, underCnt = 0;
       all.forEach(b => {
@@ -2048,12 +2012,18 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const w = weeklySummary;
       if (!w) { el.innerHTML = ''; return; }
       const achieved = w.verdict.indexOf('1차목표 달성') !== -1 || w.verdict.indexOf('2차목표(BHAG) 달성') !== -1;
-      const color = achieved ? '#3D8361' : '#A34848';
+      const statusColor = achieved ? '#3D8361' : '#A34848';
+      const rate = placementRate(w.totalActual, w.totalTarget1);
+      const rateColor = rate === null ? '#6B7280' : (rate < 100 ? '#2C6690' : (rate > 100 ? '#A34848' : '#6B7280'));
+      const rateBg = rate === null ? '#F3F4F7' : (rate < 100 ? '#EAF3FB' : (rate > 100 ? '#FBECEC' : '#F3F4F7'));
+      const gap = Math.round((w.totalActual - w.totalTarget1) * 10) / 10;
       el.innerHTML =
-        '<span class="status-dot" style="background:' + color + ';"></span>' +
-        '<span style="color:' + color + ';">' + levelPhrase(w.verdict) + '</span>' +
-        '<span class="status-sep">·</span>' +
-        '<span style="color:#4A505E; font-weight:500;">' + diffPhrase(w.totalActual, w.totalTarget1, true) + '</span>';
+        '<div class="status-main">' +
+          '<span class="status-dot" style="background:' + statusColor + ';"></span>' +
+          '<span class="status-title" style="color:' + statusColor + ';">' + levelPhrase(w.verdict) + '</span>' +
+          '<span class="status-detail">목표 ' + w.totalTarget1 + 'h → 실제 ' + w.totalActual + 'h · Gap ' + (gap > 0 ? '+' : '') + gap + 'h</span>' +
+        '</div>' +
+        '<span class="status-rate" style="color:' + rateColor + '; background:' + rateBg + ';">배치효율 ' + (rate === null ? '-' : rate + '%') + '</span>';
     }
 
     function renderGlanceHero() {
@@ -2118,7 +2088,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       el.innerHTML = html;
     }
 
-    // 주 전체(모든 날짜 x 8블록)를 5단계로 집계하는 도넛 - 요약 화면용
+    // 주 전체(모든 날짜 x 10블록)를 5단계로 집계
     function computeWeekTierCounts() {
       let overHours = 0, underHours = 0;
       let overCnt = 0, midOverCnt = 0, okCnt = 0, midUnderCnt = 0, underCnt = 0, total = 0;
@@ -2257,7 +2227,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     // 주간진단 - 요일 x 시간대 히트맵 (행=시간대블록, 열=요일)
     function renderWeeklyDayBlockHeatmap() {
       const el = document.getElementById('weeklyDayBlockHeatmap');
-      const blockDefs = SHIFT_BLOCKS.map(b => b.name); // 오픈조/런치피크/스윙/디너마감 (주방+홀 공통 명칭)
+      const blockDefs = SHIFT_BLOCKS.map(b => b.name); // 오픈/런치피크/스윙/디너/마감 (주방+홀 공통 명칭)
       let html = '<table class="heatmap" style="width:100%;"><tr><th>시간대</th>' + dateHeaders.map(d => '<th>' + d + '</th>').join('') + '</tr>';
       blockDefs.forEach(name => {
         html += '<tr><td style="font-weight:600; text-align:left; background:#FAFAFC;">' + name + '</td>';
@@ -2404,10 +2374,11 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     // ==================== 한눈에(1페이지 요약) ====================
     const GLANCE_BLOCKS = [
-      { name: '오픈조', start: 9*60, end: 11*60+30 },
+      { name: '오픈', start: 8*60+30, end: 11*60+30 },
       { name: '런치피크', start: 11*60+30, end: 14*60+30 },
       { name: '스윙', start: 14*60+30, end: 17*60 },
-      { name: '디너마감', start: 17*60, end: 21*60+30 },
+      { name: '디너', start: 17*60, end: 20*60 },
+      { name: '마감', start: 20*60, end: 22*60 },
     ];
     const GLANCE_PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO'];
 
@@ -2440,7 +2411,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const AVG_WAGE = 14650; // 혼합 평균시급(원/h)
 
       const overHours = computeOverHoursFromSummaries(weeklyBlockSummary, weeklyHallBlockSummary);
-      const allBlocks = weeklyBlockSummary.concat(weeklyHallBlockSummary); // 8개(주방4+홀4)
+      const allBlocks = weeklyBlockSummary.concat(weeklyHallBlockSummary); // 10개(주방5+홀5)
       const okCount = allBlocks.filter(b => b.verdict === '적정').length;
       const okRatio = allBlocks.length ? Math.round(okCount / allBlocks.length * 100) : 0;
       const targetRatio = (weeklySummary && weeklySummary.totalActual > 0) ? Math.round(weeklySummary.totalTarget1 / weeklySummary.totalActual * 1000) / 10 : 0;
@@ -2543,7 +2514,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       });
       const net = Math.round((actual - standard) * 10) / 10;
       const verdict = Math.abs(net) < 0.5 ? '적정' : (net > 0 ? '과다' : '부족');
-      const score = actual > 0 ? Math.round((standard / actual) * 1000) / 10 : null; // 배치율(%) = 기준÷실제 (적게 쓸수록 100 초과=효율적)
+      const score = standard > 0 ? Math.round((actual / standard) * 1000) / 10 : null; // 배치효율(%) = 실제÷기준
       return { actual, standard, net, verdict, score };
     }
 
@@ -2658,8 +2629,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const cardHtml = (gb, days) => {
         const agg = aggregateBlockForGroup(gb, days, sourceDiagnosis);
         const cls = agg.verdict === '과다' ? 'gd-over' : (agg.verdict === '부족' ? 'gd-under' : 'gd-ok');
-        const scoreText = agg.score === null ? '-' : agg.score + '점';
-        return '<div class="glance-day-card ' + cls + '"><div class="day-label">' + gb.name + ' 점수</div><div class="day-score">' + scoreText + '</div></div>';
+        const scoreText = agg.score === null ? '-' : agg.score + '%';
+        return '<div class="glance-day-card ' + cls + '"><div class="day-label">' + gb.name + ' 배치효율</div><div class="day-score">' + scoreText + '</div></div>';
       };
 
       el.innerHTML =
@@ -2802,19 +2773,13 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         btn.onclick = () => {
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          renderDailyHeadline(d);
-          renderTierBanner(d);
           renderDailyKPIRow(d);
           renderDailyDonut(d);
           renderDailyComments(d);
           compareTablePage = 1;
           renderDailyComparisonTable(d);
           renderDailyPartRanking(d);
-          renderBlockDiagnosis(d);
-          renderHallBlockDiagnosis(d);
-          renderCompareSection(d);
           renderHeatmap(d);
-          renderPriorityList(d);
         };
         tabsDiv.appendChild(btn);
       });
@@ -2824,8 +2789,8 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     setupTabs();
     setupStandardTabs();
     if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }
-    renderTrendTable();
     renderGlanceHero();
+    renderWeekKPIRowInto('glanceKpiRow');
     renderGlanceHeadlineBanner();
     renderGlancePartGapSummary();
     renderGlanceComments();
@@ -2834,14 +2799,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     renderWeeklyDayTable();
     renderWeeklyDayBlockHeatmap();
     renderWeeklyComments();
-    renderWeeklyHeadline();
-    renderWeeklyBanner();
-    renderWeeklyBlockDiagnosis();
-    renderWeeklyHallBlockDiagnosis();
-    renderWeekBlockMatrix();
     if (dateHeaders.length > 0) {
-      renderDailyHeadline(dateHeaders[0]);
-      renderTierBanner(dateHeaders[0]);
       renderDailyKPIRow(dateHeaders[0]);
       renderHeatmapLegendInto('dailyHeatmapLegend');
       renderHeatmapLegendInto('weeklyHeatmapLegend');
@@ -2850,11 +2808,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       compareTablePage = 1;
       renderDailyComparisonTable(dateHeaders[0]);
       renderDailyPartRanking(dateHeaders[0]);
-      renderBlockDiagnosis(dateHeaders[0]);
-      renderHallBlockDiagnosis(dateHeaders[0]);
-      renderCompareSection(dateHeaders[0]);
       renderHeatmap(dateHeaders[0]);
-      renderPriorityList(dateHeaders[0]);
     }
     }
 
