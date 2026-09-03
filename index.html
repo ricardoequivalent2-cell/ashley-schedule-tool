@@ -21,7 +21,7 @@
     .sidebar .nav-btn.active { background: #3B5BFF; color: #fff; font-weight: bold; }
     .sidebar-spacer { flex: 1; }
     .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 6px; }
-    .main-content { flex: 1; width: 100%; padding: 24px 32px; max-width: 1680px; margin: 0 auto; box-sizing: border-box; background: #F6F7FB; }
+    .main-content { flex: 1; width: 100%; min-width: 0; padding: 20px 24px; max-width: none; margin: 0; box-sizing: border-box; background: #F6F7FB; }
     h2 { margin-top: 0; }
 
     .daily-page-title { font-size: 21px; font-weight: 800; color: #1A2233; margin-bottom: 4px; }
@@ -54,20 +54,53 @@
     .status-strip .status-sep { color: #D6D8E0; font-weight: 400; }
     .glance-kpi-row { margin-bottom: 14px; }
 
-    .glance-summary-stack { display:flex; flex-direction:column; gap:14px; height:100%; }
-    .glance-summary-stack .summary-section + .summary-section { border-top:1px solid #F0F1F5; padding-top:12px; }
-    .glance-mini-title { font-size:12px; font-weight:800; color:#5B6272; margin-bottom:8px; }
-    .glance-efficiency-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-    .glance-efficiency-item { border:1px solid #EEF0F4; background:#FAFBFD; border-radius:9px; padding:9px 10px; min-width:0; }
-    .glance-efficiency-label { font-size:10.5px; color:#8B93A5; margin-bottom:3px; white-space:nowrap; }
-    .glance-efficiency-value { font-size:16px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .glance-efficiency-sub { font-size:10px; color:#A7AEBD; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .glance-heatmap-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:start; }
+    /* 요약 화면은 빈 공간보다 정보 밀도를 우선한다. */
+    #view-glance .section-card { padding: 14px 16px; margin-bottom: 12px; }
+    #view-glance .section-title { margin-bottom: 9px; }
+    .glance-primary-grid { grid-template-columns: minmax(0, 2.15fr) minmax(330px, .95fr); gap: 12px; margin-bottom: 12px; align-items:start; }
+    .glance-summary-stack { display:flex; flex-direction:column; gap:8px; }
+    .glance-summary-stack .summary-section + .summary-section { border-top:1px solid #F0F1F5; padding-top:8px; }
+    .glance-mini-title { font-size:11.5px; font-weight:800; color:#5B6272; margin-bottom:5px; }
+
+    /* 우측 요약은 카드 안에 카드를 또 만드는 대신, 행 단위 스냅샷으로 압축 */
+    .glance-efficiency-list { display:flex; flex-direction:column; }
+    .glance-efficiency-line { display:grid; grid-template-columns: 88px 64px minmax(0,1fr); align-items:center; gap:8px; min-height:25px; border-top:1px solid #F3F4F7; font-size:11px; }
+    .glance-efficiency-line:first-child { border-top:none; }
+    .glance-efficiency-label { color:#7D8596; white-space:nowrap; }
+    .glance-efficiency-value { font-size:12.5px; font-weight:800; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; }
+    .glance-efficiency-sub { color:#A0A7B5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .glance-main-right .insight-row { min-height:27px; padding:4px 0; gap:8px; }
+    .glance-main-right .insight-rank { flex-basis:18px; font-size:10.5px; }
+    .glance-main-right .insight-part { flex-basis:46px; font-size:12px; }
+    .glance-main-right .insight-val { flex-basis:62px; font-size:12px; }
+    .glance-main-right .insight-meaning { font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .glance-main-right .compact-rank-row { padding:4px 0; gap:7px; font-size:11px; min-height:22px; }
+    .glance-main-right .compact-rank-num { flex-basis:14px; font-size:9.5px; }
+    .glance-main-right .compact-rank-meta { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .glance-main-right .compact-rank-val { font-size:11px; }
+
+    /* 홀/주방 배치효율을 가로 2열로 배치해 세로 공간을 절반 수준으로 축소 */
+    .glance-efficiency-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; align-items:start; }
+    .glance-efficiency-pair .section-card { margin-bottom:0 !important; min-width:0; }
+    .glance-efficiency-pair .glance-day-card { min-width:56px; padding:6px 3px; }
+    .glance-efficiency-pair .glance-day-card .day-label { font-size:10px; }
+    .glance-efficiency-pair .glance-day-card .day-score { font-size:12.5px; }
+
+    .glance-heatmap-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:start; }
     .glance-heatmap-grid .section-card { margin-bottom:0; min-width:0; }
-    .glance-main-right { height:100%; align-self:stretch; }
+    .glance-main-right { align-self:start; }
     @media (max-width: 1280px) {
-      .glance-heatmap-grid { grid-template-columns:1fr; }
+      .glance-primary-grid, .glance-efficiency-pair, .glance-heatmap-grid { grid-template-columns:1fr; }
     }
+
+
+    /* 요약: 큰 공백을 만들지 않도록 섹션 사이 간격 최소화 */
+    #view-glance .dashboard-grid-main { margin-bottom:12px; }
+    #view-glance .kpi-row-5 { gap:10px; margin-bottom:10px; }
+    #view-glance .kpi-card-5 { padding:12px 14px; gap:9px; }
+    #view-glance .kpi-card-5 .kpi-icon { width:32px; height:32px; border-radius:8px; }
+    #view-glance .kpi-card-5 .kpi-value { font-size:16px; }
+    #view-glance .status-strip { margin-bottom:12px; padding:10px 14px; }
 
     .exec-hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 2px 16px; }
     .exec-eyebrow { font-size: 11.5px; font-weight: 700; color: #9AA1B0; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
@@ -373,7 +406,7 @@
     <div class="kpi-row-5 glance-kpi-row" id="glanceKpiRow"></div>
     <div class="status-strip" id="glanceHeadlineBanner"></div>
 
-    <div class="dashboard-grid-main">
+    <div class="dashboard-grid-main glance-primary-grid">
       <div class="section-card">
         <div class="part-gap-header-row">
           <div class="section-title">파트별 인력 진단</div>
@@ -404,16 +437,18 @@
       </div>
     </div>
 
-    <div class="section-card">
-      <div class="section-title">시간대별 배치효율 (홀)</div>
-      <div id="glanceHallScoreCards"></div>
-      <div id="glanceHallBlockChart"></div>
-    </div>
+    <div class="glance-efficiency-pair">
+      <div class="section-card">
+        <div class="section-title">시간대별 배치효율 (홀)</div>
+        <div id="glanceHallScoreCards"></div>
+        <div id="glanceHallBlockChart"></div>
+      </div>
 
-    <div class="section-card">
-      <div class="section-title">시간대별 배치효율 (주방)</div>
-      <div id="glanceScoreCards"></div>
-      <div id="glanceBlockChart"></div>
+      <div class="section-card">
+        <div class="section-title">시간대별 배치효율 (주방)</div>
+        <div id="glanceScoreCards"></div>
+        <div id="glanceBlockChart"></div>
+      </div>
     </div>
 
     <div class="glance-heatmap-grid">
@@ -2249,13 +2284,13 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
       const rateColor = (v) => v === null ? '#6B7280' : (v < 100 ? '#2C6690' : (v > 100 ? '#A34848' : '#6B7280'));
       const items = [
-        { label: '홀 배치효율', value: hallRate === null ? '-' : hallRate + '%', color: rateColor(hallRate), sub: '실제 ' + weeklySummary.totalHall + 'h / 기준 ' + hallStd + 'h' },
-        { label: '주방 배치효율', value: kitchenRate === null ? '-' : kitchenRate + '%', color: rateColor(kitchenRate), sub: '실제 ' + weeklySummary.totalKitchen + 'h / 기준 ' + kitchenStd + 'h' },
-        { label: '절감 인시', value: savingHours + 'h', color: '#2C6690', sub: '기준보다 적게 배치한 합계' },
-        { label: '과다 인시', value: '+' + overHours + 'h', color: '#A34848', sub: '기준보다 많이 배치한 합계' },
+        { label: '홀 배치효율', value: hallRate === null ? '-' : hallRate + '%', color: rateColor(hallRate), sub: '실제 ' + weeklySummary.totalHall + 'h · 기준 ' + hallStd + 'h' },
+        { label: '주방 배치효율', value: kitchenRate === null ? '-' : kitchenRate + '%', color: rateColor(kitchenRate), sub: '실제 ' + weeklySummary.totalKitchen + 'h · 기준 ' + kitchenStd + 'h' },
+        { label: '절감 인시', value: savingHours + 'h', color: '#2C6690', sub: '기준 대비 절감 합계' },
+        { label: '과다 인시', value: '+' + overHours + 'h', color: '#A34848', sub: '기준 대비 과다 합계' },
       ];
-      el.innerHTML = '<div class="glance-efficiency-grid">' + items.map(x =>
-        '<div class="glance-efficiency-item">' +
+      el.innerHTML = '<div class="glance-efficiency-list">' + items.map(x =>
+        '<div class="glance-efficiency-line">' +
           '<div class="glance-efficiency-label">' + x.label + '</div>' +
           '<div class="glance-efficiency-value" style="color:' + x.color + ';">' + x.value + '</div>' +
           '<div class="glance-efficiency-sub">' + x.sub + '</div>' +
