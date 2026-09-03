@@ -21,7 +21,7 @@
     .sidebar .nav-btn.active { background: #3B5BFF; color: #fff; font-weight: bold; }
     .sidebar-spacer { flex: 1; }
     .sidebar-divider { border-top: 1px solid rgba(255,255,255,0.08); margin: 14px 6px; }
-    .main-content { flex: 1; padding: 28px 36px; max-width: 1360px; box-sizing: border-box; background: #F6F7FB; }
+    .main-content { flex: 1; width: 100%; padding: 24px 32px; max-width: 1680px; margin: 0 auto; box-sizing: border-box; background: #F6F7FB; }
     h2 { margin-top: 0; }
 
     .daily-page-title { font-size: 21px; font-weight: 800; color: #1A2233; margin-bottom: 4px; }
@@ -36,17 +36,23 @@
       width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center; font-size: 17px;
     }
-    .kpi-card-5 .kpi-label { font-size: 11.5px; color: #8B93A5; margin-bottom: 2px; }
-    .kpi-card-5 .kpi-value { font-size: 18px; font-weight: 800; color: #1A2233; }
+    .kpi-card-5 .kpi-label { font-size: 11.5px; color: #8B93A5; margin-bottom: 2px; white-space: nowrap; }
+    .kpi-card-5 .kpi-value { font-size: 18px; font-weight: 800; color: #1A2233; white-space: nowrap; }
     .kpi-card-5 .kpi-sub { font-size: 10.5px; color: #A7AEBD; margin-top: 2px; }
     .kpi-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-left: 6px; }
 
-    /* ==================== 요약 화면 Executive Hero ==================== */
-    .exec-hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 2px 22px; }
+    .status-strip {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600;
+      background: #fff; border: 1px solid #EAEAEA; border-radius: 8px; padding: 7px 14px; margin-bottom: 16px;
+    }
+    .status-strip .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .status-strip .status-sep { color: #D6D8E0; font-weight: 400; }
+
+    .exec-hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 2px 16px; }
     .exec-eyebrow { font-size: 11.5px; font-weight: 700; color: #9AA1B0; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
     .exec-gap-row { display: flex; align-items: baseline; gap: 10px; }
-    .exec-gap-number { font-size: 46px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
-    .exec-gap-word { font-size: 15px; font-weight: 700; padding: 3px 10px; border-radius: 6px; }
+    .exec-gap-number { font-size: 46px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .exec-gap-word { font-size: 15px; font-weight: 700; padding: 3px 10px; border-radius: 6px; white-space: nowrap; }
     .exec-relation { margin-top: 10px; font-size: 14px; color: #5B6272; font-variant-numeric: tabular-nums; }
     .exec-relation b { color: #1A2233; font-weight: 700; }
     .exec-relation .arrow { color: #C2C6D1; margin: 0 8px; }
@@ -66,11 +72,11 @@
     .compact-rank-meta b { color: #1A2233; }
     .compact-rank-val { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-    .insight-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #F3F4F7; }
+    .insight-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-top: 1px solid #F3F4F7; }
     .insight-row:first-child { border-top: none; }
     .insight-rank { flex: 0 0 22px; font-size: 12px; font-weight: 800; color: #C2C6D1; }
-    .insight-part { flex: 0 0 46px; font-size: 13.5px; font-weight: 700; color: #1A2233; }
-    .insight-val { flex: 0 0 68px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .insight-part { flex: 0 0 58px; font-size: 13.5px; font-weight: 700; color: #1A2233; white-space: nowrap; }
+    .insight-val { flex: 0 0 72px; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .insight-meaning { flex: 1; font-size: 12px; color: #9AA1B0; }
 
 
@@ -119,15 +125,19 @@
     .part-gap-header-sub b { font-weight: 700; }
 
     .diverge-axis-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: #A7AEBD; padding: 0 0 4px; }
-    .diverge-chart { position: relative; }
+    .diverge-track .diverge-mini-baseline { position: absolute; top: -1px; bottom: -1px; left: 50%; width: 1.5px; background: #C8CCD6; z-index: 1; }
+    .diverge-col-header .diverge-track { position: relative; font-size: 10px; color: #A7AEBD; font-weight: 600; text-transform: none; letter-spacing: 0; }
 
-    .diverge-row { display: flex; align-items: center; gap: 10px; height: 27px; }
-    .diverge-part-name { flex: 0 0 46px; font-size: 12.5px; font-weight: 700; color: #1A2233; }
-    .diverge-gap-num { flex: 0 0 64px; font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
-    .diverge-track { flex: 1; position: relative; height: 12px; }
-    .diverge-fill { position: absolute; top: 1px; height: 10px; border-radius: 3px; z-index: 2; }
-    .diverge-badge { flex: 0 0 50px; font-size: 10.5px; text-align: left; font-weight: 600; }
-    .diverge-chart .diverge-baseline { position: absolute; top: 0; bottom: 0; left: 50%; width: 1.5px; background: #C8CCD6; z-index: 1; }
+    .diverge-surface { background: #FAFAFC; border: 1px solid #EEEEF2; border-radius: 10px; padding: 4px 14px; }
+    .diverge-col-header { display: flex; align-items: center; gap: 10px; padding: 8px 14px 6px; font-size: 10.5px; font-weight: 700; color: #A7AEBD; text-transform: uppercase; letter-spacing: 0.03em; }
+    .diverge-col-header .diverge-part-name, .diverge-col-header .diverge-gap-num, .diverge-col-header .diverge-badge { color: #A7AEBD; font-weight: 700; }
+    .diverge-row { display: flex; align-items: stretch; gap: 10px; height: 30px; border-top: 1px solid #EEEEF2; }
+    .diverge-row:first-child { border-top: none; }
+    .diverge-part-name { flex: 0 0 58px; font-size: 12.5px; font-weight: 700; color: #1A2233; white-space: nowrap; display: flex; align-items: center; }
+    .diverge-gap-num { flex: 0 0 68px; font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; white-space: nowrap; display: flex; align-items: center; justify-content: flex-end; }
+    .diverge-track { flex: 1; position: relative; }
+    .diverge-fill { position: absolute; top: 9px; height: 12px; border-radius: 3px; z-index: 2; }
+    .diverge-badge { flex: 0 0 62px; font-size: 10.5px; text-align: left; font-weight: 600; white-space: nowrap; display: flex; align-items: center; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .tab-btn {
       padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
@@ -148,7 +158,8 @@
     .type-과다 { color: #c0392b; font-weight: bold; }
     .type-부족 { color: #2980b9; font-weight: bold; }
     .section-title { margin-top: 0; margin-bottom: 14px; font-size: 15px; font-weight: bold; }
-    .section-card { background: #fff; border: 1px solid #eaeaea; border-radius: 14px; padding: 20px 22px; margin-bottom: 18px; }
+    .section-card { background: #fff; border: 1px solid #eaeaea; border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
+    .section-card > .section-title:first-child { padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid #F3F4F7; }
 
     .priority-list { display: flex; flex-direction: column; gap: 10px; }
     .priority-card {
@@ -338,8 +349,7 @@
       <div class="exec-hero-right" id="execContext"></div>
     </div>
 
-    <div class="kpi-row-5" id="glanceKpiRow"></div>
-    <div class="headline-banner" id="glanceHeadlineBanner"></div>
+    <div class="status-strip" id="glanceHeadlineBanner"></div>
 
     <div class="dashboard-grid-main">
       <div class="section-card">
@@ -2038,8 +2048,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       const w = weeklySummary;
       if (!w) { el.innerHTML = ''; return; }
       const achieved = w.verdict.indexOf('1차목표 달성') !== -1 || w.verdict.indexOf('2차목표(BHAG) 달성') !== -1;
-      el.className = 'headline-banner ' + (achieved ? 'hl-ok' : 'hl-critical');
-      el.innerHTML = diffPhrase(w.totalActual, w.totalTarget1, true) + ' · ' + levelPhrase(w.verdict);
+      const color = achieved ? '#3D8361' : '#A34848';
+      el.innerHTML =
+        '<span class="status-dot" style="background:' + color + ';"></span>' +
+        '<span style="color:' + color + ';">' + levelPhrase(w.verdict) + '</span>' +
+        '<span class="status-sep">·</span>' +
+        '<span style="color:#4A505E; font-weight:500;">' + diffPhrase(w.totalActual, w.totalTarget1, true) + '</span>';
     }
 
     function renderGlanceHero() {
@@ -2165,7 +2179,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         const color = isOver ? '#B03A3A' : (isUnder ? '#3478C4' : '#D8D8DE');
         const action = isOver ? '축소 검토' : (isUnder ? '보강 검토' : '적정');
         const badgeFg = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#B7BCC8');
-        const halfWidthPct = (Math.abs(g.gap) / maxAbs) * 50; // 중심 기준 좌우 최대 50%
+        const halfWidthPct = (Math.abs(g.gap) / maxAbs) * 50;
         const style = isOver
           ? ('left:50%; width:' + halfWidthPct + '%;')
           : ('left:' + (50 - halfWidthPct) + '%; width:' + halfWidthPct + '%;');
@@ -2173,21 +2187,20 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           '<div class="diverge-row">' +
             '<div class="diverge-part-name">' + g.part + '</div>' +
             '<div class="diverge-gap-num" style="color:' + color + ';">' + (g.gap > 0 ? '+' : '') + g.gap + 'h</div>' +
-            '<div class="diverge-track"><div class="diverge-fill" style="' + style + ' background:' + color + ';"></div></div>' +
+            '<div class="diverge-track"><div class="diverge-mini-baseline"></div><div class="diverge-fill" style="' + style + ' background:' + color + ';"></div></div>' +
             '<div class="diverge-badge" style="color:' + badgeFg + ';">' + action + '</div>' +
           '</div>'
         );
       }).join('');
 
       el.innerHTML =
-        '<div style="position:relative; height:16px; font-size:10.5px; color:#A7AEBD;">' +
-          '<span style="position:absolute; left:130px;">← 부족</span>' +
-          '<span style="position:absolute; left:calc(50% + 31px); transform:translateX(-50%);">0</span>' +
-          '<span style="position:absolute; right:68px;">과다 →</span>' +
+        '<div class="diverge-col-header">' +
+          '<div class="diverge-part-name">파트</div>' +
+          '<div class="diverge-gap-num">Gap</div>' +
+          '<div class="diverge-track"><span style="position:absolute; left:0;">← 부족</span><span style="position:absolute; left:50%; transform:translateX(-50%);">0</span><span style="position:absolute; right:0;">과다 →</span></div>' +
+          '<div class="diverge-badge">진단</div>' +
         '</div>' +
-        '<div class="diverge-chart"><div class="diverge-baseline" style="left:calc(50% + 31px);"></div>' +
-          rows +
-        '</div>';
+        '<div class="diverge-surface">' + rows + '</div>';
     }
 
     // 이번 주 가장 문제 큰 요일/시간대/파트 - 요약 화면의 핵심 코멘트
@@ -2813,7 +2826,6 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }
     renderTrendTable();
     renderGlanceHero();
-    renderWeekKPIRowInto('glanceKpiRow');
     renderGlanceHeadlineBanner();
     renderGlancePartGapSummary();
     renderGlanceComments();
