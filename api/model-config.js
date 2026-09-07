@@ -54,6 +54,12 @@ export default async function handler(req, res) {
     const target1 = byKey.get('curve.target1') || {};
     const target2 = byKey.get('curve.target2') || {};
 
+    const partCaps = {
+      DMO: byKey.get('part_cap.DMO') || [],
+      '데코이': byKey.get('part_cap.데코이') || [],
+      '폴리싱': byKey.get('part_cap.폴리싱') || [],
+    };
+
     const config = {
       guestUnitPrice: {
         weekday,
@@ -81,10 +87,18 @@ export default async function handler(req, res) {
           },
         },
       },
+      partCaps,
     };
 
+    const baseRows = rows.filter((row) =>
+      row.config_group === 'guest_unit_price' || row.config_group === 'curve'
+    );
+    const partCapRows = rows.filter((row) => row.config_group === 'part_cap');
+
     const expected = {
-      rowCount: 6,
+      baseRowCount: 6,
+      totalRowCount: 9,
+      partCapRowCount: 3,
       guestUnitPrice: {
         weekday: 21138,
         weekend: 24889,
@@ -99,10 +113,23 @@ export default async function handler(req, res) {
           target2: { a: 60.09, b: 0.1403, c: 1.023 },
         },
       },
+      partCaps: {
+        DMO: [{ maxSales: 20000000, cap: 1 }],
+        '데코이': [{ maxSales: 20000000, cap: 1 }],
+        '폴리싱': [{ maxSales: 20000000, cap: 1 }],
+      },
     };
 
+    const capRuleMatches = (actual, expectedRule) =>
+      Array.isArray(actual) &&
+      actual.length === 1 &&
+      Number(actual[0]?.maxSales) === expectedRule[0].maxSales &&
+      Number(actual[0]?.cap) === expectedRule[0].cap;
+
     const matchesExpected =
-      rows.length === expected.rowCount &&
+      baseRows.length === expected.baseRowCount &&
+      rows.length === expected.totalRowCount &&
+      partCapRows.length === expected.partCapRowCount &&
       config.guestUnitPrice.weekday === expected.guestUnitPrice.weekday &&
       config.guestUnitPrice.weekend === expected.guestUnitPrice.weekend &&
       config.curve.floor === expected.curve.floor &&
@@ -116,13 +143,23 @@ export default async function handler(req, res) {
       config.curve.tiers.target1.c === expected.curve.tiers.target1.c &&
       config.curve.tiers.target2.a === expected.curve.tiers.target2.a &&
       config.curve.tiers.target2.b === expected.curve.tiers.target2.b &&
-      config.curve.tiers.target2.c === expected.curve.tiers.target2.c;
+      config.curve.tiers.target2.c === expected.curve.tiers.target2.c &&
+      capRuleMatches(config.partCaps.DMO, expected.partCaps.DMO) &&
+      capRuleMatches(config.partCaps['데코이'], expected.partCaps['데코이']) &&
+      capRuleMatches(config.partCaps['폴리싱'], expected.partCaps['폴리싱']);
 
     res.status(200).json({
       ok: true,
       source: 'supabase',
       version: '1.0',
-      rowCount: rows.length,
+
+      // Step 11-4와 compare-config.html 호환성을 위해 기존 V1.0 계산기준 rowCount는 6으로 유지
+      rowCount: baseRows.length,
+
+      // Step 12 CAP 확장 정보
+      totalRowCount: rows.length,
+      partCapRowCount: partCapRows.length,
+
       matchesExpected,
       config,
       rows,
