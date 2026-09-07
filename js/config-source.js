@@ -15,6 +15,11 @@ function buildLocalDiagnosisConfig() {
   return {
     GUEST_UNIT_PRICE_WEEKDAY,
     GUEST_UNIT_PRICE_WEEKEND,
+    PART_CAP_RULES: {
+      DMO: PART_CAP_RULES.DMO.map(r => ({ ...r })),
+      '데코이': PART_CAP_RULES['데코이'].map(r => ({ ...r })),
+      '폴리싱': PART_CAP_RULES['폴리싱'].map(r => ({ ...r })),
+    },
     CURVE: {
       FLOOR: CURVE.FLOOR,
       KNOT: CURVE.KNOT,
@@ -42,9 +47,9 @@ function isFiniteNumber(value) {
 
 function isValidDiagnosisConfigPayload(data) {
   if (!data || data.ok !== true || data.source !== 'supabase') return false;
-  if (data.version !== '1.0' || data.rowCount !== 6 || data.matchesExpected !== true) return false;
+  if (data.version !== '1.0' || data.rowCount !== 6 || data.totalRowCount !== 9 || data.partCapRowCount !== 3 || data.matchesExpected !== true) return false;
   const c = data.config;
-  if (!c || !c.guestUnitPrice || !c.curve || !c.curve.tiers) return false;
+  if (!c || !c.guestUnitPrice || !c.curve || !c.curve.tiers || !c.partCaps) return false;
 
   const values = [
     c.guestUnitPrice.weekday,
@@ -62,13 +67,25 @@ function isValidDiagnosisConfigPayload(data) {
     c.curve.tiers.target2 && c.curve.tiers.target2.b,
     c.curve.tiers.target2 && c.curve.tiers.target2.c,
   ];
-  return values.length === 14 && values.every(isFiniteNumber);
+  const capParts = ['DMO', '데코이', '폴리싱'];
+  const capsValid = capParts.every(part => {
+    const rules = c.partCaps[part];
+    return Array.isArray(rules) && rules.length > 0 && rules.every(r =>
+      isFiniteNumber(r.maxSales) && isFiniteNumber(r.cap)
+    );
+  });
+  return values.length === 14 && values.every(isFiniteNumber) && capsValid;
 }
 
 function mapApiConfigToEngineConfig(config) {
   return {
     GUEST_UNIT_PRICE_WEEKDAY: Number(config.guestUnitPrice.weekday),
     GUEST_UNIT_PRICE_WEEKEND: Number(config.guestUnitPrice.weekend),
+    PART_CAP_RULES: {
+      DMO: config.partCaps.DMO.map(r => ({ maxSales: Number(r.maxSales), cap: Number(r.cap) })),
+      '데코이': config.partCaps['데코이'].map(r => ({ maxSales: Number(r.maxSales), cap: Number(r.cap) })),
+      '폴리싱': config.partCaps['폴리싱'].map(r => ({ maxSales: Number(r.maxSales), cap: Number(r.cap) })),
+    },
     CURVE: {
       FLOOR: Number(config.curve.floor),
       KNOT: Number(config.curve.knot),
@@ -107,7 +124,7 @@ async function loadDiagnosisConfigFromSupabase() {
 
   const data = await response.json();
   if (!isValidDiagnosisConfigPayload(data)) {
-    throw new Error('Supabase V1.0 설정 검증 실패 (6 rows / 14 values 조건 불일치)');
+    throw new Error('Supabase V1.0 설정 검증 실패 (6 base rows / 3 CAP rows 조건 불일치)');
   }
 
   ACTIVE_DIAGNOSIS_CONFIG = mapApiConfigToEngineConfig(data.config);
@@ -119,7 +136,7 @@ async function loadDiagnosisConfigFromSupabase() {
     reason: null,
   };
 
-  console.log('[V1.0 Config] Supabase loaded: 6 rows / 14 values');
+  console.log('[V1.0 Config] Supabase loaded: 6 base rows / 14 values + 3 CAP rules');
   return getDiagnosisConfigSourceInfo();
 }
 

@@ -26,10 +26,16 @@ const PART_CAP_RULES = {
 };
 
 function getPartCap(part, salesVal) {
-  const rules = PART_CAP_RULES[part];
+  // Step 12-3: Supabase에서 로드된 CAP을 우선 사용한다.
+  // config-source.js/API 오류 시 ACTIVE_DIAGNOSIS_CONFIG가 로컬 PART_CAP_RULES를 담으므로 자동 fallback된다.
+  const activeConfig = (typeof getActiveDiagnosisConfig === 'function')
+    ? getActiveDiagnosisConfig()
+    : null;
+  const activeRules = activeConfig && activeConfig.PART_CAP_RULES;
+  const rules = (activeRules && activeRules[part]) || PART_CAP_RULES[part];
   if (!rules) return null;
   for (const r of rules) {
-    if (salesVal <= r.maxSales) return r.cap;
+    if (salesVal <= Number(r.maxSales)) return Number(r.cap);
   }
   return null;
 }
