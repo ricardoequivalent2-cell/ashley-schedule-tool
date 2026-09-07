@@ -5,6 +5,7 @@
   <link rel="stylesheet" href="./css/dashboard.css">
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="./js/standard-models.js"></script>
+  <script src="./js/model-source.js"></script>
   <script src="./js/diagnosis-engine.js"></script>
   <script src="./js/excel-parser.js"></script>
 </head>
@@ -334,7 +335,7 @@ function minToLabel(min) {
 
     function renderBackdataModelsTable() {
       const el = document.getElementById('backdataModelsTable');
-      const models = EMBEDDED_STANDARD_MODELS.slice().sort((a, b) => a.sales - b.sales);
+      const models = getStandardModels().slice().sort((a, b) => a.sales - b.sales);
       let html = '<table class="compare-table-v2"><tr><th>모델</th><th>기준매출</th><th>총사용시간</th><th>주방</th><th>홀</th></tr>';
       models.forEach(m => {
         let kitchenTotal = 0, hallTotal = 0;
@@ -530,7 +531,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
     const hallLayout = detectLayout(hallSheet);
     hallSheetTotalHours = computeSheetDailyTotalHours(hallSheet, hallLayout);
   }
-  const rawModels = EMBEDDED_STANDARD_MODELS; // 파일에서 안 읽고 코드에 내장된 기준모델 사용
+  const rawModels = getStandardModels(); // Step 10: Supabase 우선, 실패 시 로컬 기준모델 fallback
   const slots = getTimeSlots();
   const slotCount = slots.length;
 
@@ -717,9 +718,13 @@ async function handleFile(e) {
   try {
     const { kitchenSheet, hallSheet } = await loadScheduleWorkbook(file);
 
+    // Step 10: 실제 계산 전 Supabase 기준모델을 우선 로드한다.
+    // DB/API 오류가 있으면 js/standard-models.js의 기존 16개 모델로 자동 fallback한다.
+    const modelSourceInfo = await ensureStandardModelsLoaded();
+
     const result = await computeDiagnosis(kitchenSheet, hallSheet);
     lastResult = result;
-    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ')';
+    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
 
     // 파일명에서 매장명 자동추출 (확장자·"_TEST"류 접미사 제거)
     let guessedName = file.name.replace(/\.xlsx$/i, '').replace(/_?TEST$|_?테스트$/i, '').trim();
