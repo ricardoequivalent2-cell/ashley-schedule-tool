@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Step 9 - 기준모델 데이터 비교</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", sans-serif; margin: 0; background:#f7f8fa; color:#172033; }
+    .wrap { max-width: 980px; margin: 40px auto; padding: 0 20px; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:24px; box-shadow:0 4px 14px rgba(0,0,0,.04); }
+    h1 { margin:0 0 8px; font-size:24px; }
+    .sub { color:#667085; margin-bottom:24px; }
+    .status { display:flex; align-items:center; gap:12px; padding:16px; border-radius:12px; font-weight:700; }
+    .pending { background:#f3f4f6; }
+    .success { background:#ecfdf3; color:#067647; }
+    .fail { background:#fef3f2; color:#b42318; }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:18px 0; }
+    .kpi { border:1px solid #eaecf0; border-radius:12px; padding:14px; }
+    .kpi .label { color:#667085; font-size:12px; }
+    .kpi .value { margin-top:6px; font-size:22px; font-weight:800; }
+    button { border:0; border-radius:10px; background:#141b2d; color:white; padding:11px 16px; cursor:pointer; font-weight:700; }
+    pre { margin-top:18px; background:#0f172a; color:#e2e8f0; padding:16px; border-radius:12px; overflow:auto; max-height:460px; white-space:pre-wrap; }
+    @media (max-width:760px){ .grid{grid-template-columns:repeat(2,1fr);} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Step 9 · 기준모델 원본 vs Supabase 비교</h1>
+      <div class="sub">기존 <b>js/standard-models.js</b>와 <b>/api/standard-models</b>의 전체 모델·슬롯·파트 값을 비교합니다.</div>
+
+      <div id="status" class="status pending">비교 준비 중...</div>
+
+      <div class="grid">
+        <div class="kpi"><div class="label">로컬 모델</div><div id="localCount" class="value">-</div></div>
+        <div class="kpi"><div class="label">DB 모델</div><div id="dbCount" class="value">-</div></div>
+        <div class="kpi"><div class="label">비교 숫자</div><div id="valueCount" class="value">-</div></div>
+        <div class="kpi"><div class="label">불일치</div><div id="mismatchCount" class="value">-</div></div>
+      </div>
+
+      <button id="runBtn" type="button">다시 비교</button>
+      <pre id="details">실행 대기</pre>
+    </div>
+  </div>
+
+  <script src="./js/standard-models.js"></script>
+  <script src="./js/model-source-compare.js"></script>
+</body>
+</html>
