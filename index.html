@@ -7,6 +7,7 @@
   <script src="./js/standard-models.js"></script>
   <script src="./js/model-source.js"></script>
   <script src="./js/diagnosis-engine.js"></script>
+  <script src="./js/config-source.js"></script>
   <script src="./js/excel-parser.js"></script>
 </head>
 <body>
@@ -532,6 +533,9 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
     hallSheetTotalHours = computeSheetDailyTotalHours(hallSheet, hallLayout);
   }
   const rawModels = getStandardModels(); // Step 10: Supabase 우선, 실패 시 로컬 기준모델 fallback
+  const calcConfig = (typeof getActiveDiagnosisConfig === 'function')
+    ? getActiveDiagnosisConfig()
+    : { GUEST_UNIT_PRICE_WEEKDAY, GUEST_UNIT_PRICE_WEEKEND, CURVE };
   const slots = getTimeSlots();
   const slotCount = slots.length;
 
@@ -540,7 +544,7 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
 
   activeDateHeaders.forEach(label => {
     const salesVal = salesInputs[label] || 0;
-    const price = isWeekendLabel(label) ? GUEST_UNIT_PRICE_WEEKEND : GUEST_UNIT_PRICE_WEEKDAY;
+    const price = isWeekendLabel(label) ? calcConfig.GUEST_UNIT_PRICE_WEEKEND : calcConfig.GUEST_UNIT_PRICE_WEEKDAY;
     const guestCount = salesVal / price;
 
     const kitchenSheetActual = kitchenSheetTotalHours[label] || 0;
@@ -560,9 +564,9 @@ async function computeDiagnosis(kitchenSheet, hallSheet) {
     rawHallSlotSum *= hourPerSlot;
     const hallScaleFactor = rawHallSlotSum > 0 ? (hallActualHours / rawHallSlotSum) : 1;
 
-    const hurdle = tierHoursDaily(CURVE.TIERS['최소허들'], guestCount);
-    const target1 = tierHoursDaily(CURVE.TIERS['1차목표'], guestCount);
-    const target2 = tierHoursDaily(CURVE.TIERS['2차목표'], guestCount);
+    const hurdle = tierHoursDaily(calcConfig.CURVE.TIERS['최소허들'], guestCount, calcConfig.CURVE);
+    const target1 = tierHoursDaily(calcConfig.CURVE.TIERS['1차목표'], guestCount, calcConfig.CURVE);
+    const target2 = tierHoursDaily(calcConfig.CURVE.TIERS['2차목표'], guestCount, calcConfig.CURVE);
 
     // 비중x목표 스케일링
     const normalizedModels = rawModels.map(normalizeModelTable);
@@ -722,9 +726,13 @@ async function handleFile(e) {
     // DB/API 오류가 있으면 js/standard-models.js의 기존 16개 모델로 자동 fallback한다.
     const modelSourceInfo = await ensureStandardModelsLoaded();
 
+    // Step 11-4: 실제 계산 전 Supabase V1.0 계산 기준을 우선 로드한다.
+    // DB/API 오류가 있으면 diagnosis-engine.js의 기존 V1.0 14개 값으로 자동 fallback한다.
+    const configSourceInfo = await ensureDiagnosisConfigLoaded();
+
     const result = await computeDiagnosis(kitchenSheet, hallSheet);
     lastResult = result;
-    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
+    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ', 계산기준: ' + (configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
 
     // 파일명에서 매장명 자동추출 (확장자·"_TEST"류 접미사 제거)
     let guessedName = file.name.replace(/\.xlsx$/i, '').replace(/_?TEST$|_?테스트$/i, '').trim();

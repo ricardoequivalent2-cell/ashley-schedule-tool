@@ -35,10 +35,10 @@ function getPartCap(part, salesVal) {
 }
 
 // V1.0 curve
-function tierHoursDaily(p, n) {
-  const base1200 = p.a + p.b * Math.pow(CURVE.KNOT, p.c);
-  if (n <= CURVE.KNOT) return Math.max(CURVE.FLOOR, p.a + p.b * Math.pow(n, p.c));
-  return base1200 + CURVE.SLOPE * (n - CURVE.KNOT);
+function tierHoursDaily(p, n, curveConfig = CURVE) {
+  const base1200 = p.a + p.b * Math.pow(curveConfig.KNOT, p.c);
+  if (n <= curveConfig.KNOT) return Math.max(curveConfig.FLOOR, p.a + p.b * Math.pow(n, p.c));
+  return base1200 + curveConfig.SLOPE * (n - curveConfig.KNOT);
 }
 
 function normalizeModelTable(model) {
