@@ -56,25 +56,41 @@
 
       dailyHours[label].total += hours;
 
+      // UP-5 기준: 근무구분은 사용하지 않고 오전파트/오후파트만 본다.
       const rawAm = String(row.morningPart || '').trim();
       const rawPm = String(row.afternoonPart || '').trim();
-      let mapped = null;
+      const am = global.AshleyUpParser.mapPartName(rawAm);
+      const pm = global.AshleyUpParser.mapPartName(rawPm);
 
-      // 오전/오후가 같은 명시 파트인 경우에만 세부 인시 분류.
-      if (rawAm && rawPm && rawAm === rawPm) {
-        mapped = global.AshleyUpParser.mapPartName(rawAm);
-      } else if (rawAm && !rawPm) {
-        mapped = global.AshleyUpParser.mapPartName(rawAm);
-      } else if (!rawAm && rawPm) {
-        mapped = global.AshleyUpParser.mapPartName(rawPm);
+      if (!rawAm && !rawPm) {
+        dailyHours[label].other += hours;
+        return;
       }
 
-      if (mapped && PARTS.indexOf(mapped) !== -1) {
-        dailyHours[label].kitchen += hours;
-      } else if (mapped && HALL_PARTS.indexOf(mapped) !== -1) {
-        dailyHours[label].hall += hours;
+      // 한쪽만 있거나 동일 파트
+      if ((rawAm && !rawPm) || (!rawAm && rawPm) || (rawAm && rawPm && rawAm === rawPm)) {
+        const mapped = am || pm;
+        if (mapped && PARTS.indexOf(mapped) !== -1) {
+          dailyHours[label].kitchen += hours;
+        } else if (mapped && HALL_PARTS.indexOf(mapped) !== -1) {
+          dailyHours[label].hall += hours;
+        } else {
+          dailyHours[label].other += hours;
+        }
+        return;
+      }
+
+      // 오전/오후가 다른 경우: 현재 UP-5의 midpoint 규칙과 동일하게 50:50 분할
+      if (am && pm) {
+        const half = hours / 2;
+        if (PARTS.indexOf(am) !== -1) dailyHours[label].kitchen += half;
+        else if (HALL_PARTS.indexOf(am) !== -1) dailyHours[label].hall += half;
+        else dailyHours[label].other += half;
+
+        if (PARTS.indexOf(pm) !== -1) dailyHours[label].kitchen += half;
+        else if (HALL_PARTS.indexOf(pm) !== -1) dailyHours[label].hall += half;
+        else dailyHours[label].other += half;
       } else {
-        // 관리 / 공란 / 오전오후 전환 미정 / 미매핑 값
         dailyHours[label].other += hours;
       }
     });
@@ -86,7 +102,6 @@
     const partDiagnosisAvailable =
       upActuals.canRunPartDiagnosis &&
       totalOtherHours < 0.1 &&
-      upActuals.ambiguousTransitionRows.length === 0 &&
       upActuals.unresolvedRows.length === 0 &&
       upActuals.noPartRows.length === 0;
 
@@ -98,9 +113,6 @@
     }
     if (totalOtherHours >= 0.1) {
       partBlockReasons.push(`V1 표준파트 외 실제인시 ${totalOtherHours}h`);
-    }
-    if (upActuals.ambiguousTransitionRows.length) {
-      partBlockReasons.push(`오전/오후 전환시각 미정 ${upActuals.ambiguousTransitionRows.length}행`);
     }
     if (upActuals.unresolvedRows.length) {
       partBlockReasons.push(`미매핑 파트 ${upActuals.unresolvedRows.length}행`);
@@ -335,9 +347,9 @@
         eligiblePartRows: upActuals.eligiblePartRows,
         mappedRows: upActuals.mappedRows,
         coverageRate: upActuals.coverageRate,
-        nonStandardRows: upActuals.nonStandardRows.length,
         nonStandardHours: totalOtherHours,
-        ambiguousTransitionRows: upActuals.ambiguousTransitionRows.length,
+        transitionedRows: upActuals.transitionedRows.length,
+        transitionMode: upActuals.transitionMode,
         unresolvedRows: upActuals.unresolvedRows.length,
         noPartRows: upActuals.noPartRows.length
       },

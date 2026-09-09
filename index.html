@@ -40,7 +40,7 @@
 
   <div class="upload-box" id="uploadBox">
     <div>진단할 파트정보 UP 파일(.up)을 선택하세요</div>
-    <div style="font-size:12px;color:#999;margin-top:4px;">스케줄 시스템에서 추출한 <b>Schedule_PartInfo_*.up</b> 파일을 사용합니다. 현재 단계에서는 UP 구조와 데이터를 먼저 검증하며, 기존 .xlsx 방식은 임시 fallback으로 유지합니다.</div>
+    <div style="font-size:12px;color:#999;margin-top:4px;">스케줄 시스템에서 추출한 <b>Schedule_PartInfo_*.up</b> 파일을 사용합니다. 근무구분은 사용하지 않고 오전파트/오후파트를 기준으로 진단합니다. 기존 .xlsx 방식은 임시 fallback으로 유지합니다.</div>
     <input type="file" id="fileInput" accept=".up,.xlsx">
     <div id="status"></div>
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
@@ -766,7 +766,7 @@ async function handleFile(e) {
       statusEl.textContent =
         `완료 (${result.dateHeaders.length}일 총인시 진단` +
         (result.partDiagnosisAvailable ? ', 시간대·파트 진단 포함' : ', 시간대·파트 진단 보류') +
-        ` · 표준파트 매핑 ${upActuals.mappedRows}/${upActuals.eligiblePartRows}행(${coveragePct}%)` +
+        ` · 표준파트 매핑 ${upActuals.mappedRows}/${upActuals.eligiblePartRows}행(${coveragePct}%) · 파트전환 ${upActuals.transitionedRows.length}행` +
         ` · 기준모델: ${modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback'}` +
         ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback'}` +
         ')' +
@@ -801,9 +801,9 @@ async function handleFile(e) {
       document.getElementById('saveBox').style.display = 'block';
       document.getElementById('saveStatus').textContent = '';
 
-      console.log('[UP-4] parsed UP data', parsedUp);
-      console.log('[UP-4] 30분 actual data', upActuals);
-      console.log('[UP-4] diagnosis result', result);
+      console.log('[UP-5] parsed UP data', parsedUp);
+      console.log('[UP-5] 30분 actual data', upActuals);
+      console.log('[UP-5] diagnosis result', result);
       return;
     }
 
