@@ -1,39 +1,21 @@
 // Ashley Schedule Tool - V1.0 calculation config source selector
-// Step 11-4: Supabase 우선 / diagnosis-engine.js 로컬 V1.0 자동 fallback
+// DB CLEAN-3: Supabase model_config 단일 소스
+// 로컬 V1.0 / CAP fallback은 사용하지 않는다.
 
-let ACTIVE_DIAGNOSIS_CONFIG = buildLocalDiagnosisConfig();
+let ACTIVE_DIAGNOSIS_CONFIG = null;
 let DIAGNOSIS_CONFIG_SOURCE_INFO = {
-  source: 'local',
-  version: '1.0',
-  valueCount: 14,
-  fallback: true,
-  reason: '초기 로컬 V1.0 설정',
+  source: 'unloaded',
+  version: null,
+  valueCount: 0,
+  fallback: false,
+  reason: null,
 };
 let diagnosisConfigLoadPromise = null;
 
-function buildLocalDiagnosisConfig() {
-  return {
-    GUEST_UNIT_PRICE_WEEKDAY,
-    GUEST_UNIT_PRICE_WEEKEND,
-    PART_CAP_RULES: {
-      DMO: PART_CAP_RULES.DMO.map(r => ({ ...r })),
-      '데코이': PART_CAP_RULES['데코이'].map(r => ({ ...r })),
-      '폴리싱': PART_CAP_RULES['폴리싱'].map(r => ({ ...r })),
-    },
-    CURVE: {
-      FLOOR: CURVE.FLOOR,
-      KNOT: CURVE.KNOT,
-      SLOPE: CURVE.SLOPE,
-      TIERS: {
-        '최소허들': { ...CURVE.TIERS['최소허들'] },
-        '1차목표': { ...CURVE.TIERS['1차목표'] },
-        '2차목표': { ...CURVE.TIERS['2차목표'] },
-      },
-    },
-  };
-}
-
 function getActiveDiagnosisConfig() {
+  if (!ACTIVE_DIAGNOSIS_CONFIG || DIAGNOSIS_CONFIG_SOURCE_INFO.source !== 'supabase') {
+    throw new Error('계산기준이 아직 로드되지 않았습니다. Supabase model_config를 먼저 불러와주세요.');
+  }
   return ACTIVE_DIAGNOSIS_CONFIG;
 }
 
@@ -47,7 +29,14 @@ function isFiniteNumber(value) {
 
 function isValidDiagnosisConfigPayload(data) {
   if (!data || data.ok !== true || data.source !== 'supabase') return false;
-  if (data.version !== '1.0' || data.rowCount !== 6 || data.totalRowCount !== 9 || data.partCapRowCount !== 3 || data.matchesExpected !== true) return false;
+  if (
+    data.version !== '1.0' ||
+    data.rowCount !== 6 ||
+    data.totalRowCount !== 9 ||
+    data.partCapRowCount !== 3 ||
+    data.matchesExpected !== true
+  ) return false;
+
   const c = data.config;
   if (!c || !c.guestUnitPrice || !c.curve || !c.curve.tiers || !c.partCaps) return false;
 
@@ -67,6 +56,7 @@ function isValidDiagnosisConfigPayload(data) {
     c.curve.tiers.target2 && c.curve.tiers.target2.b,
     c.curve.tiers.target2 && c.curve.tiers.target2.c,
   ];
+
   const capParts = ['DMO', '데코이', '폴리싱'];
   const capsValid = capParts.every(part => {
     const rules = c.partCaps[part];
@@ -74,6 +64,7 @@ function isValidDiagnosisConfigPayload(data) {
       isFiniteNumber(r.maxSales) && isFiniteNumber(r.cap)
     );
   });
+
   return values.length === 14 && values.every(isFiniteNumber) && capsValid;
 }
 
@@ -82,9 +73,18 @@ function mapApiConfigToEngineConfig(config) {
     GUEST_UNIT_PRICE_WEEKDAY: Number(config.guestUnitPrice.weekday),
     GUEST_UNIT_PRICE_WEEKEND: Number(config.guestUnitPrice.weekend),
     PART_CAP_RULES: {
-      DMO: config.partCaps.DMO.map(r => ({ maxSales: Number(r.maxSales), cap: Number(r.cap) })),
-      '데코이': config.partCaps['데코이'].map(r => ({ maxSales: Number(r.maxSales), cap: Number(r.cap) })),
-      '폴리싱': config.partCaps['폴리싱'].map(r => ({ maxSales: Number(r.maxSales), cap: Number(r.cap) })),
+      DMO: config.partCaps.DMO.map(r => ({
+        maxSales: Number(r.maxSales),
+        cap: Number(r.cap),
+      })),
+      '데코이': config.partCaps['데코이'].map(r => ({
+        maxSales: Number(r.maxSales),
+        cap: Number(r.cap),
+      })),
+      '폴리싱': config.partCaps['폴리싱'].map(r => ({
+        maxSales: Number(r.maxSales),
+        cap: Number(r.cap),
+      })),
     },
     CURVE: {
       FLOOR: Number(config.curve.floor),
@@ -149,16 +149,22 @@ async function ensureDiagnosisConfigLoaded() {
 
   diagnosisConfigLoadPromise = loadDiagnosisConfigFromSupabase()
     .catch(error => {
-      ACTIVE_DIAGNOSIS_CONFIG = buildLocalDiagnosisConfig();
+      // DB CLEAN-3:
+      // Supabase config를 못 읽으면 구버전 로컬값으로 계산하지 않고 진단을 중단한다.
+      ACTIVE_DIAGNOSIS_CONFIG = null;
       DIAGNOSIS_CONFIG_SOURCE_INFO = {
-        source: 'local',
-        version: '1.0',
-        valueCount: 14,
-        fallback: true,
+        source: 'error',
+        version: null,
+        valueCount: 0,
+        fallback: false,
         reason: error && error.message ? error.message : String(error),
       };
-      console.warn('[V1.0 Config] Supabase 조회 실패 → 로컬 fallback 사용:', error);
-      return getDiagnosisConfigSourceInfo();
+
+      console.error('[V1.0 Config] Supabase load failed:', error);
+      throw new Error(
+        '계산기준 데이터를 불러오지 못했습니다. 진단을 실행할 수 없습니다. ' +
+        (error && error.message ? error.message : '')
+      );
     })
     .finally(() => {
       diagnosisConfigLoadPromise = null;
@@ -167,5 +173,8 @@ async function ensureDiagnosisConfigLoaded() {
   return diagnosisConfigLoadPromise;
 }
 
-// 페이지 진입 시 미리 DB 설정을 받아둔다. 업로드 시점에도 ensure를 다시 호출한다.
-ensureDiagnosisConfigLoaded();
+// 페이지 진입 시 미리 DB config를 받아둔다.
+// 실패해도 로컬값으로 대체하지 않으며, 실제 UP 업로드 시 ensure에서 다시 시도한다.
+ensureDiagnosisConfigLoaded().catch(error => {
+  console.warn('[V1.0 Config] 사전 로드 실패. UP 업로드 시 다시 시도합니다:', error);
+});
