@@ -8,7 +8,6 @@
   <script src="./js/model-source.js"></script>
   <script src="./js/diagnosis-engine.js"></script>
   <script src="./js/config-source.js"></script>
-  <script src="./js/excel-parser.js"></script>
   <script src="./js/up-parser.js"></script>
   <script src="./js/up-diagnosis-adapter.js"></script>
 </head>
@@ -40,8 +39,8 @@
 
   <div class="upload-box" id="uploadBox">
     <div>진단할 파트정보 UP 파일(.up)을 선택하세요</div>
-    <div style="font-size:12px;color:#999;margin-top:4px;">스케줄 시스템에서 추출한 <b>Schedule_PartInfo_*.up</b> 파일을 사용합니다. 근무구분은 사용하지 않고 오전파트/오후파트를 기준으로 진단합니다. 기존 .xlsx 방식은 임시 fallback으로 유지합니다.</div>
-    <input type="file" id="fileInput" accept=".up,.xlsx">
+    <div style="font-size:12px;color:#999;margin-top:4px;">스케줄 시스템에서 추출한 <b>Schedule_PartInfo_*.up</b> 파일만 사용합니다. 근무구분은 사용하지 않고 오전파트/오후파트를 기준으로 진단합니다.</div>
+    <input type="file" id="fileInput" accept=".up">
     <div id="status"></div>
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
       <label style="font-size:13px; color:#555;">매장명: </label>
@@ -725,11 +724,13 @@ async function handleFile(e) {
 
   try {
     const isUpFile = /\.up$/i.test(file.name);
+    if (!isUpFile) {
+      throw new Error('파트정보 UP(.up) 파일만 업로드할 수 있습니다.');
+    }
 
     // =========================================================
-    // Step UP-2: 새로운 정식 입력 포맷(.up)
-    // - 이 단계에서는 UP 파일을 정상적으로 읽고 검증하는 데까지 수행
-    // - 30분 단위 실제 인력표 변환 및 diagnosis-engine 연결은 UP-3/UP-4에서 진행
+    // 공식 입력 포맷: 파트정보 UP(.up)
+    // - UP 파일을 읽고 30분 단위 실제 배치 및 V1 진단까지 수행
     // =========================================================
     if (isUpFile) {
       if (!window.AshleyUpParser) {
@@ -807,44 +808,6 @@ async function handleFile(e) {
       return;
     }
 
-    // =========================================================
-    // 기존 XLSX 입력 fallback
-    // UP 진단 연결이 완료될 때까지 기존 운영 기능을 보존한다.
-    // =========================================================
-    const { kitchenSheet, hallSheet } = await loadScheduleWorkbook(file);
-
-    // Step 10: 실제 계산 전 Supabase 기준모델을 우선 로드한다.
-    const modelSourceInfo = await ensureStandardModelsLoaded();
-
-    // Step 11-4: 실제 계산 전 Supabase V1.0 계산 기준을 우선 로드한다.
-    const configSourceInfo = await ensureDiagnosisConfigLoaded();
-
-    const result = await computeDiagnosis(kitchenSheet, hallSheet);
-    lastResult = result;
-    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' +
-      (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') +
-      ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') +
-      ', 계산기준: ' + (configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
-
-    let guessedName = file.name.replace(/\.xlsx$/i, '').replace(/_?TEST$|_?테스트$/i, '').trim();
-    guessedName = guessedName || '이름없는매장';
-    document.getElementById('storeNameInput').value = guessedName;
-
-    previousSnapshot = null;
-    try {
-      const listRes = await fetch('/api/list');
-      const listData = await listRes.json();
-      const match = (listData.stores || []).find(s => s.storeName === guessedName);
-      if (match && match.result) previousSnapshot = match.result;
-    } catch (e) { /* 조회 실패시 그냥 비교 없이 진행 */ }
-
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('uploadBox').style.display = 'none';
-    document.getElementById('reuploadLink').style.display = 'inline-block';
-    renderApp(result);
-
-    document.getElementById('saveBox').style.display = 'block';
-    document.getElementById('saveStatus').textContent = '';
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = '오류: ' + err.message;
