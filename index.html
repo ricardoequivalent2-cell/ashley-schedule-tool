@@ -39,7 +39,7 @@
 
   <div class="upload-box" id="uploadBox">
     <div style="font-weight:700; margin-bottom:4px;">파트정보 UP 파일 업로드</div>
-    <div style="font-size:12px;color:#999;margin-bottom:14px;">현장 운영 방식에 맞춰 <b>주방 스케줄</b>과 <b>홀 스케줄</b>을 각각 올릴 수 있습니다. 둘 다 올리면 전체 진단도 함께 생성됩니다.</div>
+    <div style="font-size:12px;color:#999;margin-bottom:14px;">현장 운영 방식에 맞춰 <b>주방 스케줄</b>과 <b>홀 스케줄</b>로 구분해 올릴 수 있습니다. 단, 시스템은 업로드 위치가 아니라 <b>UP 내부 오전파트/오후파트</b>를 기준으로 실제 주방·홀을 자동 분류합니다.</div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
       <label style="display:block;padding:14px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;">
@@ -55,7 +55,7 @@
     </div>
 
     <button id="runDiagnosisBtn" type="button" style="padding:9px 18px;background:#4a6cf7;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer;">진단 시작</button>
-    <div style="font-size:11px;color:#999;margin-top:8px;">한 파일만 올려도 해당 파트 진단은 가능합니다. <b>전체</b> 진단은 주방+홀 두 파일이 모두 있을 때 활성화됩니다.</div>
+    <div style="font-size:11px;color:#999;margin-top:8px;">한 파일만 올려도 진단됩니다. 두 파일을 올리면 먼저 통합한 뒤 중복을 제거하고, 내부 파트값으로 <b>전체 / 주방 / 홀</b>을 자동 분류합니다.</div>
     <div id="status" style="margin-top:10px;"></div>
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
       <label style="font-size:13px; color:#555;">매장명: </label>
@@ -602,13 +602,17 @@ function updateSelectedFileLabels() {
     hallFile ? hallFile.name : '선택 안 됨';
 }
 
-function mergeParsedUpData(kitchenParsed, hallParsed) {
-  const sources = [kitchenParsed, hallParsed].filter(Boolean);
+function mergeParsedUpData(firstParsed, secondParsed) {
+  // DUAL-UP V2 STEP1
+  // 화면의 '주방/홀' 업로드 명칭은 사용자 편의를 위한 표시일 뿐,
+  // 시스템은 어느 칸에 올렸는지로 소속을 판단하지 않는다.
+  // 두 파일의 행을 먼저 하나로 합친 뒤 오전파트/오후파트 값으로 진단한다.
+  const sources = [firstParsed, secondParsed].filter(Boolean);
   if (!sources.length) throw new Error('합칠 UP 데이터가 없습니다.');
 
   const storeNames = sources.map(x => String(x.storeName || '').trim()).filter(Boolean);
   if (storeNames.length >= 2 && new Set(storeNames).size > 1) {
-    throw new Error('주방/홀 파일의 매장명이 서로 다릅니다. 같은 매장 파일인지 확인해주세요.');
+    throw new Error('두 UP 파일의 매장명이 서로 다릅니다. 같은 매장 파일인지 확인해주세요.');
   }
 
   const dateMap = new Map();
@@ -619,12 +623,39 @@ function mergeParsedUpData(kitchenParsed, hallParsed) {
         dateMap.set(d.key, { ...d });
         return;
       }
+
       const a = Number(existing.sales || 0);
       const b = Number(d.sales || 0);
       if (a > 0 && b > 0 && Math.abs(a - b) > 1) {
-        throw new Error(`${d.label} 주방/홀 파일의 예상매출이 서로 다릅니다.`);
+        throw new Error(`${d.label} 두 UP 파일의 예상매출이 서로 다릅니다.`);
       }
       if (!a && b) existing.sales = b;
+    });
+  });
+
+  // 같은 근무행이 두 파일에 완전히 중복되어 있으면 한 번만 집계한다.
+  // 파일 위치는 키에 포함하지 않는다.
+  const rowMap = new Map();
+  let duplicateRowCount = 0;
+
+  sources.forEach(src => {
+    (src.rows || []).forEach(row => {
+      const employeeKey = String(row.employeeId || '').trim() || String(row.name || '').trim();
+      const key = [
+        row.dateKey || '',
+        employeeKey,
+        Number.isFinite(Number(row.startMinutes)) ? Number(row.startMinutes) : '',
+        Number.isFinite(Number(row.endMinutes)) ? Number(row.endMinutes) : '',
+        String(row.morningPart || '').trim(),
+        String(row.afternoonPart || '').trim(),
+        Number(row.workHours || 0)
+      ].join('|');
+
+      if (rowMap.has(key)) {
+        duplicateRowCount += 1;
+        return;
+      }
+      rowMap.set(key, { ...row });
     });
   });
 
@@ -639,10 +670,12 @@ function mergeParsedUpData(kitchenParsed, hallParsed) {
     fileName: sources.map(x => x.fileName).join(' + '),
     sheetName: sources[0].sheetName,
     storeName: storeNames[0] || '',
-    rowCount: sources.reduce((s, x) => s + Number(x.rowCount || 0), 0),
+    rowCount: rowMap.size,
+    originalRowCount: sources.reduce((s, x) => s + Number(x.rowCount || 0), 0),
+    duplicateRowCount,
     dates,
     salesByDate,
-    rows: sources.flatMap(x => x.rows || [])
+    rows: Array.from(rowMap.values())
   };
 }
 
@@ -788,7 +821,7 @@ async function handleDualUpload() {
 
   if (!kitchenFile && !hallFile) {
     statusEl.className = 'error';
-    statusEl.textContent = '오류: 주방 또는 홀 UP 파일을 하나 이상 선택해주세요.';
+    statusEl.textContent = '오류: UP 파일을 하나 이상 선택해주세요.';
     return;
   }
 
@@ -806,63 +839,63 @@ async function handleDualUpload() {
     const modelSourceInfo = await ensureStandardModelsLoaded();
     const configSourceInfo = await ensureDiagnosisConfigLoaded();
 
-    // 각 파일을 먼저 독립 진단한다.
-    const kitchenPack = await parseAndDiagnoseSingle(kitchenFile);
-    const hallPack = await parseAndDiagnoseSingle(hallFile);
-
-    diagnosisResultsByScope.kitchen = kitchenPack
-      ? makeScopedDiagnosisResult(kitchenPack.result, 'kitchen')
+    // STEP1 핵심:
+    // 업로드 칸 이름으로 주방/홀을 판정하지 않는다.
+    // 선택된 모든 UP을 먼저 파싱 → 통합 → 중복제거 → 단 한 번 진단한다.
+    const firstParsed = kitchenFile
+      ? await window.AshleyUpParser.parseUpFile(kitchenFile)
       : null;
-    diagnosisResultsByScope.hall = hallPack
-      ? makeScopedDiagnosisResult(hallPack.result, 'hall')
+    const secondParsed = hallFile
+      ? await window.AshleyUpParser.parseUpFile(hallFile)
       : null;
-    diagnosisResultsByScope.total = null;
 
-    // 두 파일이 모두 있을 때만 '전체' 결과를 만든다.
-    let totalPack = null;
-    if (kitchenPack && hallPack) {
-      const mergedParsed = mergeParsedUpData(kitchenPack.parsed, hallPack.parsed);
-      const mergedActuals = window.AshleyUpParser.buildThirtyMinuteActuals(mergedParsed, {
-        slotSizeMin: 30,
-        slotStartMin: 8 * 60 + 30,
-        slotEndMin: 22 * 60
-      });
-      const mergedResult = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(
-        mergedParsed,
-        mergedActuals
-      );
-      totalPack = { parsed: mergedParsed, actuals: mergedActuals, result: mergedResult };
-      diagnosisResultsByScope.total = mergedResult;
-    }
+    const mergedParsed = mergeParsedUpData(firstParsed, secondParsed);
+    const mergedActuals = window.AshleyUpParser.buildThirtyMinuteActuals(mergedParsed, {
+      slotSizeMin: 30,
+      slotStartMin: 8 * 60 + 30,
+      slotEndMin: 22 * 60
+    });
 
-    // 기본 진입: 둘 다 있으면 전체, 하나만 있으면 해당 조직.
-    activeDiagnosisScope = diagnosisResultsByScope.total
-      ? 'total'
-      : (diagnosisResultsByScope.kitchen ? 'kitchen' : 'hall');
+    const mergedResult = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(
+      mergedParsed,
+      mergedActuals
+    );
 
-    const activePack = activeDiagnosisScope === 'total'
-      ? totalPack
-      : (activeDiagnosisScope === 'kitchen' ? kitchenPack : hallPack);
+    // 전체/주방/홀은 모두 '같은 통합 진단 결과'에서 파트값으로 분리한다.
+    diagnosisResultsByScope.total = mergedResult;
+    diagnosisResultsByScope.kitchen = makeScopedDiagnosisResult(mergedResult, 'kitchen');
+    diagnosisResultsByScope.hall = makeScopedDiagnosisResult(mergedResult, 'hall');
 
-    window.lastParsedUpData = activePack.parsed;
-    window.lastUpActuals = activePack.actuals;
-    lastResult = diagnosisResultsByScope[activeDiagnosisScope];
+    // 실제 데이터가 전혀 없는 조직은 비활성화한다.
+    const kitchenHours = Object.values(mergedResult.tierDiagnosis || {})
+      .reduce((s, d) => s + Number(d.kitchenActualHours || 0), 0);
+    const hallHours = Object.values(mergedResult.tierDiagnosis || {})
+      .reduce((s, d) => s + Number(d.hallActualHours || 0), 0);
 
-    const scopes = [
-      diagnosisResultsByScope.total ? '전체' : null,
-      diagnosisResultsByScope.kitchen ? '주방' : null,
-      diagnosisResultsByScope.hall ? '홀' : null
+    if (kitchenHours < 0.1) diagnosisResultsByScope.kitchen = null;
+    if (hallHours < 0.1) diagnosisResultsByScope.hall = null;
+
+    activeDiagnosisScope = 'total';
+    window.lastParsedUpData = mergedParsed;
+    window.lastUpActuals = mergedActuals;
+    lastResult = mergedResult;
+
+    const detectedScopes = [
+      '전체',
+      diagnosisResultsByScope.kitchen ? `주방 ${Math.round(kitchenHours * 10) / 10}h` : null,
+      diagnosisResultsByScope.hall ? `홀 ${Math.round(hallHours * 10) / 10}h` : null
     ].filter(Boolean).join(' / ');
 
+    const duplicateText = mergedParsed.duplicateRowCount
+      ? ` · 중복 ${mergedParsed.duplicateRowCount}행 제외`
+      : '';
+
     statusEl.textContent =
-      `완료 (${scopes} 진단 생성` +
+      `완료 (${detectedScopes}${duplicateText}` +
       ` · 기준모델: ${modelSourceInfo.source === 'supabase' ? 'Supabase DB' : modelSourceInfo.source}` +
       ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : configSourceInfo.source})`;
 
-    const parsedForName = totalPack
-      ? totalPack.parsed
-      : (kitchenPack ? kitchenPack.parsed : hallPack.parsed);
-    let guessedName = String(parsedForName.storeName || '').trim();
+    let guessedName = String(mergedParsed.storeName || '').trim();
     if (!guessedName) {
       const nameFile = kitchenFile || hallFile;
       guessedName = nameFile.name
@@ -892,9 +925,9 @@ async function handleDualUpload() {
     document.getElementById('saveBox').style.display = 'block';
     document.getElementById('saveStatus').textContent = '';
 
-    console.log('[DUAL-UP] kitchen', kitchenPack);
-    console.log('[DUAL-UP] hall', hallPack);
-    console.log('[DUAL-UP] total', totalPack);
+    console.log('[DUAL-UP V2 STEP1] merged parsed', mergedParsed);
+    console.log('[DUAL-UP V2 STEP1] merged actuals', mergedActuals);
+    console.log('[DUAL-UP V2 STEP1] merged diagnosis', mergedResult);
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = '오류: ' + err.message;
