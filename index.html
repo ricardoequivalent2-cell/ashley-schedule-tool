@@ -38,10 +38,25 @@
   </div>
 
   <div class="upload-box" id="uploadBox">
-    <div>진단할 파트정보 UP 파일(.up)을 선택하세요</div>
-    <div style="font-size:12px;color:#999;margin-top:4px;">스케줄 시스템에서 추출한 <b>Schedule_PartInfo_*.up</b> 파일만 사용합니다. 근무구분은 사용하지 않고 오전파트/오후파트를 기준으로 진단합니다.</div>
-    <input type="file" id="fileInput" accept=".up">
-    <div id="status"></div>
+    <div style="font-weight:700; margin-bottom:4px;">파트정보 UP 파일 업로드</div>
+    <div style="font-size:12px;color:#999;margin-bottom:14px;">현장 운영 방식에 맞춰 <b>주방 스케줄</b>과 <b>홀 스케줄</b>을 각각 올릴 수 있습니다. 둘 다 올리면 전체 진단도 함께 생성됩니다.</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <label style="display:block;padding:14px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">주방 스케줄 UP</div>
+        <input type="file" id="kitchenFileInput" accept=".up" style="width:100%;">
+        <div id="kitchenFileStatus" style="font-size:11px;color:#8B93A5;margin-top:6px;">선택 안 됨</div>
+      </label>
+      <label style="display:block;padding:14px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">홀 스케줄 UP</div>
+        <input type="file" id="hallFileInput" accept=".up" style="width:100%;">
+        <div id="hallFileStatus" style="font-size:11px;color:#8B93A5;margin-top:6px;">선택 안 됨</div>
+      </label>
+    </div>
+
+    <button id="runDiagnosisBtn" type="button" style="padding:9px 18px;background:#4a6cf7;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer;">진단 시작</button>
+    <div style="font-size:11px;color:#999;margin-top:8px;">한 파일만 올려도 해당 파트 진단은 가능합니다. <b>전체</b> 진단은 주방+홀 두 파일이 모두 있을 때 활성화됩니다.</div>
+    <div id="status" style="margin-top:10px;"></div>
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
       <label style="font-size:13px; color:#555;">매장명: </label>
       <input type="text" id="storeNameInput" style="padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; width:200px;">
@@ -132,6 +147,12 @@
     <div class="daily-page-title">주간진단</div>
     <div class="daily-page-sub">이번 주 동안 어느 요일·시간대·파트에서 문제가 반복됐는지 확인하세요.</div>
 
+    <div class="diagnosis-scope-tabs" style="display:flex;gap:6px;margin:14px 0 18px;">
+      <button type="button" class="scope-tab active" data-scope="total" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#4a6cf7;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">전체</button>
+      <button type="button" class="scope-tab" data-scope="kitchen" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#fff;color:#555;font-size:12px;font-weight:700;cursor:pointer;">주방</button>
+      <button type="button" class="scope-tab" data-scope="hall" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#fff;color:#555;font-size:12px;font-weight:700;cursor:pointer;">홀</button>
+    </div>
+
     <div class="kpi-row-5" id="weeklyKpiRow"></div>
 
     <div class="section-card">
@@ -164,6 +185,12 @@
   <div class="view-panel" id="view-daily">
     <div class="daily-page-title">스케줄 진단 대시보드</div>
     <div class="daily-page-sub">매출/객수 기반 정석 스케줄과 실제 스케줄을 비교하여 인력 과다/부족을 진단합니다.</div>
+
+    <div class="diagnosis-scope-tabs" style="display:flex;gap:6px;margin:14px 0 18px;">
+      <button type="button" class="scope-tab active" data-scope="total" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#4a6cf7;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">전체</button>
+      <button type="button" class="scope-tab" data-scope="kitchen" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#fff;color:#555;font-size:12px;font-weight:700;cursor:pointer;">주방</button>
+      <button type="button" class="scope-tab" data-scope="hall" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#fff;color:#555;font-size:12px;font-weight:700;cursor:pointer;">홀</button>
+    </div>
     <div class="tabs" id="tabs"></div>
 
     <div class="kpi-row-5" id="dailyKpiRow"></div>
@@ -526,111 +553,348 @@ function computeWeeklySummary(tierDiagnosis, dateHeaders) {
   };
 }
 
-// ==================== 파일 업로드 처리 ====================
-document.getElementById('fileInput').addEventListener('change', handleFile);
+// ==================== 주방/홀 이중 UP 업로드 처리 ====================
+// 운영 기준
+// - 주방 파일: 현장에서 주방 관리자가 사용하는 스케줄 파일
+// - 홀 파일: 현장에서 홀 관리자가 사용하는 스케줄 파일
+// - 두 파일이 모두 있으면 합쳐서 전체 진단도 생성
+// - 전체/주방/홀 화면은 같은 진단 UI를 재사용
+//
+// 표준시간표의 기존 V1 운영 소유 기준은 유지:
+// - 홀 표준 = 홀 + 데코이 + 폴리싱
+//   (실제 UP에는 데코이/폴리싱이 별도 파트로 거의 입력되지 않지만,
+//    현실에서는 홀 인력이 해당 업무를 수행하는 현재 V1 구조를 유지)
+// - 주방 표준 = 그 외 주방 파트
+
+const diagnosisResultsByScope = {
+  total: null,
+  kitchen: null,
+  hall: null
+};
+let activeDiagnosisScope = 'total';
+
+document.getElementById('kitchenFileInput').addEventListener('change', updateSelectedFileLabels);
+document.getElementById('hallFileInput').addEventListener('change', updateSelectedFileLabels);
+document.getElementById('runDiagnosisBtn').addEventListener('click', handleDualUpload);
+
 document.getElementById('reuploadLink').addEventListener('click', (e) => {
   e.preventDefault();
   document.getElementById('uploadBox').style.display = 'block';
 });
 
+document.querySelectorAll('.scope-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const scope = btn.dataset.scope;
+    if (!diagnosisResultsByScope[scope]) return;
+    setDiagnosisScope(scope);
+  });
+});
+
 let lastResult = null; // 저장 버튼에서 사용
 let previousSnapshot = null; // 같은 매장의 직전 저장 결과 (지난 저장 대비 추세용)
 
-async function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+function updateSelectedFileLabels() {
+  const kitchenFile = document.getElementById('kitchenFileInput').files[0];
+  const hallFile = document.getElementById('hallFileInput').files[0];
+  document.getElementById('kitchenFileStatus').textContent =
+    kitchenFile ? kitchenFile.name : '선택 안 됨';
+  document.getElementById('hallFileStatus').textContent =
+    hallFile ? hallFile.name : '선택 안 됨';
+}
 
+function mergeParsedUpData(kitchenParsed, hallParsed) {
+  const sources = [kitchenParsed, hallParsed].filter(Boolean);
+  if (!sources.length) throw new Error('합칠 UP 데이터가 없습니다.');
+
+  const storeNames = sources.map(x => String(x.storeName || '').trim()).filter(Boolean);
+  if (storeNames.length >= 2 && new Set(storeNames).size > 1) {
+    throw new Error('주방/홀 파일의 매장명이 서로 다릅니다. 같은 매장 파일인지 확인해주세요.');
+  }
+
+  const dateMap = new Map();
+  sources.forEach(src => {
+    (src.dates || []).forEach(d => {
+      const existing = dateMap.get(d.key);
+      if (!existing) {
+        dateMap.set(d.key, { ...d });
+        return;
+      }
+      const a = Number(existing.sales || 0);
+      const b = Number(d.sales || 0);
+      if (a > 0 && b > 0 && Math.abs(a - b) > 1) {
+        throw new Error(`${d.label} 주방/홀 파일의 예상매출이 서로 다릅니다.`);
+      }
+      if (!a && b) existing.sales = b;
+    });
+  });
+
+  const dates = Array.from(dateMap.values()).sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const salesByDate = {};
+  dates.forEach(d => { salesByDate[d.key] = Number(d.sales || 0); });
+
+  return {
+    sourceType: 'up',
+    fileName: sources.map(x => x.fileName).join(' + '),
+    sheetName: sources[0].sheetName,
+    storeName: storeNames[0] || '',
+    rowCount: sources.reduce((s, x) => s + Number(x.rowCount || 0), 0),
+    dates,
+    salesByDate,
+    rows: sources.flatMap(x => x.rows || [])
+  };
+}
+
+function sumStandardHoursForScope(result, dateLabel, scope) {
+  const schedule = (result.standardSchedule || {})[dateLabel] || {};
+  const hourPerSlot = 0.5;
+  let total = 0;
+
+  (result.slots || []).forEach(slot => {
+    const row = schedule[slot] || {};
+    Object.keys(row).forEach(part => {
+      if (scope === 'hall' && part !== '홀') return;
+      if (scope === 'kitchen' && part === '홀') return;
+      total += Number(row[part] || 0) * hourPerSlot;
+    });
+  });
+  return Math.round(total * 10) / 10;
+}
+
+function makeScopedDiagnosisResult(sourceResult, scope) {
+  if (!sourceResult) return null;
+  if (scope === 'total') return sourceResult;
+
+  // structuredClone이 지원되는 최신 브라우저를 우선 사용.
+  // 저장 결과는 일반 객체/배열/숫자/문자열만 포함하므로 JSON fallback도 안전하다.
+  const scoped = (typeof structuredClone === 'function')
+    ? structuredClone(sourceResult)
+    : JSON.parse(JSON.stringify(sourceResult));
+
+  scoped.diagnosisScope = scope;
+
+  // 시간대 × 파트 화면을 해당 조직만 남긴다.
+  Object.keys(scoped.heatmap || {}).forEach(date => {
+    Object.keys(scoped.heatmap[date] || {}).forEach(slot => {
+      const row = scoped.heatmap[date][slot] || {};
+      Object.keys(row).forEach(part => {
+        const keep = scope === 'hall' ? part === '홀' : part !== '홀';
+        if (!keep) delete row[part];
+      });
+    });
+  });
+
+  if (scope === 'kitchen') {
+    scoped.hallBlockDiagnosis = Object.fromEntries(
+      (scoped.dateHeaders || []).map(d => [d, []])
+    );
+    scoped.weeklyHallBlockSummary = [];
+    scoped.diagnosisList = (scoped.diagnosisList || []).filter(x => x.part !== '홀');
+  } else {
+    scoped.blockDiagnosis = Object.fromEntries(
+      (scoped.dateHeaders || []).map(d => [d, []])
+    );
+    scoped.weeklyBlockSummary = [];
+    // 기존 diagnosisList는 주방 세부파트용이므로 홀 화면에서는 비운다.
+    scoped.diagnosisList = [];
+  }
+
+  // 파트 화면의 총인시는 '해당 조직 실제인시 vs 해당 조직 표준시간표 인시'로 맞춘다.
+  // V1 전체 곡선을 주방/홀에 다시 회귀시키지 않고,
+  // 현재 표준시간표가 가진 조직별 몫을 1차목표로 사용한다.
+  (scoped.dateHeaders || []).forEach(date => {
+    const t = scoped.tierDiagnosis && scoped.tierDiagnosis[date];
+    if (!t) return;
+
+    const originalTarget1 = Number(t.target1 || 0);
+    const scopedTarget1 = sumStandardHoursForScope(scoped, date, scope);
+    const ratio = originalTarget1 > 0 ? scopedTarget1 / originalTarget1 : 0;
+
+    t.actualTotal = scope === 'hall'
+      ? Number(t.hallActualHours || 0)
+      : Number(t.kitchenActualHours || 0);
+    t.target1 = scopedTarget1;
+
+    // 최소허들/2차목표는 화면의 단계 판정 일관성을 위해
+    // 기존 전체 곡선의 비율을 그대로 적용한다.
+    t.hurdle = Math.round(Number(t.hurdle || 0) * ratio * 10) / 10;
+    t.target2 = Math.round(Number(t.target2 || 0) * ratio * 10) / 10;
+
+    if (t.actualTotal > t.hurdle) t.verdict = '최소허들 초과 (비효율)';
+    else if (t.actualTotal > t.target1) t.verdict = '최소허들 충족 · 1차목표 미달';
+    else if (t.actualTotal > t.target2) t.verdict = '1차목표 달성 · 2차목표 미달';
+    else t.verdict = '2차목표(BHAG) 달성';
+  });
+
+  scoped.priorityList = {};
+  (scoped.dateHeaders || []).forEach(date => {
+    const items = (scoped.diagnosisList || [])
+      .filter(x => x.date === date)
+      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+    scoped.priorityList[date] = items.slice(0, 5).map((x, i) => ({ ...x, rank: i + 1 }));
+  });
+
+  scoped.weeklySummary = computeWeeklySummary(scoped.tierDiagnosis, scoped.dateHeaders);
+  scoped.weeklySummary.totalOther = 0;
+  return scoped;
+}
+
+function refreshScopeTabs() {
+  document.querySelectorAll('.scope-tab').forEach(btn => {
+    const scope = btn.dataset.scope;
+    const available = !!diagnosisResultsByScope[scope];
+    btn.disabled = !available;
+    btn.style.opacity = available ? '1' : '0.35';
+    btn.style.cursor = available ? 'pointer' : 'not-allowed';
+
+    const active = available && scope === activeDiagnosisScope;
+    btn.classList.toggle('active', active);
+    btn.style.background = active ? '#4a6cf7' : '#fff';
+    btn.style.color = active ? '#fff' : '#555';
+  });
+}
+
+function setDiagnosisScope(scope) {
+  const result = diagnosisResultsByScope[scope];
+  if (!result) return;
+
+  activeDiagnosisScope = scope;
+  lastResult = result;
+  refreshScopeTabs();
+  renderApp(result);
+}
+
+async function parseAndDiagnoseSingle(file) {
+  if (!file) return null;
+  if (!/\.up$/i.test(file.name)) {
+    throw new Error('파트정보 UP(.up) 파일만 업로드할 수 있습니다.');
+  }
+
+  const parsed = await window.AshleyUpParser.parseUpFile(file);
+  const actuals = window.AshleyUpParser.buildThirtyMinuteActuals(parsed, {
+    slotSizeMin: 30,
+    slotStartMin: 8 * 60 + 30,
+    slotEndMin: 22 * 60
+  });
+  const result = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(parsed, actuals);
+  return { parsed, actuals, result };
+}
+
+async function handleDualUpload() {
+  const kitchenFile = document.getElementById('kitchenFileInput').files[0];
+  const hallFile = document.getElementById('hallFileInput').files[0];
   const statusEl = document.getElementById('status');
+
+  if (!kitchenFile && !hallFile) {
+    statusEl.className = 'error';
+    statusEl.textContent = '오류: 주방 또는 홀 UP 파일을 하나 이상 선택해주세요.';
+    return;
+  }
+
   statusEl.className = '';
   statusEl.textContent = '읽는 중...';
 
   try {
-    const isUpFile = /\.up$/i.test(file.name);
-    if (!isUpFile) {
-      throw new Error('파트정보 UP(.up) 파일만 업로드할 수 있습니다.');
+    if (!window.AshleyUpParser) {
+      throw new Error('UP Parser가 로드되지 않았습니다. js/up-parser.js를 확인해주세요.');
+    }
+    if (!window.AshleyUpDiagnosisAdapter) {
+      throw new Error('UP Diagnosis Adapter가 로드되지 않았습니다. js/up-diagnosis-adapter.js를 확인해주세요.');
     }
 
-    // =========================================================
-    // Step UP-2: 새로운 정식 입력 포맷(.up)
-    // - 이 단계에서는 UP 파일을 정상적으로 읽고 검증하는 데까지 수행
-    // - 30분 단위 실제 인력표 변환 및 diagnosis-engine 연결은 UP-3/UP-4에서 진행
-    // =========================================================
-    if (isUpFile) {
-      if (!window.AshleyUpParser) {
-        throw new Error('UP Parser가 로드되지 않았습니다. js/up-parser.js를 확인해주세요.');
-      }
+    const modelSourceInfo = await ensureStandardModelsLoaded();
+    const configSourceInfo = await ensureDiagnosisConfigLoaded();
 
-      const parsedUp = await window.AshleyUpParser.parseUpFile(file);
-      const upActuals = window.AshleyUpParser.buildThirtyMinuteActuals(parsedUp, {
+    // 각 파일을 먼저 독립 진단한다.
+    const kitchenPack = await parseAndDiagnoseSingle(kitchenFile);
+    const hallPack = await parseAndDiagnoseSingle(hallFile);
+
+    diagnosisResultsByScope.kitchen = kitchenPack
+      ? makeScopedDiagnosisResult(kitchenPack.result, 'kitchen')
+      : null;
+    diagnosisResultsByScope.hall = hallPack
+      ? makeScopedDiagnosisResult(hallPack.result, 'hall')
+      : null;
+    diagnosisResultsByScope.total = null;
+
+    // 두 파일이 모두 있을 때만 '전체' 결과를 만든다.
+    let totalPack = null;
+    if (kitchenPack && hallPack) {
+      const mergedParsed = mergeParsedUpData(kitchenPack.parsed, hallPack.parsed);
+      const mergedActuals = window.AshleyUpParser.buildThirtyMinuteActuals(mergedParsed, {
         slotSizeMin: 30,
         slotStartMin: 8 * 60 + 30,
         slotEndMin: 22 * 60
       });
-
-      if (!window.AshleyUpDiagnosisAdapter) {
-        throw new Error('UP Diagnosis Adapter가 로드되지 않았습니다. js/up-diagnosis-adapter.js를 확인해주세요.');
-      }
-
-      // 기존과 동일하게 Supabase 기준모델/계산기준을 먼저 확보
-      const modelSourceInfo = await ensureStandardModelsLoaded();
-      const configSourceInfo = await ensureDiagnosisConfigLoaded();
-
-      // Step UP-4: UP 데이터를 기존 V1 진단 계산구조에 연결
-      const result = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(
-        parsedUp,
-        upActuals
+      const mergedResult = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(
+        mergedParsed,
+        mergedActuals
       );
-
-      window.lastParsedUpData = parsedUp;
-      window.lastUpActuals = upActuals;
-      lastResult = result;
-
-      const coveragePct = Math.round(upActuals.coverageRate * 100);
-
-      statusEl.textContent =
-        `완료 (${result.dateHeaders.length}일 총인시 진단` +
-        (result.partDiagnosisAvailable ? ', 시간대·파트 진단 포함' : ', 시간대·파트 진단 보류') +
-        ` · 표준파트 매핑 ${upActuals.mappedRows}/${upActuals.eligiblePartRows}행(${coveragePct}%) · 파트전환 ${upActuals.transitionedRows.length}행` +
-        ` · 기준모델: ${modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback'}` +
-        ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback'}` +
-        ')' +
-        (!result.partDiagnosisAvailable && result.partDiagnosisBlockReason
-          ? ` · 보류사유: ${result.partDiagnosisBlockReason}`
-          : '');
-
-      let guessedName = (parsedUp.storeName || '').trim();
-      if (!guessedName) {
-        guessedName = file.name
-          .replace(/\.up$/i, '')
-          .replace(/^Schedule_PartInfo_/i, '')
-          .replace(/_?TEST$|_?테스트$/i, '')
-          .trim();
-      }
-      guessedName = guessedName || '이름없는매장';
-      document.getElementById('storeNameInput').value = guessedName;
-
-      previousSnapshot = null;
-      try {
-        const listRes = await fetch('/api/list');
-        const listData = await listRes.json();
-        const match = (listData.stores || []).find(s => s.storeName === guessedName);
-        if (match && match.result) previousSnapshot = match.result;
-      } catch (e) { /* 조회 실패시 비교 없이 진행 */ }
-
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('uploadBox').style.display = 'none';
-      document.getElementById('reuploadLink').style.display = 'inline-block';
-      renderApp(result);
-
-      document.getElementById('saveBox').style.display = 'block';
-      document.getElementById('saveStatus').textContent = '';
-
-      console.log('[UP-5] parsed UP data', parsedUp);
-      console.log('[UP-5] 30분 actual data', upActuals);
-      console.log('[UP-5] diagnosis result', result);
-      return;
+      totalPack = { parsed: mergedParsed, actuals: mergedActuals, result: mergedResult };
+      diagnosisResultsByScope.total = mergedResult;
     }
 
+    // 기본 진입: 둘 다 있으면 전체, 하나만 있으면 해당 조직.
+    activeDiagnosisScope = diagnosisResultsByScope.total
+      ? 'total'
+      : (diagnosisResultsByScope.kitchen ? 'kitchen' : 'hall');
+
+    const activePack = activeDiagnosisScope === 'total'
+      ? totalPack
+      : (activeDiagnosisScope === 'kitchen' ? kitchenPack : hallPack);
+
+    window.lastParsedUpData = activePack.parsed;
+    window.lastUpActuals = activePack.actuals;
+    lastResult = diagnosisResultsByScope[activeDiagnosisScope];
+
+    const scopes = [
+      diagnosisResultsByScope.total ? '전체' : null,
+      diagnosisResultsByScope.kitchen ? '주방' : null,
+      diagnosisResultsByScope.hall ? '홀' : null
+    ].filter(Boolean).join(' / ');
+
+    statusEl.textContent =
+      `완료 (${scopes} 진단 생성` +
+      ` · 기준모델: ${modelSourceInfo.source === 'supabase' ? 'Supabase DB' : modelSourceInfo.source}` +
+      ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : configSourceInfo.source})`;
+
+    const parsedForName = totalPack
+      ? totalPack.parsed
+      : (kitchenPack ? kitchenPack.parsed : hallPack.parsed);
+    let guessedName = String(parsedForName.storeName || '').trim();
+    if (!guessedName) {
+      const nameFile = kitchenFile || hallFile;
+      guessedName = nameFile.name
+        .replace(/\.up$/i, '')
+        .replace(/^Schedule_PartInfo_/i, '')
+        .replace(/_?TEST$|_?테스트$/i, '')
+        .trim();
+    }
+    guessedName = guessedName || '이름없는매장';
+    document.getElementById('storeNameInput').value = guessedName;
+
+    previousSnapshot = null;
+    try {
+      const listRes = await fetch('/api/list');
+      const listData = await listRes.json();
+      const match = (listData.stores || []).find(s => s.storeName === guessedName);
+      if (match && match.result) previousSnapshot = match.result;
+    } catch (e) { /* 조회 실패시 비교 없이 진행 */ }
+
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('uploadBox').style.display = 'none';
+    document.getElementById('reuploadLink').style.display = 'inline-block';
+
+    refreshScopeTabs();
+    renderApp(lastResult);
+
+    document.getElementById('saveBox').style.display = 'block';
+    document.getElementById('saveStatus').textContent = '';
+
+    console.log('[DUAL-UP] kitchen', kitchenPack);
+    console.log('[DUAL-UP] hall', hallPack);
+    console.log('[DUAL-UP] total', totalPack);
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = '오류: ' + err.message;
