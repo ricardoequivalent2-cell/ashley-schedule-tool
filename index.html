@@ -779,12 +779,44 @@ async function handleFile(e) {
       }
       document.getElementById('storeNameInput').value = guessedName || '이름없는매장';
 
-      // UP-2에서는 진단 결과를 아직 만들지 않으므로 저장/대시보드는 열지 않음.
-      lastResult = null;
-      document.getElementById('saveBox').style.display = 'none';
+      // UP-4: 파트 매핑이 안전한 경우 기존 진단엔진 계산기준에 실제 연결
+      if (!upActuals.canRunPartDiagnosis) {
+        lastResult = null;
+        document.getElementById('saveBox').style.display = 'none';
+        console.warn('[UP-4] 파트 매핑률 부족 - 진단 차단', upActuals);
+        return;
+      }
 
-      console.log('[UP-3] parsed UP data', parsedUp);
-      console.log('[UP-3] 30분 actual data', upActuals);
+      const modelSourceInfo = await ensureStandardModelsLoaded();
+      const configSourceInfo = await ensureDiagnosisConfigLoaded();
+      const result = await computeDiagnosisFromUp(parsedUp, upActuals);
+      lastResult = result;
+
+      statusEl.textContent =
+        `완료 (${result.dateHeaders.length}일 UP 진단됨` +
+        `, 파트매핑 ${Math.round(upActuals.coverageRate * 100)}%` +
+        ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') +
+        ', 계산기준: ' + (configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
+
+      previousSnapshot = null;
+      try {
+        const listRes = await fetch('/api/list');
+        const listData = await listRes.json();
+        const match = (listData.stores || []).find(s => s.storeName === (guessedName || '이름없는매장'));
+        if (match && match.result) previousSnapshot = match.result;
+      } catch (e) { /* 조회 실패 시 비교 없이 진행 */ }
+
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('uploadBox').style.display = 'none';
+      document.getElementById('reuploadLink').style.display = 'inline-block';
+      renderApp(result);
+
+      document.getElementById('saveBox').style.display = 'block';
+      document.getElementById('saveStatus').textContent = '';
+
+      console.log('[UP-4] parsed UP data', parsedUp);
+      console.log('[UP-4] 30분 actual data', upActuals);
+      console.log('[UP-4] diagnosis result', result);
       return;
     }
 
