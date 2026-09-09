@@ -25,7 +25,32 @@
     '근무시간'
   ];
 
-  /**
+  // 기존 진단엔진이 사용하는 파트명.
+  // UP-3에서는 이름이 명확히 일치하는 값만 자동 매핑한다.
+  // '파트1', '파트4', '라이브'처럼 의미가 확정되지 않은 값은 임의 변환하지 않는다.
+  const DIAGNOSIS_PARTS = [
+    '스시', '콜드', '베이커리', '핫', '그릴', '피파',
+    'DMO', '데코이', '폴리싱', '홀'
+  ];
+
+  const PART_ALIASES = {
+    '스시': '스시',
+    '콜드': '콜드',
+    '베이커리': '베이커리',
+    '핫': '핫',
+    '그릴': '그릴',
+    '피파': '피파',
+    '피/파': '피파',
+    '피자파스타': '피파',
+    '피자/파스타': '피파',
+    'DMO': 'DMO',
+    'dmo': 'DMO',
+    '데코이': '데코이',
+    '폴리싱': '폴리싱',
+    '홀': '홀'
+  };
+
+  /** 
    * .up 파일을 읽어 정규화된 데이터로 반환합니다.
    *
    * 반환 예:
@@ -372,11 +397,179 @@
     return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
   }
 
-  // Step UP-2에서 index.html이 사용할 공개 API
+
+  /**
+   * Step UP-3
+   * 파싱된 UP 행을 30분 단위 실제 배치 데이터로 변환한다.
+   *
+   * 중요:
+   * 1) 오전파트=오후파트 또는 한쪽만 있는 경우에만 파트 전체 근무시간 적용
+   * 2) 오전/오후 파트가 서로 다르면 전환시각이 UP에 없으므로 임의로 반분하지 않음
+   * 3) 알 수 없는 파트명은 미매핑 목록으로 남김
+   * 4) 근무구분만 '주방'이고 세부파트가 비어 있는 경우도 파트진단에서 제외
+   */
+  function buildThirtyMinuteActuals(parsedUp, options = {}) {
+    if (!parsedUp || !Array.isArray(parsedUp.rows)) {
+      throw new Error('먼저 UP 파일을 파싱해주세요.');
+    }
+
+    const slotSizeMin = Number(options.slotSizeMin || 30);
+    const slotStartMin = Number(options.slotStartMin ?? (8 * 60 + 30));
+    const slotEndMin = Number(options.slotEndMin ?? (21 * 60 + 30));
+
+    const slots = [];
+    for (let m = slotStartMin; m < slotEndMin; m += slotSizeMin) {
+      slots.push(m);
+    }
+
+    const dateKeys = (parsedUp.dates || []).map(d => d.key);
+    const actualCounts = {};
+    const actualNames = {};
+    const allScheduledCounts = {};
+    const allScheduledNames = {};
+
+    dateKeys.forEach(dateKey => {
+      actualCounts[dateKey] = {};
+      actualNames[dateKey] = {};
+      allScheduledCounts[dateKey] = {};
+      allScheduledNames[dateKey] = {};
+
+      slots.forEach(slot => {
+        actualCounts[dateKey][slot] = {};
+        actualNames[dateKey][slot] = {};
+        DIAGNOSIS_PARTS.forEach(part => {
+          actualCounts[dateKey][slot][part] = 0;
+          actualNames[dateKey][slot][part] = [];
+        });
+        allScheduledCounts[dateKey][slot] = 0;
+        allScheduledNames[dateKey][slot] = [];
+      });
+    });
+
+    const unresolvedRows = [];
+    const ambiguousTransitionRows = [];
+    const noPartRows = [];
+    const invalidTimeRows = [];
+    let scheduledRows = 0;
+    let mappedRows = 0;
+
+    parsedUp.rows.forEach(row => {
+      const start = row.startMinutes;
+      const end = row.endMinutes;
+
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+        // 출퇴근이 없는 행은 근무 배치 행이 아니므로 별도 기록만 한다.
+        if (start !== null || end !== null) {
+          invalidTimeRows.push(summarizeRow(row, '출퇴근 시간 오류'));
+        }
+        return;
+      }
+
+      scheduledRows += 1;
+
+      // 전체 근무자 배치(파트와 무관)는 항상 슬롯화한다.
+      slots.forEach(slot => {
+        if (overlapsSlot(start, end, slot, slotSizeMin)) {
+          allScheduledCounts[row.dateKey][slot] += 1;
+          allScheduledNames[row.dateKey][slot].push(row.name);
+        }
+      });
+
+      const amRaw = cleanText(row.morningPart);
+      const pmRaw = cleanText(row.afternoonPart);
+      const am = mapPartName(amRaw);
+      const pm = mapPartName(pmRaw);
+
+      // 양쪽에 값이 있는데 서로 다른 경우:
+      // UP에는 전환시각이 없으므로 정확한 시간대 배치를 만들 수 없다.
+      if (amRaw && pmRaw && amRaw !== pmRaw) {
+        ambiguousTransitionRows.push(
+          summarizeRow(row, `오전 ${amRaw} → 오후 ${pmRaw} (전환시각 미정)`)
+        );
+        return;
+      }
+
+      const rawPart = amRaw || pmRaw;
+      const mappedPart = am || pm;
+
+      if (!rawPart) {
+        noPartRows.push(summarizeRow(row, '오전/오후 파트 공란'));
+        return;
+      }
+
+      if (!mappedPart) {
+        unresolvedRows.push(summarizeRow(row, `미매핑 파트: ${rawPart}`));
+        return;
+      }
+
+      mappedRows += 1;
+
+      slots.forEach(slot => {
+        if (!overlapsSlot(start, end, slot, slotSizeMin)) return;
+
+        actualCounts[row.dateKey][slot][mappedPart] += 1;
+        actualNames[row.dateKey][slot][mappedPart].push(row.name);
+      });
+    });
+
+    const coverageRate = scheduledRows > 0 ? mappedRows / scheduledRows : 0;
+
+    return {
+      slots,
+      slotSizeMin,
+      slotStartMin,
+      slotEndMin,
+      actualCounts,
+      actualNames,
+      allScheduledCounts,
+      allScheduledNames,
+      scheduledRows,
+      mappedRows,
+      coverageRate,
+      unresolvedRows,
+      ambiguousTransitionRows,
+      noPartRows,
+      invalidTimeRows,
+      canRunPartDiagnosis: coverageRate >= 0.70,
+      diagnosisParts: [...DIAGNOSIS_PARTS]
+    };
+  }
+
+  function mapPartName(value) {
+    const text = cleanText(value);
+    if (!text) return null;
+    return PART_ALIASES[text] || null;
+  }
+
+  function overlapsSlot(startMin, endMin, slotStart, slotSizeMin) {
+    const slotEnd = slotStart + slotSizeMin;
+    return startMin < slotEnd && endMin > slotStart;
+  }
+
+  function summarizeRow(row, reason) {
+    return {
+      rowNumber: row.rowNumber,
+      dateKey: row.dateKey,
+      employeeId: row.employeeId,
+      name: row.name,
+      workType: row.workType,
+      morningPart: row.morningPart,
+      afternoonPart: row.afternoonPart,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      workHours: row.workHours,
+      reason
+    };
+  }
+
+  // Step UP-3에서 index.html이 사용할 공개 API
   global.AshleyUpParser = {
     parseUpFile,
     parseUpWorkbook,
+    buildThirtyMinuteActuals,
+    mapPartName,
     requiredHeaders: [...UP_REQUIRED_HEADERS],
+    diagnosisParts: [...DIAGNOSIS_PARTS],
     sheetName: UP_SHEET_NAME
   };
 

@@ -736,12 +736,24 @@ async function handleFile(e) {
       }
 
       const parsedUp = await window.AshleyUpParser.parseUpFile(file);
+      const upActuals = window.AshleyUpParser.buildThirtyMinuteActuals(parsedUp, {
+        slotSizeMin: 30,
+        slotStartMin: 8 * 60 + 30,
+        slotEndMin: 21 * 60 + 30
+      });
 
-      // 다음 단계에서 그대로 사용할 수 있도록 전역에 보관
+      // UP-4에서 diagnosis-engine에 연결할 정규화 결과
       window.lastParsedUpData = parsedUp;
+      window.lastUpActuals = upActuals;
 
       const dateCount = parsedUp.dates.length;
       const workerRowCount = parsedUp.rows.length;
+      const coveragePct = Math.round(upActuals.coverageRate * 100);
+      const unresolvedCount =
+        upActuals.unresolvedRows.length +
+        upActuals.ambiguousTransitionRows.length +
+        upActuals.noPartRows.length;
+
       const salesPreview = parsedUp.dates
         .slice(0, 3)
         .map(d => `${d.label} ${Math.round(d.sales || 0).toLocaleString()}원`)
@@ -749,8 +761,12 @@ async function handleFile(e) {
 
       statusEl.textContent =
         `UP 파일 정상 인식 · ${dateCount}일 · 근무데이터 ${workerRowCount}행` +
+        ` · 시간대 파트매핑 ${upActuals.mappedRows}/${upActuals.scheduledRows}행(${coveragePct}%)` +
+        (unresolvedCount ? ` · 확인필요 ${unresolvedCount}행` : '') +
         (salesPreview ? ` · ${salesPreview}` : '') +
-        ' · 다음 단계에서 실제 배치 진단에 연결합니다.';
+        (upActuals.canRunPartDiagnosis
+          ? ' · 30분 단위 실제배치 생성 완료'
+          : ' · 파트정보 부족으로 파트진단은 아직 차단');
 
       // UP 내부 매장명이 있으면 사용. 비어 있으면 파일명 기반 임시값.
       let guessedName = (parsedUp.storeName || '').trim();
@@ -767,7 +783,8 @@ async function handleFile(e) {
       lastResult = null;
       document.getElementById('saveBox').style.display = 'none';
 
-      console.log('[UP-2] parsed UP data', parsedUp);
+      console.log('[UP-3] parsed UP data', parsedUp);
+      console.log('[UP-3] 30분 actual data', upActuals);
       return;
     }
 
