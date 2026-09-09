@@ -19,9 +19,10 @@
     }
 
     const rawModels = getStandardModels();
-    const calcConfig = (typeof getActiveDiagnosisConfig === 'function')
-      ? getActiveDiagnosisConfig()
-      : { GUEST_UNIT_PRICE_WEEKDAY, GUEST_UNIT_PRICE_WEEKEND, CURVE };
+    if (typeof getActiveDiagnosisConfig !== 'function') {
+      throw new Error('계산기준 로더(config-source.js)를 찾을 수 없습니다.');
+    }
+    const calcConfig = getActiveDiagnosisConfig();
 
     const slots = getTimeSlots();
     const hourPerSlot = SLOT_SIZE_MIN / 60;

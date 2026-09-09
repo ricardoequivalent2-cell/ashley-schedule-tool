@@ -1,39 +1,22 @@
 // Ashley Schedule Tool - Diagnosis Calculation Engine
-// Step 3 refactor: calculation rules separated from index.html.
-// Keep UI/Excel parsing in index.html for now.
+// Calculation engine only. Numeric V1 standards are loaded from Supabase via config-source.js.
 
 const ALL_MODEL_PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO','데코이','폴리싱','홀'];
 
-const GUEST_UNIT_PRICE_WEEKDAY = 21138;
-const GUEST_UNIT_PRICE_WEEKEND = 24889;
-
-const CURVE = {
-  FLOOR: 90, KNOT: 1200, SLOPE: 0.164532,
-  TIERS: {
-    '최소허들': { a: 47.6487, b: 0.5936, c: 0.8431 },
-    '1차목표': { a: 61.9593, b: 0.1823, c: 0.9948 },
-    '2차목표': { a: 60.09, b: 0.1403, c: 1.023 },
-  },
-};
 
 const NO_EXTRAPOLATE_PARTS = ['DMO', '데코이', '폴리싱', '홀'];
 
-// 파트별 CAP 규칙
-const PART_CAP_RULES = {
-  'DMO':   [{ maxSales: 20000000, cap: 1 }],
-  '데코이': [{ maxSales: 20000000, cap: 1 }],
-  '폴리싱': [{ maxSales: 20000000, cap: 1 }],
-};
 
 function getPartCap(part, salesVal) {
-  // Step 12-3: Supabase에서 로드된 CAP을 우선 사용한다.
-  // config-source.js/API 오류 시 ACTIVE_DIAGNOSIS_CONFIG가 로컬 PART_CAP_RULES를 담으므로 자동 fallback된다.
-  const activeConfig = (typeof getActiveDiagnosisConfig === 'function')
-    ? getActiveDiagnosisConfig()
-    : null;
+  // DB CLEAN-4: CAP은 Supabase model_config에서 로드된 활성 설정만 사용한다.
+  if (typeof getActiveDiagnosisConfig !== 'function') {
+    throw new Error('계산기준 로더(config-source.js)를 찾을 수 없습니다.');
+  }
+  const activeConfig = getActiveDiagnosisConfig();
   const activeRules = activeConfig && activeConfig.PART_CAP_RULES;
-  const rules = (activeRules && activeRules[part]) || PART_CAP_RULES[part];
+  const rules = activeRules && activeRules[part];
   if (!rules) return null;
+
   for (const r of rules) {
     if (salesVal <= Number(r.maxSales)) return Number(r.cap);
   }
@@ -41,7 +24,11 @@ function getPartCap(part, salesVal) {
 }
 
 // V1.0 curve
-function tierHoursDaily(p, n, curveConfig = CURVE) {
+// 숫자 기준은 코드에 두지 않고 Supabase에서 전달받은 curveConfig만 사용한다.
+function tierHoursDaily(p, n, curveConfig) {
+  if (!p || !curveConfig) {
+    throw new Error('표준인시 계산기준이 없습니다. Supabase model_config 로드를 확인해주세요.');
+  }
   const base1200 = p.a + p.b * Math.pow(curveConfig.KNOT, p.c);
   if (n <= curveConfig.KNOT) return Math.max(curveConfig.FLOOR, p.a + p.b * Math.pow(n, p.c));
   return base1200 + curveConfig.SLOPE * (n - curveConfig.KNOT);

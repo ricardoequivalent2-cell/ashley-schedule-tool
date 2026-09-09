@@ -4,7 +4,6 @@
   <base target="_top">
   <link rel="stylesheet" href="./css/dashboard.css">
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-  <script src="./js/standard-models.js"></script>
   <script src="./js/model-source.js"></script>
   <script src="./js/diagnosis-engine.js"></script>
   <script src="./js/config-source.js"></script>
@@ -289,16 +288,23 @@ function minToLabel(min) {
 
 // Excel 레이아웃/셀/값 파싱 로직은 js/excel-parser.js 에서 로드됨
 
-// ==================== 내장 기준모델 데이터 ====================
-// 매장이 파일 업로드시 더 이상 '기준모델' 시트를 안 올려도 되도록, 여기 코드에 직접 내장.
-// 표준시간표 데이터가 갱신되면 이 배열만 교체하면 됨 (11개 모델, 08:30~22:00 27슬롯 기준).
-// 내장 기준모델 데이터는 js/standard-models.js 에서 로드됨
+// ==================== 기준모델 데이터 ====================
+// 기준모델은 Supabase에서 model-source.js를 통해 로드됨.
 
     // ==================== 백데이터 (관리자 전용) ====================
     const BACKDATA_PASSWORD = 'ashley2026'; // 여기 문자열만 바꾸면 비밀번호 변경됨
 
     function renderV10Chart() {
       const el = document.getElementById('v10ChartContainer');
+
+      let curveConfig;
+      try {
+        curveConfig = getActiveDiagnosisConfig().CURVE;
+      } catch (error) {
+        el.innerHTML = '<div style="padding:14px; color:#B03A3A;">계산기준 데이터를 불러오지 못해 V1.0 곡선을 표시할 수 없습니다.</div>';
+        return;
+      }
+
       const W = 640, H = 220, PAD = 30;
       const minN = 300, maxN = 1500;
       const tierNames = ['최소허들', '1차목표', '2차목표'];
@@ -309,7 +315,7 @@ function minToLabel(min) {
       tierNames.forEach(name => {
         points[name] = [];
         for (let n = minN; n <= maxN; n += 30) {
-          const h = tierHoursDaily(CURVE.TIERS[name], n);
+          const h = tierHoursDaily(curveConfig.TIERS[name], n, curveConfig);
           maxH = Math.max(maxH, h);
           points[name].push([n, h]);
         }
@@ -355,7 +361,7 @@ function minToLabel(min) {
           '<td>' + total + 'h</td><td>' + kitchenTotal + 'h</td><td>' + hallTotal + 'h</td></tr>';
       });
       html += '</table>';
-      html += '<div style="font-size:11px; color:#999; margin-top:10px;">총 ' + models.length + '개 모델 내장 · 매출구간이 인접한 두 모델을 보간해서 사용</div>';
+      html += '<div style="font-size:11px; color:#999; margin-top:10px;">총 ' + models.length + '개 모델 · Supabase 기준모델을 매출구간에 따라 보간해서 사용</div>';
       el.innerHTML = html;
     }
 
