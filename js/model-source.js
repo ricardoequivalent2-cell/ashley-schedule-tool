@@ -1,17 +1,21 @@
 // Ashley Schedule Tool - standard model source selector
-// Step 10: Supabase 우선 / 로컬 standard-models.js 자동 fallback
+// DB CLEAN-1: Supabase 기준모델 단일 소스
+// 로컬 standard-models.js fallback은 사용하지 않는다.
 
-let ACTIVE_STANDARD_MODELS = EMBEDDED_STANDARD_MODELS;
+let ACTIVE_STANDARD_MODELS = [];
 let STANDARD_MODEL_SOURCE_INFO = {
-  source: 'local',
-  modelCount: EMBEDDED_STANDARD_MODELS.length,
-  slotCount: EMBEDDED_STANDARD_MODELS.reduce((sum, m) => sum + Object.keys(m.table || {}).length, 0),
-  fallback: true,
-  reason: '초기 로컬 모델',
+  source: 'unloaded',
+  modelCount: 0,
+  slotCount: 0,
+  fallback: false,
+  reason: null,
 };
 let standardModelLoadPromise = null;
 
 function getStandardModels() {
+  if (!Array.isArray(ACTIVE_STANDARD_MODELS) || ACTIVE_STANDARD_MODELS.length === 0) {
+    throw new Error('기준모델이 아직 로드되지 않았습니다. Supabase 기준모델을 먼저 불러와주세요.');
+  }
   return ACTIVE_STANDARD_MODELS;
 }
 
@@ -47,7 +51,6 @@ async function loadStandardModelsFromSupabase() {
     throw new Error('Supabase 기준모델 검증 실패 (16개 모델 / 432개 슬롯 조건 불일치)');
   }
 
-  // API는 기존 EMBEDDED_STANDARD_MODELS와 동일한 title/sales/table 형태를 반환한다.
   ACTIVE_STANDARD_MODELS = data.models.map(model => ({
     title: model.title,
     sales: Number(model.sales),
@@ -74,17 +77,21 @@ async function ensureStandardModelsLoaded() {
 
   standardModelLoadPromise = loadStandardModelsFromSupabase()
     .catch(error => {
-      // DB/API 장애가 진단 기능 전체 장애로 이어지지 않도록 기존 기준모델을 유지한다.
-      ACTIVE_STANDARD_MODELS = EMBEDDED_STANDARD_MODELS;
+      // 로컬 fallback 금지:
+      // 기준모델을 못 읽으면 잘못된 구버전 계산 대신 진단을 중단한다.
+      ACTIVE_STANDARD_MODELS = [];
       STANDARD_MODEL_SOURCE_INFO = {
-        source: 'local',
-        modelCount: EMBEDDED_STANDARD_MODELS.length,
-        slotCount: EMBEDDED_STANDARD_MODELS.reduce((sum, m) => sum + Object.keys(m.table || {}).length, 0),
-        fallback: true,
+        source: 'error',
+        modelCount: 0,
+        slotCount: 0,
+        fallback: false,
         reason: error && error.message ? error.message : String(error),
       };
-      console.warn('[Standard Models] Supabase 조회 실패 → 로컬 fallback 사용:', error);
-      return getStandardModelSourceInfo();
+      console.error('[Standard Models] Supabase 기준모델 로드 실패:', error);
+      throw new Error(
+        '기준모델 데이터를 불러오지 못했습니다. 진단을 실행할 수 없습니다. ' +
+        (error && error.message ? error.message : '')
+      );
     })
     .finally(() => {
       standardModelLoadPromise = null;
@@ -93,12 +100,16 @@ async function ensureStandardModelsLoaded() {
   return standardModelLoadPromise;
 }
 
-// 페이지 진입 시 미리 DB 모델을 받아둔다. 업로드 시점에도 ensure를 다시 호출하므로
-// 느린 네트워크에서도 계산 전에는 source가 확정된다.
-ensureStandardModelsLoaded().then(() => {
-  try {
-    if (typeof renderBackdataModelsTable === 'function') renderBackdataModelsTable();
-  } catch (e) {
-    console.warn('[Standard Models] 백데이터 표 갱신 생략:', e);
-  }
-});
+// 페이지 진입 시 미리 DB 모델을 받아둔다.
+// 실패해도 로컬 모델로 대체하지 않으며, 실제 업로드 시 ensure에서 다시 시도한다.
+ensureStandardModelsLoaded()
+  .then(() => {
+    try {
+      if (typeof renderBackdataModelsTable === 'function') renderBackdataModelsTable();
+    } catch (e) {
+      console.warn('[Standard Models] 백데이터 표 갱신 생략:', e);
+    }
+  })
+  .catch(error => {
+    console.warn('[Standard Models] 사전 로드 실패. 업로드 시 다시 시도합니다:', error);
+  });
