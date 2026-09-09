@@ -9,6 +9,7 @@
   <script src="./js/diagnosis-engine.js"></script>
   <script src="./js/config-source.js"></script>
   <script src="./js/excel-parser.js"></script>
+  <script src="./js/up-parser.js"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -37,9 +38,9 @@
   </div>
 
   <div class="upload-box" id="uploadBox">
-    <div>진단할 스케줄 파일(.xlsx)을 선택하세요</div>
-    <div style="font-size:12px;color:#999;margin-top:4px;">파일 안에 <b>"주방"</b> 시트가 있어야 합니다. <b>"홀"</b> 시트는 있으면 함께 진단됩니다. (기준모델은 이미 내장되어 있어 별도로 필요 없습니다)</div>
-    <input type="file" id="fileInput" accept=".xlsx">
+    <div>진단할 파트정보 UP 파일(.up)을 선택하세요</div>
+    <div style="font-size:12px;color:#999;margin-top:4px;">스케줄 시스템에서 추출한 <b>Schedule_PartInfo_*.up</b> 파일을 사용합니다. 현재 단계에서는 UP 구조와 데이터를 먼저 검증하며, 기존 .xlsx 방식은 임시 fallback으로 유지합니다.</div>
+    <input type="file" id="fileInput" accept=".up,.xlsx">
     <div id="status"></div>
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
       <label style="font-size:13px; color:#555;">매장명: </label>
@@ -716,30 +717,83 @@ let previousSnapshot = null; // 같은 매장의 직전 저장 결과 (지난 �
 async function handleFile(e) {
   const file = e.target.files[0];
   if (!file) return;
+
   const statusEl = document.getElementById('status');
-  statusEl.className = ''; statusEl.textContent = '읽는 중...';
+  statusEl.className = '';
+  statusEl.textContent = '읽는 중...';
 
   try {
+    const isUpFile = /\.up$/i.test(file.name);
+
+    // =========================================================
+    // Step UP-2: 새로운 정식 입력 포맷(.up)
+    // - 이 단계에서는 UP 파일을 정상적으로 읽고 검증하는 데까지 수행
+    // - 30분 단위 실제 인력표 변환 및 diagnosis-engine 연결은 UP-3/UP-4에서 진행
+    // =========================================================
+    if (isUpFile) {
+      if (!window.AshleyUpParser) {
+        throw new Error('UP Parser가 로드되지 않았습니다. js/up-parser.js를 확인해주세요.');
+      }
+
+      const parsedUp = await window.AshleyUpParser.parseUpFile(file);
+
+      // 다음 단계에서 그대로 사용할 수 있도록 전역에 보관
+      window.lastParsedUpData = parsedUp;
+
+      const dateCount = parsedUp.dates.length;
+      const workerRowCount = parsedUp.rows.length;
+      const salesPreview = parsedUp.dates
+        .slice(0, 3)
+        .map(d => `${d.label} ${Math.round(d.sales || 0).toLocaleString()}원`)
+        .join(' / ');
+
+      statusEl.textContent =
+        `UP 파일 정상 인식 · ${dateCount}일 · 근무데이터 ${workerRowCount}행` +
+        (salesPreview ? ` · ${salesPreview}` : '') +
+        ' · 다음 단계에서 실제 배치 진단에 연결합니다.';
+
+      // UP 내부 매장명이 있으면 사용. 비어 있으면 파일명 기반 임시값.
+      let guessedName = (parsedUp.storeName || '').trim();
+      if (!guessedName) {
+        guessedName = file.name
+          .replace(/\.up$/i, '')
+          .replace(/^Schedule_PartInfo_/i, '')
+          .replace(/_?TEST$|_?테스트$/i, '')
+          .trim();
+      }
+      document.getElementById('storeNameInput').value = guessedName || '이름없는매장';
+
+      // UP-2에서는 진단 결과를 아직 만들지 않으므로 저장/대시보드는 열지 않음.
+      lastResult = null;
+      document.getElementById('saveBox').style.display = 'none';
+
+      console.log('[UP-2] parsed UP data', parsedUp);
+      return;
+    }
+
+    // =========================================================
+    // 기존 XLSX 입력 fallback
+    // UP 진단 연결이 완료될 때까지 기존 운영 기능을 보존한다.
+    // =========================================================
     const { kitchenSheet, hallSheet } = await loadScheduleWorkbook(file);
 
     // Step 10: 실제 계산 전 Supabase 기준모델을 우선 로드한다.
-    // DB/API 오류가 있으면 js/standard-models.js의 기존 16개 모델로 자동 fallback한다.
     const modelSourceInfo = await ensureStandardModelsLoaded();
 
     // Step 11-4: 실제 계산 전 Supabase V1.0 계산 기준을 우선 로드한다.
-    // DB/API 오류가 있으면 diagnosis-engine.js의 기존 V1.0 14개 값으로 자동 fallback한다.
     const configSourceInfo = await ensureDiagnosisConfigLoaded();
 
     const result = await computeDiagnosis(kitchenSheet, hallSheet);
     lastResult = result;
-    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' + (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') + ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ', 계산기준: ' + (configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
+    statusEl.textContent = '완료 (' + result.dateHeaders.length + '일 진단됨' +
+      (hallSheet ? ', 홀 포함' : ', 홀 시트 없음') +
+      ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') +
+      ', 계산기준: ' + (configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
 
-    // 파일명에서 매장명 자동추출 (확장자·"_TEST"류 접미사 제거)
     let guessedName = file.name.replace(/\.xlsx$/i, '').replace(/_?TEST$|_?테스트$/i, '').trim();
     guessedName = guessedName || '이름없는매장';
     document.getElementById('storeNameInput').value = guessedName;
 
-    // 같은 매장명의 직전 저장기록 조회 ("지난 저장 대비" 추세 카드용, 실패해도 무시)
     previousSnapshot = null;
     try {
       const listRes = await fetch('/api/list');
@@ -2197,4 +2251,3 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   </script>
 </body>
 </html>
-<!-- Production redeploy -->
