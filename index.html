@@ -10,6 +10,7 @@
   <script src="./js/config-source.js"></script>
   <script src="./js/excel-parser.js"></script>
   <script src="./js/up-parser.js"></script>
+  <script src="./js/up-diagnosis-adapter.js"></script>
 </head>
 <body>
 <div class="app-shell">
@@ -739,36 +740,40 @@ async function handleFile(e) {
       const upActuals = window.AshleyUpParser.buildThirtyMinuteActuals(parsedUp, {
         slotSizeMin: 30,
         slotStartMin: 8 * 60 + 30,
-        slotEndMin: 21 * 60 + 30
+        slotEndMin: 22 * 60
       });
 
-      // UP-4에서 diagnosis-engine에 연결할 정규화 결과
+      if (!window.AshleyUpDiagnosisAdapter) {
+        throw new Error('UP Diagnosis Adapter가 로드되지 않았습니다. js/up-diagnosis-adapter.js를 확인해주세요.');
+      }
+
+      // 기존과 동일하게 Supabase 기준모델/계산기준을 먼저 확보
+      const modelSourceInfo = await ensureStandardModelsLoaded();
+      const configSourceInfo = await ensureDiagnosisConfigLoaded();
+
+      // Step UP-4: UP 데이터를 기존 V1 진단 계산구조에 연결
+      const result = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(
+        parsedUp,
+        upActuals
+      );
+
       window.lastParsedUpData = parsedUp;
       window.lastUpActuals = upActuals;
+      lastResult = result;
 
-      const dateCount = parsedUp.dates.length;
-      const workerRowCount = parsedUp.rows.length;
       const coveragePct = Math.round(upActuals.coverageRate * 100);
-      const unresolvedCount =
-        upActuals.unresolvedRows.length +
-        upActuals.ambiguousTransitionRows.length +
-        upActuals.noPartRows.length;
-
-      const salesPreview = parsedUp.dates
-        .slice(0, 3)
-        .map(d => `${d.label} ${Math.round(d.sales || 0).toLocaleString()}원`)
-        .join(' / ');
 
       statusEl.textContent =
-        `UP 파일 정상 인식 · ${dateCount}일 · 근무데이터 ${workerRowCount}행` +
-        ` · 시간대 파트매핑 ${upActuals.mappedRows}/${upActuals.scheduledRows}행(${coveragePct}%)` +
-        (unresolvedCount ? ` · 확인필요 ${unresolvedCount}행` : '') +
-        (salesPreview ? ` · ${salesPreview}` : '') +
-        (upActuals.canRunPartDiagnosis
-          ? ' · 30분 단위 실제배치 생성 완료'
-          : ' · 파트정보 부족으로 파트진단은 아직 차단');
+        `완료 (${result.dateHeaders.length}일 총인시 진단` +
+        (result.partDiagnosisAvailable ? ', 시간대·파트 진단 포함' : ', 시간대·파트 진단 보류') +
+        ` · 표준파트 매핑 ${upActuals.mappedRows}/${upActuals.eligiblePartRows}행(${coveragePct}%)` +
+        ` · 기준모델: ${modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback'}` +
+        ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback'}` +
+        ')' +
+        (!result.partDiagnosisAvailable && result.partDiagnosisBlockReason
+          ? ` · 보류사유: ${result.partDiagnosisBlockReason}`
+          : '');
 
-      // UP 내부 매장명이 있으면 사용. 비어 있으면 파일명 기반 임시값.
       let guessedName = (parsedUp.storeName || '').trim();
       if (!guessedName) {
         guessedName = file.name
@@ -777,34 +782,16 @@ async function handleFile(e) {
           .replace(/_?TEST$|_?테스트$/i, '')
           .trim();
       }
-      document.getElementById('storeNameInput').value = guessedName || '이름없는매장';
-
-      // UP-4: 파트 매핑이 안전한 경우 기존 진단엔진 계산기준에 실제 연결
-      if (!upActuals.canRunPartDiagnosis) {
-        lastResult = null;
-        document.getElementById('saveBox').style.display = 'none';
-        console.warn('[UP-4] 파트 매핑률 부족 - 진단 차단', upActuals);
-        return;
-      }
-
-      const modelSourceInfo = await ensureStandardModelsLoaded();
-      const configSourceInfo = await ensureDiagnosisConfigLoaded();
-      const result = await computeDiagnosisFromUp(parsedUp, upActuals);
-      lastResult = result;
-
-      statusEl.textContent =
-        `완료 (${result.dateHeaders.length}일 UP 진단됨` +
-        `, 파트매핑 ${Math.round(upActuals.coverageRate * 100)}%` +
-        ', 기준모델: ' + (modelSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') +
-        ', 계산기준: ' + (configSourceInfo.source === 'supabase' ? 'Supabase DB' : '로컬 fallback') + ')';
+      guessedName = guessedName || '이름없는매장';
+      document.getElementById('storeNameInput').value = guessedName;
 
       previousSnapshot = null;
       try {
         const listRes = await fetch('/api/list');
         const listData = await listRes.json();
-        const match = (listData.stores || []).find(s => s.storeName === (guessedName || '이름없는매장'));
+        const match = (listData.stores || []).find(s => s.storeName === guessedName);
         if (match && match.result) previousSnapshot = match.result;
-      } catch (e) { /* 조회 실패 시 비교 없이 진행 */ }
+      } catch (e) { /* 조회 실패시 비교 없이 진행 */ }
 
       document.getElementById('app').style.display = 'block';
       document.getElementById('uploadBox').style.display = 'none';
@@ -918,6 +905,53 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     const hallBlockDiagnosis = data.hallBlockDiagnosis || {};
     const weeklyBlockSummary = data.weeklyBlockSummary || [];
     const weeklyHallBlockSummary = data.weeklyHallBlockSummary || [];
+    const partDiagnosisAvailable = data.partDiagnosisAvailable !== false;
+
+    function renderPartDiagnosisPending() {
+      const reason = data.partDiagnosisBlockReason || '파트 매핑 기준 확인 필요';
+      const summary = data.upMappingSummary || {};
+      const box =
+        '<div style="padding:18px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;color:#555;line-height:1.65;">' +
+          '<b style="color:#333;">총인시 진단은 완료되었습니다.</b><br>' +
+          '시간대·파트 진단은 잘못된 피드백을 막기 위해 현재 보류합니다.<br>' +
+          '<span style="font-size:12px;color:#8B93A5;">' + reason + '</span>' +
+          (summary.nonStandardHours
+            ? '<br><span style="font-size:12px;color:#8B93A5;">현재 V1 표준파트 외 인시: ' + summary.nonStandardHours + 'h</span>'
+            : '') +
+        '</div>';
+
+      const divIds = [
+        'glanceDonut','glanceComments','glanceEfficiencySummary','glanceTop3',
+        'glanceHallScoreCards','glanceHallBlockChart','glanceScoreCards','glanceBlockChart',
+        'weeklyDayBlockHeatmap','partRanking','weeklyComments',
+        'dailyDonut','dailyComments','heatmapContainer','compareTableContainer','dailyPartRanking'
+      ];
+      divIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = box;
+      });
+
+      ['glanceHeatmapWeekday','glanceHeatmapWeekend'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<tr><td style="padding:18px;text-align:left;">' + box + '</td></tr>';
+      });
+    }
+
+    function setupTotalOnlyTabs() {
+      const tabsDiv = document.getElementById('tabs');
+      tabsDiv.innerHTML = '';
+      dateHeaders.forEach((d, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+        btn.textContent = d;
+        btn.onclick = () => {
+          tabsDiv.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          renderDailyKPIRow(d);
+        };
+        tabsDiv.appendChild(btn);
+      });
+    }
 
     function verdictClass(verdict) {
       if (verdict.indexOf('초과') !== -1) return 'verdict-미달';       // 최소허들 초과 = 비효율(나쁨, 빨강)
@@ -2243,6 +2277,23 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     }
 
     setupMainTabs();
+
+    if (!partDiagnosisAvailable) {
+      setupTotalOnlyTabs();
+      setupStandardTabs();
+      if (dateHeaders.length > 0) {
+        renderStandardSchedule(dateHeaders[0]);
+        renderDailyKPIRow(dateHeaders[0]);
+      }
+      renderGlanceHero();
+      renderWeekKPIRowInto('glanceKpiRow');
+      renderGlanceHeadlineBanner();
+      renderWeekKPIRowInto('weeklyKpiRow');
+      renderWeeklyDayTable();
+      renderPartDiagnosisPending();
+      return;
+    }
+
     setupTabs();
     setupStandardTabs();
     if (dateHeaders.length > 0) { renderStandardSchedule(dateHeaders[0]); }

@@ -415,7 +415,8 @@
 
     const slotSizeMin = Number(options.slotSizeMin || 30);
     const slotStartMin = Number(options.slotStartMin ?? (8 * 60 + 30));
-    const slotEndMin = Number(options.slotEndMin ?? (21 * 60 + 30));
+    // 기존 표준모델과 동일: 08:30 시작, 마지막 슬롯 21:30~22:00
+    const slotEndMin = Number(options.slotEndMin ?? (22 * 60));
 
     const slots = [];
     for (let m = slotStartMin; m < slotEndMin; m += slotSizeMin) {
@@ -449,8 +450,11 @@
     const unresolvedRows = [];
     const ambiguousTransitionRows = [];
     const noPartRows = [];
+    const nonStandardRows = [];
     const invalidTimeRows = [];
+
     let scheduledRows = 0;
+    let eligiblePartRows = 0;
     let mappedRows = 0;
 
     parsedUp.rows.forEach(row => {
@@ -458,7 +462,6 @@
       const end = row.endMinutes;
 
       if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
-        // 출퇴근이 없는 행은 근무 배치 행이 아니므로 별도 기록만 한다.
         if (start !== null || end !== null) {
           invalidTimeRows.push(summarizeRow(row, '출퇴근 시간 오류'));
         }
@@ -467,7 +470,7 @@
 
       scheduledRows += 1;
 
-      // 전체 근무자 배치(파트와 무관)는 항상 슬롯화한다.
+      // 전체 근무자 배치는 파트와 무관하게 보관.
       slots.forEach(slot => {
         if (overlapsSlot(start, end, slot, slotSizeMin)) {
           allScheduledCounts[row.dateKey][slot] += 1;
@@ -480,25 +483,38 @@
       const am = mapPartName(amRaw);
       const pm = mapPartName(pmRaw);
 
-      // 양쪽에 값이 있는데 서로 다른 경우:
-      // UP에는 전환시각이 없으므로 정확한 시간대 배치를 만들 수 없다.
+      // '관리'는 현재 V1 표준시간표에 대응 파트가 없으므로
+      // 다른 파트로 임의 매핑하지 않고 "표준 외 인시"로 별도 보관한다.
+      const singleRawPart = amRaw || pmRaw;
+      if (
+        (amRaw === '관리' && (!pmRaw || pmRaw === '관리')) ||
+        (pmRaw === '관리' && (!amRaw || amRaw === '관리')) ||
+        (!amRaw && !pmRaw && cleanText(row.workType) === '관리')
+      ) {
+        nonStandardRows.push(summarizeRow(row, 'V1 표준파트 외: 관리'));
+        return;
+      }
+
+      // 양쪽 파트가 다르면 전환시각이 UP에 없으므로 임의 반분 금지.
       if (amRaw && pmRaw && amRaw !== pmRaw) {
+        eligiblePartRows += 1;
         ambiguousTransitionRows.push(
           summarizeRow(row, `오전 ${amRaw} → 오후 ${pmRaw} (전환시각 미정)`)
         );
         return;
       }
 
-      const rawPart = amRaw || pmRaw;
-      const mappedPart = am || pm;
-
-      if (!rawPart) {
+      if (!singleRawPart) {
+        eligiblePartRows += 1;
         noPartRows.push(summarizeRow(row, '오전/오후 파트 공란'));
         return;
       }
 
+      const mappedPart = am || pm;
+      eligiblePartRows += 1;
+
       if (!mappedPart) {
-        unresolvedRows.push(summarizeRow(row, `미매핑 파트: ${rawPart}`));
+        unresolvedRows.push(summarizeRow(row, `미매핑 파트: ${singleRawPart}`));
         return;
       }
 
@@ -506,13 +522,12 @@
 
       slots.forEach(slot => {
         if (!overlapsSlot(start, end, slot, slotSizeMin)) return;
-
         actualCounts[row.dateKey][slot][mappedPart] += 1;
         actualNames[row.dateKey][slot][mappedPart].push(row.name);
       });
     });
 
-    const coverageRate = scheduledRows > 0 ? mappedRows / scheduledRows : 0;
+    const coverageRate = eligiblePartRows > 0 ? mappedRows / eligiblePartRows : 0;
 
     return {
       slots,
@@ -523,14 +538,21 @@
       actualNames,
       allScheduledCounts,
       allScheduledNames,
+
       scheduledRows,
+      eligiblePartRows,
       mappedRows,
       coverageRate,
+
       unresolvedRows,
       ambiguousTransitionRows,
       noPartRows,
+      nonStandardRows,
       invalidTimeRows,
-      canRunPartDiagnosis: coverageRate >= 0.70,
+
+      // 이것은 "명시된 표준파트 행이 제대로 읽혔는가"만 뜻한다.
+      // 실제 파트진단 가능 여부는 UP-4 adapter가 표준 외 인시까지 함께 보고 최종 판정한다.
+      canRunPartDiagnosis: coverageRate >= 0.95,
       diagnosisParts: [...DIAGNOSIS_PARTS]
     };
   }
