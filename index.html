@@ -679,6 +679,26 @@ function mergeParsedUpData(firstParsed, secondParsed) {
   };
 }
 
+// DUAL-UP V2 STEP3
+// 실제와 표준의 조직 분류 기준은 서로 다르다.
+//
+// 실제(UP)
+// - 홀   = UP의 '홀'
+// - 주방 = 그 외
+//
+// 표준(V1)
+// - 홀   = 홀 + 데코이 + 폴리싱
+// - 주방 = 그 외
+//
+// 현재 up-diagnosis-adapter.js는 데코이/폴리싱 표준을 이미 '홀'에 합산해
+// standardSchedule에 저장한다. 아래 배열은 향후 표준시간표 구조가 바뀌더라도
+// 동일한 운영 소유 기준을 유지하도록 명시해 둔 것이다.
+const HALL_STANDARD_PARTS = new Set(['홀', '데코이', '폴리싱']);
+
+function isHallStandardPart(part) {
+  return HALL_STANDARD_PARTS.has(String(part || '').trim());
+}
+
 function sumStandardHoursForScope(result, dateLabel, scope) {
   const schedule = (result.standardSchedule || {})[dateLabel] || {};
   const hourPerSlot = 0.5;
@@ -687,8 +707,9 @@ function sumStandardHoursForScope(result, dateLabel, scope) {
   (result.slots || []).forEach(slot => {
     const row = schedule[slot] || {};
     Object.keys(row).forEach(part => {
-      if (scope === 'hall' && part !== '홀') return;
-      if (scope === 'kitchen' && part === '홀') return;
+      const hallOwned = isHallStandardPart(part);
+      if (scope === 'hall' && !hallOwned) return;
+      if (scope === 'kitchen' && hallOwned) return;
       total += Number(row[part] || 0) * hourPerSlot;
     });
   });
@@ -712,7 +733,8 @@ function makeScopedDiagnosisResult(sourceResult, scope) {
     Object.keys(scoped.heatmap[date] || {}).forEach(slot => {
       const row = scoped.heatmap[date][slot] || {};
       Object.keys(row).forEach(part => {
-        const keep = scope === 'hall' ? part === '홀' : part !== '홀';
+        const hallOwned = isHallStandardPart(part);
+        const keep = scope === 'hall' ? hallOwned : !hallOwned;
         if (!keep) delete row[part];
       });
     });
@@ -723,7 +745,7 @@ function makeScopedDiagnosisResult(sourceResult, scope) {
       (scoped.dateHeaders || []).map(d => [d, []])
     );
     scoped.weeklyHallBlockSummary = [];
-    scoped.diagnosisList = (scoped.diagnosisList || []).filter(x => x.part !== '홀');
+    scoped.diagnosisList = (scoped.diagnosisList || []).filter(x => !isHallStandardPart(x.part));
   } else {
     scoped.blockDiagnosis = Object.fromEntries(
       (scoped.dateHeaders || []).map(d => [d, []])
@@ -741,7 +763,14 @@ function makeScopedDiagnosisResult(sourceResult, scope) {
     if (!t) return;
 
     const originalTarget1 = Number(t.target1 || 0);
-    const scopedTarget1 = sumStandardHoursForScope(scoped, date, scope);
+
+    // 핵심: 전체 목표인시를 비율로 쪼개지 않는다.
+    // 해당 날짜의 표준시간표에서 조직 소유 파트를 직접 합산해 1차목표를 만든다.
+    const scopedTarget1 = sumStandardHoursForScope(sourceResult, date, scope);
+
+    // 최소허들/2차목표는 아직 조직별 별도 곡선이 없으므로
+    // V1 화면 단계표시를 유지하기 위한 보조 비율만 사용한다.
+    // '표준인시(1차목표)' 자체에는 이 비율을 사용하지 않는다.
     const ratio = originalTarget1 > 0 ? scopedTarget1 / originalTarget1 : 0;
 
     t.actualTotal = scope === 'hall'
@@ -770,6 +799,16 @@ function makeScopedDiagnosisResult(sourceResult, scope) {
 
   scoped.weeklySummary = computeWeeklySummary(scoped.tierDiagnosis, scoped.dateHeaders);
   scoped.weeklySummary.totalOther = 0;
+
+  // 개발/검증용: 조직별 표준시간표 합이 전체 표준시간표와 맞는지 기록.
+  // 화면 계산에는 영향을 주지 않는다.
+  scoped.standardScopeValidation = (scoped.dateHeaders || []).map(date => {
+    const kitchen = sumStandardHoursForScope(sourceResult, date, 'kitchen');
+    const hall = sumStandardHoursForScope(sourceResult, date, 'hall');
+    const total = Math.round((kitchen + hall) * 10) / 10;
+    return { date, kitchen, hall, total };
+  });
+
   return scoped;
 }
 
@@ -928,6 +967,8 @@ async function handleDualUpload() {
     console.log('[DUAL-UP V2 STEP1] merged parsed', mergedParsed);
     console.log('[DUAL-UP V2 STEP1] merged actuals', mergedActuals);
     console.log('[DUAL-UP V2 STEP1] merged diagnosis', mergedResult);
+    console.table((diagnosisResultsByScope.kitchen && diagnosisResultsByScope.kitchen.standardScopeValidation) || []);
+    console.log('[DUAL-UP V2 STEP3] 표준 분류: 홀=홀+데코이+폴리싱 / 주방=그 외, Target1=표준시간표 직접합산');
   } catch (err) {
     statusEl.className = 'error';
     statusEl.textContent = '오류: ' + err.message;
