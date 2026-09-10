@@ -131,13 +131,31 @@
 }
 
 
-/* TARGET2 integer UX: 파트 진단 컬럼 */
-#glancePartBars .diverge-row {
-  grid-template-columns: 70px 92px 92px 82px 64px !important;
-  gap: 10px;
-  align-items: center;
+/* TARGET2 integer UX: 파트 진단 + 도식 + 홀 분리 */
+.part-gap-tabs{display:inline-flex;gap:4px;padding:3px;background:#F3F5F8;border-radius:9px;margin:8px 0 10px 0}
+.part-gap-tab{border:0;background:transparent;color:#7B8495;font-size:12px;font-weight:700;padding:6px 13px;border-radius:7px;cursor:pointer}
+.part-gap-tab.active{background:#FFFFFF;color:#263247;box-shadow:0 1px 4px rgba(31,41,55,.10)}
+#glancePartBars .diverge-col-header,
+#glancePartBars .diverge-row{
+  display:grid !important;
+  grid-template-columns:72px 82px 82px 72px minmax(240px,1fr) 70px !important;
+  gap:12px;align-items:center;
 }
-#glancePartBars .diverge-track { display: none !important; }
+#glancePartBars .diverge-col-header{padding:0 14px 6px;font-size:11px;color:#9AA2B1;font-weight:700}
+#glancePartBars .diverge-surface{padding:4px 8px;background:#FBFBFD}
+#glancePartBars .diverge-row{min-height:46px;height:auto !important;padding:6px 8px;border-radius:8px;border-top:0 !important;margin:3px 0}
+#glancePartBars .diverge-row.is-over{background:#FFF1F1;border:1px solid #F2CACA !important}
+#glancePartBars .diverge-row.is-under{background:#F7FAFE;border:1px solid #E3ECF7 !important}
+#glancePartBars .diverge-row.is-ok{background:#FAFAFC;border:1px solid #EEEEF2 !important}
+#glancePartBars .diverge-part-name{font-size:14px;font-weight:800}
+#glancePartBars .part-hour-cell{font-size:13px;color:#5F6878;text-align:right}
+#glancePartBars .part-hour-cell b{font-size:14px;color:#273142}
+#glancePartBars .diverge-gap-num{font-size:14px;font-weight:800;text-align:right}
+#glancePartBars .diverge-track{display:block !important;position:relative;height:18px;border-radius:9px;background:#EEF0F4;overflow:visible}
+#glancePartBars .diverge-track .diverge-mini-baseline{position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;background:#AEB5C2;z-index:2}
+#glancePartBars .diverge-fill{position:absolute;top:3px;height:12px;border-radius:6px;z-index:1}
+#glancePartBars .diverge-badge{font-size:12px;font-weight:800;text-align:right}
+#glancePartBars .part-gap-empty{padding:28px 12px;text-align:center;color:#9AA2B1;font-size:13px}
 
 </style>
 </head>
@@ -316,6 +334,10 @@
         <div class="part-gap-header-row">
           <div class="section-title">파트별 인력 진단</div>
           <div class="part-gap-header-sub" id="glanceGapSub"></div>
+        </div>
+        <div class="part-gap-tabs" id="partGapTabs">
+          <button class="part-gap-tab active" data-part-scope="kitchen">주방 파트</button>
+          <button class="part-gap-tab" data-part-scope="hall">홀</button>
         </div>
         <div id="glanceDonut"></div>
       </div>
@@ -2682,46 +2704,69 @@ async function autoSaveDiagnosisResult(storeName) {
       }));
     }
 
+    let glancePartScope = 'kitchen';
+
     function renderGlancePartGapSummary() {
       const el = document.getElementById('glanceDonut');
       const subEl = document.getElementById('glanceGapSub');
-      const gaps = computeWeekPartGaps();
-      const totalGap = gaps.reduce((s, g) => s + g.gap, 0);
+      const allGaps = computeWeekPartGaps();
+      const totalGap = allGaps.reduce((sum, g) => sum + g.gap, 0);
       const totalWord = Math.abs(totalGap) < 0.5 ? '적정' : (totalGap > 0 ? '과다' : '절감');
       const totalColor = Math.abs(totalGap) < 0.5 ? '#3D8361' : (totalGap > 0 ? '#A34848' : '#2C6690');
-      subEl.innerHTML = '이번 주 <b style="color:' + totalColor + ';">' + displaySignedHours(totalGap) + ' ' + totalWord + '</b> · 모든 시간은 정수 반올림 표시';
+      subEl.innerHTML = '이번 주 <b style="color:' + totalColor + ';">' + displaySignedHours(totalGap) + ' ' + totalWord + '</b>';
 
-      const ranked = gaps.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+      document.querySelectorAll('#partGapTabs .part-gap-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.partScope === glancePartScope);
+        btn.onclick = () => {
+          glancePartScope = btn.dataset.partScope || 'kitchen';
+          renderGlancePartGapSummary();
+        };
+      });
+
+      const scoped = glancePartScope === 'hall'
+        ? allGaps.filter(g => g.part === '홀')
+        : allGaps.filter(g => g.part !== '홀');
+      const ranked = scoped.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+      if (!ranked.length) {
+        el.innerHTML = '<div class="part-gap-empty">표시할 파트 진단이 없습니다.</div>';
+        return;
+      }
       const maxAbs = Math.max(1, ...ranked.map(g => Math.abs(g.gap)));
 
       const rows = ranked.map(g => {
         const isOver = g.gap > 0.05, isUnder = g.gap < -0.05;
-        const color = isOver ? '#B03A3A' : (isUnder ? '#3478C4' : '#D8D8DE');
+        const color = isOver ? '#C64545' : (isUnder ? '#3478C4' : '#AAB1BE');
         const action = isOver ? '축소 검토' : (isUnder ? '절감' : '적정');
-        const badgeFg = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#B7BCC8');
+        const badgeFg = isOver ? '#A93737' : (isUnder ? '#2C6690' : '#8B93A5');
+        const rowClass = isOver ? 'is-over' : (isUnder ? 'is-under' : 'is-ok');
         const halfWidthPct = (Math.abs(g.gap) / maxAbs) * 50;
         const style = isOver
-          ? ('left:50%; width:' + halfWidthPct + '%;')
-          : ('left:' + (50 - halfWidthPct) + '%; width:' + halfWidthPct + '%;');
+          ? ('left:50%; width:' + halfWidthPct + '%; background:' + color + ';')
+          : ('left:' + (50 - halfWidthPct) + '%; width:' + halfWidthPct + '%; background:' + color + ';');
         return (
-          '<div class="diverge-row">' +
-            '<div class="diverge-part-name" style="font-weight:700;">' + g.part + '</div>' +
-            '<div style="text-align:right;font-size:12px;color:#5F6878;">목표 <b style="color:#273142;">' + displayHours(g.target) + 'h</b></div>' +
-            '<div style="text-align:right;font-size:12px;color:#5F6878;">실제 <b style="color:#273142;">' + displayHours(g.actual) + 'h</b></div>' +
+          '<div class="diverge-row ' + rowClass + '">' +
+            '<div class="diverge-part-name">' + g.part + '</div>' +
+            '<div class="part-hour-cell">목표 <b>' + displayHours(g.target) + 'h</b></div>' +
+            '<div class="part-hour-cell">실제 <b>' + displayHours(g.actual) + 'h</b></div>' +
             '<div class="diverge-gap-num" style="color:' + color + ';">' + displaySignedHours(g.gap) + '</div>' +
+            '<div class="diverge-track"><div class="diverge-mini-baseline"></div><div class="diverge-fill" style="' + style + '"></div></div>' +
             '<div class="diverge-badge" style="color:' + badgeFg + ';">' + action + '</div>' +
           '</div>'
         );
       }).join('');
 
       el.innerHTML =
-        '<div class="diverge-col-header">' +
-          '<div class="diverge-part-name">파트</div>' +
-          '<div class="diverge-gap-num">Gap</div>' +
-          '<div class="diverge-track"><span style="position:absolute; left:0;">← 절감</span><span style="position:absolute; left:50%; transform:translateX(-50%);">0</span><span style="position:absolute; right:0;">과다 →</span></div>' +
-          '<div class="diverge-badge">진단</div>' +
-        '</div>' +
-        '<div class="diverge-surface">' + rows + '</div>';
+        '<div id="glancePartBars">' +
+          '<div class="diverge-col-header">' +
+            '<div>파트</div>' +
+            '<div style="text-align:right;">목표인시</div>' +
+            '<div style="text-align:right;">실제인시</div>' +
+            '<div style="text-align:right;">GAP</div>' +
+            '<div style="position:relative;text-align:center;"><span style="position:absolute;left:0;">← 절감</span><span>0</span><span style="position:absolute;right:0;">과다 →</span></div>' +
+            '<div style="text-align:right;">진단</div>' +
+          '</div>' +
+          '<div class="diverge-surface">' + rows + '</div>' +
+        '</div>';
     }
 
     // 이번 주 가장 문제 큰 요일/시간대/파트 - 요약 화면의 핵심 코멘트
@@ -2748,7 +2793,7 @@ async function autoSaveDiagnosisResult(storeName) {
           '<div class="insight-row">' +
             '<div class="insight-rank">0' + (i + 1) + '</div>' +
             '<div class="insight-part">' + g.part + '</div>' +
-            '<div class="insight-val" style="color:' + color + ';">' + (g.gap > 0 ? '+' : '') + g.gap + 'h</div>' +
+            '<div class="insight-val" style="color:' + color + ';">' + displaySignedHours(g.gap) + '</div>' +
             '<div class="insight-meaning">' + meaning + '</div>' +
           '</div>'
         );
