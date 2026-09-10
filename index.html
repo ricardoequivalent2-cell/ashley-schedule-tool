@@ -1078,28 +1078,146 @@ function buildHeadlineSummary(result) {
   return top.source + ' ' + top.block + ' 과다 (' + partText + '주간 +' + top.diff + 'h)';
 }
 
+
+function round1(value) {
+  return Math.round(Number(value || 0) * 10) / 10;
+}
+
+function round4(value) {
+  return Math.round(Number(value || 0) * 10000) / 10000;
+}
+
+function buildWeeklyAdminSummary(storeName) {
+  const totalResult = diagnosisResultsByScope.total || lastResult;
+  const kitchenResult = diagnosisResultsByScope.kitchen;
+  const hallResult = diagnosisResultsByScope.hall;
+  const parsed = window.lastParsedUpData;
+
+  if (!totalResult || !parsed) {
+    throw new Error('관리자용 주차 요약을 만들 진단 데이터가 없습니다.');
+  }
+
+  const dateKeys = (parsed.dates || [])
+    .map(d => d.key)
+    .filter(Boolean)
+    .sort();
+
+  if (!dateKeys.length) {
+    throw new Error('UP 파일의 진단 주차를 확인할 수 없습니다.');
+  }
+
+  const weekStart = dateKeys[0];
+  const weekEnd = dateKeys[dateKeys.length - 1];
+
+  // 예상매출은 날짜별 중복 행이 아닌 salesByDate의 일매출을 합산
+  const expectedSales = Math.round(
+    Object.values(parsed.salesByDate || {})
+      .reduce((sum, value) => sum + Number(value || 0), 0)
+  );
+
+  const totalW = totalResult.weeklySummary || {};
+  const kitchenW = (kitchenResult && kitchenResult.weeklySummary) || {};
+  const hallW = (hallResult && hallResult.weeklySummary) || {};
+
+  const actualHours = round1(totalW.totalActual);
+  const standardHours = round1(totalW.totalTarget1);
+  const gapHours = round1(actualHours - standardHours);
+  const gapPct = standardHours > 0 ? round4((gapHours / standardHours) * 100) : null;
+
+  const kitchenActual = round1(kitchenW.totalActual);
+  const kitchenStandard = round1(kitchenW.totalTarget1);
+  const kitchenGap = round1(kitchenActual - kitchenStandard);
+  const kitchenGapPct = kitchenStandard > 0
+    ? round4((kitchenGap / kitchenStandard) * 100)
+    : null;
+
+  const hallActual = round1(hallW.totalActual);
+  const hallStandard = round1(hallW.totalTarget1);
+  const hallGap = round1(hallActual - hallStandard);
+  const hallGapPct = hallStandard > 0
+    ? round4((hallGap / hallStandard) * 100)
+    : null;
+
+  return {
+    storeName,
+    weekStart,
+    weekEnd,
+    weekLabel: `${weekStart} ~ ${weekEnd}`,
+
+    // 현재 운영 중인 V1 기준. 향후 V2 전환 시 이 값만 버전과 함께 변경.
+    modelVersion: '1.0',
+    configVersion: '1.0',
+
+    expectedSales,
+    guestCount: Math.round(Number(totalW.totalGuest || 0)),
+
+    actualHours,
+    standardHours,
+    gapHours,
+    gapPct,
+
+    kitchenActualHours: kitchenActual,
+    kitchenStandardHours: kitchenStandard,
+    kitchenGapHours: kitchenGap,
+    kitchenGapPct,
+
+    hallActualHours: hallActual,
+    hallStandardHours: hallStandard,
+    hallGapHours: hallGap,
+    hallGapPct,
+
+    // 인시생산성 = 주간 예상매출 ÷ 실제 총인시
+    laborProductivity: actualHours > 0
+      ? Math.round((expectedSales / actualHours) * 100) / 100
+      : null
+  };
+}
+
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const storeName = document.getElementById('storeNameInput').value.trim();
   const saveStatusEl = document.getElementById('saveStatus');
-  if (!storeName) { saveStatusEl.textContent = '매장명을 입력해주세요.'; return; }
-  if (!lastResult) { saveStatusEl.textContent = '먼저 파일을 진단해주세요.'; return; }
+
+  if (!storeName) {
+    saveStatusEl.textContent = '매장명을 입력해주세요.';
+    return;
+  }
+  if (!lastResult || !diagnosisResultsByScope.total) {
+    saveStatusEl.textContent = '먼저 파일을 진단해주세요.';
+    return;
+  }
 
   saveStatusEl.textContent = '저장 중...';
+
   try {
+    // 어떤 조직 탭을 보고 있든 저장 기준은 항상 "전체" 진단 결과
+    const totalResult = diagnosisResultsByScope.total;
+    const adminWeeklySummary = buildWeeklyAdminSummary(storeName);
+
     const payload = {
       storeName,
-      headline: buildHeadlineSummary(lastResult),
-      weeklySummary: lastResult.weeklySummary,
-      result: lastResult, // 상세보기 대비 전체 결과도 저장
+      headline: buildHeadlineSummary(totalResult),
+      weeklySummary: totalResult.weeklySummary,
+      result: totalResult,
+      adminWeeklySummary
     };
+
     const res = await fetch('/api/save', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
+
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '저장 실패');
-    saveStatusEl.textContent = '저장 완료 (' + new Date().toLocaleString('ko-KR') + ')';
+
+    const savedWeek = adminWeeklySummary.weekLabel;
+    saveStatusEl.textContent =
+      `저장 완료 · ${savedWeek} 관리자 종합현황에 반영됨`;
+
+    console.log('[STEP B2] weekly_store_summary saved', adminWeeklySummary);
   } catch (err) {
     saveStatusEl.textContent = '❌ 저장 실패: ' + err.message;
+    console.error('[STEP B2] save failed', err);
   }
 });
 
