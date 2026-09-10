@@ -2329,12 +2329,16 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     function setupStandardTabs() {
       const tabsDiv = document.getElementById('standardTabs');
+
+      // 조직 전환 때 표준시간표 날짜 버튼도 중복 생성되지 않도록 초기화
+      tabsDiv.innerHTML = '';
+
       dateHeaders.forEach((d, i) => {
         const btn = document.createElement('button');
         btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
         btn.textContent = d;
         btn.onclick = () => {
-          document.querySelectorAll('#standardTabs .tab-btn').forEach(b => b.classList.remove('active'));
+          tabsDiv.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           renderStandardSchedule(d);
         };
@@ -2381,12 +2385,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     function setupTabs() {
       const tabsDiv = document.getElementById('tabs');
+
+      // DUAL-UP UI FIX:
+      // 조직 탭(전체/주방/홀) 전환 때 renderApp()이 다시 호출되므로,
+      // 기존 날짜 버튼을 지우고 한 세트만 다시 만든다.
+      tabsDiv.innerHTML = '';
+
       dateHeaders.forEach((d, i) => {
         const btn = document.createElement('button');
         btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
         btn.textContent = d;
         btn.onclick = () => {
-          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          // 다른 영역의 날짜 탭까지 active가 풀리지 않도록 현재 컨테이너만 처리
+          tabsDiv.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           renderDailyKPIRow(d);
           renderDailyDonut(d);
