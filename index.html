@@ -71,6 +71,15 @@
   background:#F1F3F7;color:#667085;font-size:11px;font-weight:700
 }
 .overview-empty{padding:50px 16px !important;text-align:center !important;color:#A7AEBD}
+
+.overview-status{
+  display:inline-flex;align-items:center;justify-content:center;min-width:48px;
+  padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800
+}
+.overview-status-normal{background:#ECFDF3;color:#067647}
+.overview-status-warning{background:#FFFAEB;color:#B54708}
+.overview-status-excess{background:#FEF3F2;color:#B42318}
+
 @media(max-width:900px){
   .overview-kpi-row{grid-template-columns:repeat(2,1fr)}
   #overviewLoadStatus{width:100%;margin-left:0}
@@ -150,30 +159,43 @@
     <div class="overview-toolbar">
       <select id="overviewWeekSelect"></select>
       <input id="overviewSearchInput" type="text" placeholder="매장 검색">
+      <select id="overviewStatusFilter">
+        <option value="all">전체 상태</option>
+        <option value="normal">정상</option>
+        <option value="warning">주의</option>
+        <option value="excess">과다</option>
+      </select>
+      <select id="overviewSortSelect">
+        <option value="gap_desc">Gap% 높은 순</option>
+        <option value="gap_asc">Gap% 낮은 순</option>
+        <option value="store_asc">매장명 순</option>
+        <option value="kitchen_desc">주방 Gap 높은 순</option>
+        <option value="hall_desc">홀 Gap 높은 순</option>
+      </select>
       <button class="overview-refresh" id="overviewRefreshBtn" type="button">새로고침</button>
       <div id="overviewLoadStatus">불러오는 중...</div>
     </div>
 
     <div class="overview-kpi-row">
       <div class="overview-kpi">
-        <div class="overview-kpi-label">저장 매장</div>
+        <div class="overview-kpi-label">진단 매장</div>
         <div class="overview-kpi-value" id="overviewKpiStores">-</div>
-        <div class="overview-kpi-hint">선택 주차 기준</div>
+        <div class="overview-kpi-hint">선택 주차 전체 저장 매장</div>
       </div>
       <div class="overview-kpi">
-        <div class="overview-kpi-label">전체 실제인시</div>
-        <div class="overview-kpi-value" id="overviewKpiActual">-</div>
-        <div class="overview-kpi-hint">전 매장 합계</div>
+        <div class="overview-kpi-label">과다 매장</div>
+        <div class="overview-kpi-value overview-gap-plus" id="overviewKpiExcessStores">-</div>
+        <div class="overview-kpi-hint">Gap% 5% 초과</div>
       </div>
       <div class="overview-kpi">
-        <div class="overview-kpi-label">전체 표준인시</div>
-        <div class="overview-kpi-value" id="overviewKpiStandard">-</div>
-        <div class="overview-kpi-hint">전 매장 합계</div>
+        <div class="overview-kpi-label">총 초과 인시</div>
+        <div class="overview-kpi-value overview-gap-plus" id="overviewKpiExcessHours">-</div>
+        <div class="overview-kpi-hint">Gap이 양수인 매장만 합산</div>
       </div>
       <div class="overview-kpi">
-        <div class="overview-kpi-label">전체 Gap</div>
-        <div class="overview-kpi-value" id="overviewKpiGap">-</div>
-        <div class="overview-kpi-hint">실제 - 표준</div>
+        <div class="overview-kpi-label">전체 Gap%</div>
+        <div class="overview-kpi-value" id="overviewKpiGapPct">-</div>
+        <div class="overview-kpi-hint">전체 실제인시 ÷ 전체 표준인시 기준</div>
       </div>
     </div>
 
@@ -186,6 +208,7 @@
           <thead>
             <tr>
               <th>매장</th>
+              <th>상태</th>
               <th>예상매출</th>
               <th>객수</th>
               <th>실제인시</th>
@@ -442,6 +465,12 @@ function overviewGapClass(v) {
   return Number(v) > 0 ? 'overview-gap-plus' :
          Number(v) < 0 ? 'overview-gap-minus' : 'overview-gap-zero';
 }
+function overviewStatus(gapPct) {
+  const n = Number(gapPct || 0);
+  if (n <= 0) return { key:'normal', label:'정상', cls:'overview-status-normal' };
+  if (n <= 5) return { key:'warning', label:'주의', cls:'overview-status-warning' };
+  return { key:'excess', label:'과다', cls:'overview-status-excess' };
+}
 function overviewSignHours(v) {
   const n = Number(v || 0);
   return (n > 0 ? '+' : '') + overviewN1(n) + 'h';
@@ -492,7 +521,7 @@ async function loadOverviewData(force = false) {
     if (statusEl) statusEl.textContent = '오류: ' + err.message;
     const body = document.getElementById('overviewTableBody');
     if (body) {
-      body.innerHTML = '<tr><td colspan="11" class="overview-empty">데이터를 불러오지 못했습니다.</td></tr>';
+      body.innerHTML = '<tr><td colspan="12" class="overview-empty">데이터를 불러오지 못했습니다.</td></tr>';
     }
   }
 }
@@ -526,45 +555,66 @@ function renderOverviewWeekOptions() {
 function getOverviewFilteredRows() {
   const weekStart = document.getElementById('overviewWeekSelect')?.value || '';
   const keyword = (document.getElementById('overviewSearchInput')?.value || '').trim().toLowerCase();
+  const statusFilter = document.getElementById('overviewStatusFilter')?.value || 'all';
+  const sortValue = document.getElementById('overviewSortSelect')?.value || 'gap_desc';
 
-  return overviewRows.filter(row => {
+  const rows = overviewRows.filter(row => {
     const sameWeek = !weekStart || row.week_start === weekStart;
     const matches = !keyword || String(row.store_name || '').toLowerCase().includes(keyword);
-    return sameWeek && matches;
+    const status = overviewStatus(row.gap_pct).key;
+    const statusMatches = statusFilter === 'all' || status === statusFilter;
+    return sameWeek && matches && statusMatches;
   });
+
+  rows.sort((a, b) => {
+    if (sortValue === 'gap_asc') return Number(a.gap_pct || 0) - Number(b.gap_pct || 0);
+    if (sortValue === 'store_asc') return String(a.store_name || '').localeCompare(String(b.store_name || ''), 'ko');
+    if (sortValue === 'kitchen_desc') return Number(b.kitchen_gap_hours || 0) - Number(a.kitchen_gap_hours || 0);
+    if (sortValue === 'hall_desc') return Number(b.hall_gap_hours || 0) - Number(a.hall_gap_hours || 0);
+    return Number(b.gap_pct || 0) - Number(a.gap_pct || 0);
+  });
+
+  return rows;
 }
 
 function renderOverview() {
   const rows = getOverviewFilteredRows();
 
-  const actual = rows.reduce((sum, row) => sum + Number(row.actual_hours || 0), 0);
-  const standard = rows.reduce((sum, row) => sum + Number(row.standard_hours || 0), 0);
+  // KPI는 검색/상태 필터가 아니라 선택 주차 전체 매장을 기준으로 계산
+  const selectedWeek = document.getElementById('overviewWeekSelect')?.value || '';
+  const weekRows = overviewRows.filter(row => !selectedWeek || row.week_start === selectedWeek);
+  const actual = weekRows.reduce((sum, row) => sum + Number(row.actual_hours || 0), 0);
+  const standard = weekRows.reduce((sum, row) => sum + Number(row.standard_hours || 0), 0);
   const gap = actual - standard;
+  const gapPct = standard > 0 ? (gap / standard * 100) : 0;
+  const excessStores = weekRows.filter(row => overviewStatus(row.gap_pct).key === 'excess').length;
+  const excessHours = weekRows.reduce((sum, row) => sum + Math.max(0, Number(row.gap_hours || 0)), 0);
 
   const storesEl = document.getElementById('overviewKpiStores');
-  const actualEl = document.getElementById('overviewKpiActual');
-  const standardEl = document.getElementById('overviewKpiStandard');
-  const gapEl = document.getElementById('overviewKpiGap');
+  const excessStoresEl = document.getElementById('overviewKpiExcessStores');
+  const excessHoursEl = document.getElementById('overviewKpiExcessHours');
+  const gapPctEl = document.getElementById('overviewKpiGapPct');
 
-  if (storesEl) storesEl.textContent = rows.length + '개';
-  if (actualEl) actualEl.textContent = overviewN1(actual) + 'h';
-  if (standardEl) standardEl.textContent = overviewN1(standard) + 'h';
-  if (gapEl) {
-    gapEl.textContent = overviewSignHours(gap);
-    gapEl.className = 'overview-kpi-value ' + overviewGapClass(gap);
+  if (storesEl) storesEl.textContent = weekRows.length + '개';
+  if (excessStoresEl) excessStoresEl.textContent = excessStores + '개';
+  if (excessHoursEl) excessHoursEl.textContent = '+' + overviewN1(excessHours) + 'h';
+  if (gapPctEl) {
+    gapPctEl.textContent = overviewPct(gapPct);
+    gapPctEl.className = 'overview-kpi-value ' + overviewGapClass(gapPct);
   }
 
   const body = document.getElementById('overviewTableBody');
   if (!body) return;
 
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="11" class="overview-empty">선택한 주차에 저장된 매장이 없습니다.</td></tr>';
+    body.innerHTML = '<tr><td colspan="12" class="overview-empty">선택한 주차에 저장된 매장이 없습니다.</td></tr>';
     return;
   }
 
   body.innerHTML = rows.map(row => `
     <tr>
       <td><span class="overview-store">${overviewEscapeHtml(row.store_name || '-')}</span></td>
+      <td><span class="overview-status ${overviewStatus(row.gap_pct).cls}">${overviewStatus(row.gap_pct).label}</span></td>
       <td>${overviewSales(row.expected_sales)}</td>
       <td>${Math.round(Number(row.guest_count || 0)).toLocaleString('ko-KR')}</td>
       <td>${overviewN1(row.actual_hours)}h</td>
@@ -596,6 +646,8 @@ function activateMainView(viewName) {
 function setupOverviewControls() {
   const weekSelect = document.getElementById('overviewWeekSelect');
   const searchInput = document.getElementById('overviewSearchInput');
+  const statusFilter = document.getElementById('overviewStatusFilter');
+  const sortSelect = document.getElementById('overviewSortSelect');
   const refreshBtn = document.getElementById('overviewRefreshBtn');
   const backLink = document.getElementById('overviewBackLink');
 
@@ -606,6 +658,14 @@ function setupOverviewControls() {
   if (searchInput && !searchInput.dataset.bound) {
     searchInput.addEventListener('input', renderOverview);
     searchInput.dataset.bound = '1';
+  }
+  if (statusFilter && !statusFilter.dataset.bound) {
+    statusFilter.addEventListener('change', renderOverview);
+    statusFilter.dataset.bound = '1';
+  }
+  if (sortSelect && !sortSelect.dataset.bound) {
+    sortSelect.addEventListener('change', renderOverview);
+    sortSelect.dataset.bound = '1';
   }
   if (refreshBtn && !refreshBtn.dataset.bound) {
     refreshBtn.addEventListener('click', () => loadOverviewData(true));
@@ -3090,6 +3150,4 @@ async function autoSaveDiagnosisResult(storeName) {
 setupOverviewControls();
 </script>
 </body>
-
-<!-- vercel reconnect test -->
 </html>
