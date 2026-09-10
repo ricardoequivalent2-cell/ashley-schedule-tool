@@ -28,6 +28,15 @@
 @media(max-width:760px){.dual-upload-grid{grid-template-columns:1fr}.dual-upload-box{min-height:0;padding:22px 16px 26px}}
 
 /* ===== 통합 종합현황 ===== */
+
+/* STEP C5: 종합현황을 기존 진단 레이아웃 안에 유지 */
+#app{width:100%}
+#view-overview{width:100%}
+.overview-sortable{cursor:pointer;user-select:none;transition:background .12s ease}
+.overview-sortable:hover{background:#F3F5F8 !important;color:#475467}
+.overview-sortable .sort-mark{display:inline-block;min-width:12px;margin-left:3px;color:#A7AEBD}
+.overview-sortable.sort-active .sort-mark{color:#4A6CF7;font-weight:900}
+
 .overview-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
 .overview-toolbar select,.overview-toolbar input{
   height:40px;border:1px solid #D9DEE8;border-radius:9px;background:#fff;
@@ -146,7 +155,6 @@
     </div>
     <div id="status" style="margin-top:10px;"></div>
   </div>
-  </div>
 
   <div id="app">
 
@@ -164,13 +172,6 @@
         <option value="normal">정상</option>
         <option value="warning">주의</option>
         <option value="excess">과다</option>
-      </select>
-      <select id="overviewSortSelect">
-        <option value="gap_desc">Gap% 높은 순</option>
-        <option value="gap_asc">Gap% 낮은 순</option>
-        <option value="store_asc">매장명 순</option>
-        <option value="kitchen_desc">주방 Gap 높은 순</option>
-        <option value="hall_desc">홀 Gap 높은 순</option>
       </select>
       <button class="overview-refresh" id="overviewRefreshBtn" type="button">새로고침</button>
       <div id="overviewLoadStatus">불러오는 중...</div>
@@ -207,18 +208,18 @@
         <table class="overview-table">
           <thead>
             <tr>
-              <th>매장</th>
-              <th>상태</th>
-              <th>예상매출</th>
-              <th>객수</th>
-              <th>실제인시</th>
-              <th>표준인시</th>
-              <th>Gap</th>
-              <th>Gap%</th>
-              <th>주방 Gap</th>
-              <th>홀 Gap</th>
+              <th class="overview-sortable" data-sort="store_name">매장 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="status">상태 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="expected_sales">예상매출 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="guest_count">객수 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="actual_hours">실제인시 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="standard_hours">표준인시 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="gap_hours">Gap <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="gap_pct">Gap% <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="kitchen_gap_hours">주방 Gap <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="hall_gap_hours">홀 Gap <span class="sort-mark"></span></th>
               <th>모델</th>
-              <th>최종 저장</th>
+              <th class="overview-sortable" data-sort="updated_at">최종 저장 <span class="sort-mark"></span></th>
             </tr>
           </thead>
           <tbody id="overviewTableBody"></tbody>
@@ -451,6 +452,8 @@
 let overviewRows = [];
 let overviewWeeks = [];
 let overviewLoaded = false;
+let overviewSortKey = 'gap_pct';
+let overviewSortDirection = 'desc';
 
 function overviewN1(v) {
   return Number(v || 0).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
@@ -556,7 +559,6 @@ function getOverviewFilteredRows() {
   const weekStart = document.getElementById('overviewWeekSelect')?.value || '';
   const keyword = (document.getElementById('overviewSearchInput')?.value || '').trim().toLowerCase();
   const statusFilter = document.getElementById('overviewStatusFilter')?.value || 'all';
-  const sortValue = document.getElementById('overviewSortSelect')?.value || 'gap_desc';
 
   const rows = overviewRows.filter(row => {
     const sameWeek = !weekStart || row.week_start === weekStart;
@@ -566,19 +568,64 @@ function getOverviewFilteredRows() {
     return sameWeek && matches && statusMatches;
   });
 
+  const statusRank = { normal: 1, warning: 2, excess: 3 };
+
   rows.sort((a, b) => {
-    if (sortValue === 'gap_asc') return Number(a.gap_pct || 0) - Number(b.gap_pct || 0);
-    if (sortValue === 'store_asc') return String(a.store_name || '').localeCompare(String(b.store_name || ''), 'ko');
-    if (sortValue === 'kitchen_desc') return Number(b.kitchen_gap_hours || 0) - Number(a.kitchen_gap_hours || 0);
-    if (sortValue === 'hall_desc') return Number(b.hall_gap_hours || 0) - Number(a.hall_gap_hours || 0);
-    return Number(b.gap_pct || 0) - Number(a.gap_pct || 0);
+    let av;
+    let bv;
+
+    if (overviewSortKey === 'status') {
+      av = statusRank[overviewStatus(a.gap_pct).key] || 0;
+      bv = statusRank[overviewStatus(b.gap_pct).key] || 0;
+    } else if (overviewSortKey === 'store_name') {
+      av = String(a.store_name || '');
+      bv = String(b.store_name || '');
+      const result = av.localeCompare(bv, 'ko');
+      return overviewSortDirection === 'asc' ? result : -result;
+    } else if (overviewSortKey === 'updated_at') {
+      av = new Date(a.updated_at || a.saved_at || 0).getTime();
+      bv = new Date(b.updated_at || b.saved_at || 0).getTime();
+    } else {
+      av = Number(a[overviewSortKey] || 0);
+      bv = Number(b[overviewSortKey] || 0);
+    }
+
+    if (av === bv) {
+      return String(a.store_name || '').localeCompare(String(b.store_name || ''), 'ko');
+    }
+
+    return overviewSortDirection === 'asc' ? av - bv : bv - av;
   });
 
   return rows;
 }
 
+function updateOverviewSortMarks() {
+  document.querySelectorAll('.overview-sortable').forEach(th => {
+    const mark = th.querySelector('.sort-mark');
+    const active = th.dataset.sort === overviewSortKey;
+    th.classList.toggle('sort-active', active);
+    if (mark) mark.textContent = active ? (overviewSortDirection === 'asc' ? '▲' : '▼') : '↕';
+  });
+}
+
+function setOverviewSort(key) {
+  if (!key) return;
+
+  if (overviewSortKey === key) {
+    overviewSortDirection = overviewSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    overviewSortKey = key;
+    // 이름은 오름차순, 나머지 수치는 큰 값부터가 기본
+    overviewSortDirection = key === 'store_name' ? 'asc' : 'desc';
+  }
+
+  renderOverview();
+}
+
 function renderOverview() {
   const rows = getOverviewFilteredRows();
+  updateOverviewSortMarks();
 
   // KPI는 검색/상태 필터가 아니라 선택 주차 전체 매장을 기준으로 계산
   const selectedWeek = document.getElementById('overviewWeekSelect')?.value || '';
@@ -647,7 +694,6 @@ function setupOverviewControls() {
   const weekSelect = document.getElementById('overviewWeekSelect');
   const searchInput = document.getElementById('overviewSearchInput');
   const statusFilter = document.getElementById('overviewStatusFilter');
-  const sortSelect = document.getElementById('overviewSortSelect');
   const refreshBtn = document.getElementById('overviewRefreshBtn');
   const backLink = document.getElementById('overviewBackLink');
 
@@ -663,14 +709,16 @@ function setupOverviewControls() {
     statusFilter.addEventListener('change', renderOverview);
     statusFilter.dataset.bound = '1';
   }
-  if (sortSelect && !sortSelect.dataset.bound) {
-    sortSelect.addEventListener('change', renderOverview);
-    sortSelect.dataset.bound = '1';
-  }
   if (refreshBtn && !refreshBtn.dataset.bound) {
     refreshBtn.addEventListener('click', () => loadOverviewData(true));
     refreshBtn.dataset.bound = '1';
   }
+  document.querySelectorAll('.overview-sortable').forEach(th => {
+    if (th.dataset.bound) return;
+    th.addEventListener('click', () => setOverviewSort(th.dataset.sort));
+    th.dataset.bound = '1';
+  });
+  updateOverviewSortMarks();
   if (backLink && !backLink.dataset.bound) {
     backLink.addEventListener('click', e => {
       e.preventDefault();
