@@ -149,45 +149,47 @@
       const target1 = tierHoursDaily(calcConfig.CURVE.TIERS['1차목표'], guestCount, calcConfig.CURVE);
       const target2 = tierHoursDaily(calcConfig.CURVE.TIERS['2차목표'], guestCount, calcConfig.CURVE);
 
-      const normalizedModels = rawModels.map(normalizeModelTable);
-      const shapeTable = interpolateStandard(normalizedModels, salesVal);
-      const targetSlotUnits = target1 / hourPerSlot;
-      const rawStandard = scaleShapeTable(shapeTable, targetSlotUnits);
+      // V1.0 기준: 총량은 2차목표(BHAG), 파트 배분은 Part Allocation,
+      // 시간대 배분은 Time Allocation(매출구간 대표평균)을 사용한다.
+      const partRatios = getPartAllocationRatios(salesVal);
+      const allTargetParts = PARTS.concat(['홀']);
+      const partTarget2Hours = {};
+      allTargetParts.forEach(part => {
+        partTarget2Hours[part] = target2 * (partRatios[part] || 0);
+      });
 
       standardSchedule[label] = {};
       heatmap[label] = {};
-
-      // 표준시간표는 actual과 무관하게 항상 생성한다.
-      slots.forEach((slot, si) => {
+      slots.forEach(slot => {
         standardSchedule[label][slot] = {};
         heatmap[label][slot] = {};
-
-        const kitchenRaw = {};
-        PARTS.forEach(part => {
-          kitchenRaw[part] = (rawStandard[si] && rawStandard[si][part]) || 0;
-        });
-        const kitchenAllocated = allocateSlotHeadcounts(
-          kitchenRaw,
-          part => getPartCap(part, salesVal)
-        );
-        PARTS.forEach(part => {
-          standardSchedule[label][slot][part] = kitchenAllocated[part] || 0;
-        });
-
-        const hallRaw = {
-          '데코이': (rawStandard[si] && rawStandard[si]['데코이']) || 0,
-          '폴리싱': (rawStandard[si] && rawStandard[si]['폴리싱']) || 0,
-          '홀': (rawStandard[si] && rawStandard[si]['홀']) || 0
-        };
-        const hallAllocated = allocateSlotHeadcounts(
-          hallRaw,
-          part => getPartCap(part, salesVal)
-        );
-        standardSchedule[label][slot]['홀'] =
-          (hallAllocated['데코이'] || 0) +
-          (hallAllocated['폴리싱'] || 0) +
-          (hallAllocated['홀'] || 0);
       });
+
+      // DB의 5개 시간대 비율을 해당 시간대의 30분 슬롯에 균등 분배한다.
+      // 화면 진단은 5개 시간대 합계가 기준이며, 30분 값은 내부 호환용이다.
+      allTargetParts.forEach(part => {
+        const bandRatios = getTimeAllocationRatios(salesVal, part);
+        SHIFT_BLOCKS.forEach(block => {
+          const blockSlots = slots.filter(slot => slot >= block.startMin && slot < block.endMin);
+          if (!blockSlots.length) return;
+          const bandHours = partTarget2Hours[part] * (bandRatios[block.name] || 0);
+          const headcountPerSlot = bandHours / (blockSlots.length * hourPerSlot);
+          blockSlots.forEach(slot => {
+            standardSchedule[label][slot][part] = headcountPerSlot;
+          });
+        });
+      });
+
+      // 계산 검증: 전체 표준시간표 인시는 2차목표와 일치해야 한다.
+      let scheduleTargetHours = 0;
+      slots.forEach(slot => {
+        allTargetParts.forEach(part => {
+          scheduleTargetHours += ((standardSchedule[label][slot] || {})[part] || 0) * hourPerSlot;
+        });
+      });
+      if (Math.abs(scheduleTargetHours - target2) > 0.01) {
+        throw new Error(`2차목표 시간배분 검증 실패: ${label} / 목표 ${target2.toFixed(2)}h / 배분 ${scheduleTargetHours.toFixed(2)}h`);
+      }
 
       // ----------------------------------------
       // 총인시 진단: UP 근무시간 합계를 그대로 사용
@@ -196,9 +198,9 @@
       const actualTotal = h.total;
 
       let verdict;
-      if (actualTotal > hurdle) verdict = '최소허들 초과 (비효율)';
-      else if (actualTotal > target1) verdict = '최소허들 충족 · 1차목표 미달';
-      else if (actualTotal > target2) verdict = '1차목표 달성 · 2차목표 미달';
+      if (actualTotal > hurdle) verdict = '과다 · 즉시개선';
+      else if (actualTotal > target1) verdict = '개선 필요';
+      else if (actualTotal > target2) verdict = '양호 · BHAG 추가개선';
       else verdict = '2차목표(BHAG) 달성';
 
       tierDiagnosis[label] = {

@@ -7,6 +7,8 @@
   <script src="./js/model-source.js"></script>
   <script src="./js/diagnosis-engine.js"></script>
   <script src="./js/config-source.js"></script>
+  <script src="./js/part-allocation-source.js"></script>
+  <script src="./js/time-allocation-source.js"></script>
   <script src="./js/up-parser.js"></script>
   <script src="./js/common-utils.js"></script>
   <script src="./js/up-diagnosis-adapter.js"></script>
@@ -982,9 +984,9 @@ const COLOR_TO_PART_DEFAULT = {
 };
 const PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO'];
 const SHIFT_BLOCKS = [
-  { name: '오픈',     startMin: 8*60+30,    endMin: 11*60+30 },
-  { name: '런치피크', startMin: 11*60+30,   endMin: 14*60+30 },
-  { name: '스윙',     startMin: 14*60+30,   endMin: 17*60 },
+  { name: '오픈',     startMin: 8*60+30,  endMin: 11*60 },
+  { name: '런치피크', startMin: 11*60,    endMin: 14*60 },
+  { name: '스윙',     startMin: 14*60,    endMin: 17*60 },
   { name: '디너',     startMin: 17*60,      endMin: 20*60 },
   { name: '마감',     startMin: 20*60,      endMin: 22*60 },
 ];
@@ -1231,9 +1233,9 @@ function computeWeeklySummary(tierDiagnosis, dateHeaders) {
     totalGuest += t.guestCount; totalKitchen += t.kitchenActualHours; totalHall += t.hallActualHours;
   });
   let verdict;
-  if (totalActual > totalHurdle) verdict = '최소허들 초과 (비효율)';
-  else if (totalActual > totalTarget1) verdict = '최소허들 충족 · 1차목표 미달';
-  else if (totalActual > totalTarget2) verdict = '1차목표 달성 · 2차목표 미달';
+  if (totalActual > totalHurdle) verdict = '과다 · 즉시개선';
+  else if (totalActual > totalTarget1) verdict = '개선 필요';
+  else if (totalActual > totalTarget2) verdict = '양호 · BHAG 추가개선';
   else verdict = '2차목표(BHAG) 달성';
   const r = v => Math.round(v * 10) / 10;
   return {
@@ -1501,37 +1503,27 @@ function makeScopedDiagnosisResult(sourceResult, scope) {
     scoped.diagnosisList = [];
   }
 
-  // 파트 화면의 총인시는 '해당 조직 실제인시 vs 해당 조직 표준시간표 인시'로 맞춘다.
-  // V1 전체 곡선을 주방/홀에 다시 회귀시키지 않고,
-  // 현재 표준시간표가 가진 조직별 몫을 1차목표로 사용한다.
+  // 조직별 화면도 전체와 동일하게 '2차목표(BHAG)'를 개선 기준으로 사용한다.
+  // 표준시간표 자체가 Part Allocation × Time Allocation으로 만든 2차목표이므로
+  // 해당 조직 소유 파트의 표준시간표 합계를 조직별 2차목표로 사용한다.
   (scoped.dateHeaders || []).forEach(date => {
     const t = scoped.tierDiagnosis && scoped.tierDiagnosis[date];
     if (!t) return;
 
-    const originalTarget1 = Number(t.target1 || 0);
-
-    // 핵심: 전체 목표인시를 비율로 쪼개지 않는다.
-    // 해당 날짜의 표준시간표에서 조직 소유 파트를 직접 합산해 1차목표를 만든다.
-    const scopedTarget1 = sumStandardHoursForScope(sourceResult, date, scope);
-
-    // 최소허들/2차목표는 아직 조직별 별도 곡선이 없으므로
-    // V1 화면 단계표시를 유지하기 위한 보조 비율만 사용한다.
-    // '표준인시(1차목표)' 자체에는 이 비율을 사용하지 않는다.
-    const ratio = originalTarget1 > 0 ? scopedTarget1 / originalTarget1 : 0;
+    const originalTarget2 = Number(t.target2 || 0);
+    const scopedTarget2 = sumStandardHoursForScope(sourceResult, date, scope);
+    const ratio = originalTarget2 > 0 ? scopedTarget2 / originalTarget2 : 0;
 
     t.actualTotal = scope === 'hall'
       ? Number(t.hallActualHours || 0)
       : Number(t.kitchenActualHours || 0);
-    t.target1 = scopedTarget1;
-
-    // 최소허들/2차목표는 화면의 단계 판정 일관성을 위해
-    // 기존 전체 곡선의 비율을 그대로 적용한다.
     t.hurdle = Math.round(Number(t.hurdle || 0) * ratio * 10) / 10;
-    t.target2 = Math.round(Number(t.target2 || 0) * ratio * 10) / 10;
+    t.target1 = Math.round(Number(t.target1 || 0) * ratio * 10) / 10;
+    t.target2 = Math.round(scopedTarget2 * 10) / 10;
 
-    if (t.actualTotal > t.hurdle) t.verdict = '최소허들 초과 (비효율)';
-    else if (t.actualTotal > t.target1) t.verdict = '최소허들 충족 · 1차목표 미달';
-    else if (t.actualTotal > t.target2) t.verdict = '1차목표 달성 · 2차목표 미달';
+    if (t.actualTotal > t.hurdle) t.verdict = '과다 · 즉시개선';
+    else if (t.actualTotal > t.target1) t.verdict = '개선 필요';
+    else if (t.actualTotal > t.target2) t.verdict = '양호 · BHAG 추가개선';
     else t.verdict = '2차목표(BHAG) 달성';
   });
 
@@ -1623,6 +1615,8 @@ async function handleDualUpload() {
 
     const modelSourceInfo = await ensureStandardModelsLoaded();
     const configSourceInfo = await ensureDiagnosisConfigLoaded();
+    const partAllocationSourceInfo = await ensurePartAllocationLoaded();
+    const timeAllocationSourceInfo = await ensureTimeAllocationLoaded();
 
     // STEP1 핵심:
     // 업로드 칸 이름으로 주방/홀을 판정하지 않는다.
@@ -1976,10 +1970,10 @@ async function autoSaveDiagnosisResult(storeName) {
     }
 
     function verdictClass(verdict) {
-      if (verdict.indexOf('초과') !== -1) return 'verdict-미달';       // 최소허들 초과 = 비효율(나쁨, 빨강)
-      if (verdict.indexOf('2차목표') !== -1 && verdict.indexOf('달성') !== -1 && verdict.indexOf('미달') === -1) return 'verdict-달성'; // BHAG 달성 = 최상(초록)
-      if (verdict.indexOf('1차목표 달성') !== -1) return 'verdict-2차'; // 1차달성·2차미달 = 양호(파랑)
-      if (verdict.indexOf('충족') !== -1) return 'verdict-충족';       // 허들충족·1차미달 = 보통(주황)
+      if (verdict.indexOf('즉시개선') !== -1 || verdict.indexOf('과다') !== -1) return 'verdict-미달';
+      if (verdict.indexOf('2차목표') !== -1 && verdict.indexOf('달성') !== -1) return 'verdict-달성';
+      if (verdict.indexOf('양호') !== -1) return 'verdict-달성';
+      if (verdict.indexOf('개선 필요') !== -1) return 'verdict-충족';
       return 'verdict-충족';
     }
 
@@ -2068,7 +2062,7 @@ async function autoSaveDiagnosisResult(storeName) {
       const cls = verdictClass(t.verdict);
       banner.className = 'tier-banner ' + cls;
 
-      const headline = diffPhrase(t.actualTotal, t.target1, true) + ' · ' + levelPhrase(t.verdict);
+      const headline = diffPhrase(t.actualTotal, t.target2, true) + ' · ' + levelPhrase(t.verdict);
 
       const improveHtml = t.verdictImproves
         ? '<div style="margin-top:8px; padding:8px 12px; background:rgba(255,255,255,0.6); border-radius:6px; font-size:12px;">' +
@@ -2081,7 +2075,7 @@ async function autoSaveDiagnosisResult(storeName) {
 
       banner.innerHTML =
         '<div class="verdict-text">' + dateLabel + ' — ' + headline + '</div>' +
-        '<div class="tier-numbers"><b>' + t.actualTotal + 'h</b> (목표 ' + t.target1 + 'h) · 주방' + t.kitchenActualHours + 'h · 홀' + t.hallActualHours + 'h' +
+        '<div class="tier-numbers"><b>' + t.actualTotal + 'h</b> (BHAG ' + t.target2 + 'h) · 주방' + t.kitchenActualHours + 'h · 홀' + t.hallActualHours + 'h' +
         improveHtml + '</div>';
     }
 
@@ -2263,7 +2257,7 @@ async function autoSaveDiagnosisResult(storeName) {
       const el = document.getElementById('dailyKpiRow');
       const t = tierDiagnosis[dateLabel];
       if (!t) { el.innerHTML = ''; return; }
-      const gap = Math.round((t.actualTotal - t.target1) * 10) / 10;
+      const gap = Math.round((t.actualTotal - t.target2) * 10) / 10;
       const gapAbs = Math.abs(gap);
       const isOver = gap > 0.5, isUnder = gap < -0.5;
       const gapLabel = isOver ? '과다' : (isUnder ? '부족' : '적정');
@@ -2273,7 +2267,7 @@ async function autoSaveDiagnosisResult(storeName) {
       const cards = [
         { icon: '₩', bg: '#EDE9F9', fg: '#5B3FA0', label: '예상 매출', value: (t.salesVal || 0).toLocaleString() + '원' },
         { icon: '人', bg: '#DCEEFB', fg: '#2C6690', label: '예상 객수', value: t.guestCount + '명' },
-        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '1차 목표 총인시', value: t.target1 + 'h' },
+        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '2차 목표(BHAG) 총인시', value: t.target2 + 'h' },
         { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: t.actualTotal + 'h' },
       ];
       let html = cards.map(c =>
@@ -2768,7 +2762,7 @@ async function autoSaveDiagnosisResult(storeName) {
       let html = '<table class="compare-table-v2"><tr><th>요일</th><th>예상매출</th><th>목표인시</th><th>실제인시</th><th>Gap</th><th>상태</th></tr>';
       dateHeaders.forEach(d => {
         const t = tierDiagnosis[d]; if (!t) return;
-        const gap = Math.round((t.actualTotal - t.target1) * 10) / 10;
+        const gap = Math.round((t.actualTotal - t.target2) * 10) / 10;
         const isOver = gap > 0.5, isUnder = gap < -0.5;
         const label = isOver ? '과다' : (isUnder ? '부족' : '적정');
         const bg = isOver ? '#F7E3E3' : (isUnder ? '#DCEEFB' : '#E3F1E8');
@@ -2839,7 +2833,7 @@ async function autoSaveDiagnosisResult(storeName) {
       let worstDay = null, worstDayGap = -Infinity;
       dateHeaders.forEach(d => {
         const t = tierDiagnosis[d]; if (!t) return;
-        const gap = t.actualTotal - t.target1;
+        const gap = t.actualTotal - t.target2;
         if (gap > worstDayGap) { worstDayGap = gap; worstDay = d; }
       });
       if (worstDay) {
