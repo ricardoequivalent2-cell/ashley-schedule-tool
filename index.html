@@ -30,6 +30,19 @@
 /* ===== 통합 종합현황 ===== */
 
 /* STEP C5: 종합현황을 기존 진단 레이아웃 안에 유지 */
+
+/* STEP C6/C7 */
+.overview-mode-tabs{display:inline-flex;gap:4px;padding:4px;background:#F2F4F7;border-radius:10px;margin-bottom:14px}
+.overview-mode-btn{border:0;background:transparent;color:#667085;padding:8px 13px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}
+.overview-mode-btn.active{background:#fff;color:#202838;box-shadow:0 1px 3px rgba(16,24,40,.08)}
+.overview-store-link{color:#3448C5;text-decoration:none;font-weight:800;cursor:pointer}
+.overview-store-link:hover,.overview-week-link:hover{text-decoration:underline}
+.overview-week-link{color:inherit;text-decoration:none;cursor:pointer;font-weight:800}
+.overview-trend-good{color:#17845B;font-weight:800}
+.overview-trend-bad{color:#D6452F;font-weight:800}
+.overview-trend-flat{color:#667085;font-weight:800}
+#overviewTrendWrap{display:none}
+
 #app{width:100%}
 #view-overview{width:100%}
 .overview-sortable{cursor:pointer;user-select:none;transition:background .12s ease}
@@ -164,6 +177,11 @@
     <div class="daily-page-title">종합현황</div>
     <div class="daily-page-sub">각 매장에서 진단한 스케줄 결과를 주차별로 모아 비교합니다.</div>
 
+    <div class="overview-mode-tabs">
+      <button type="button" class="overview-mode-btn active" data-overview-mode="weekly">주간 현황</button>
+      <button type="button" class="overview-mode-btn" data-overview-mode="trend">최근 4주 추이</button>
+    </div>
+
     <div class="overview-toolbar">
       <select id="overviewWeekSelect"></select>
       <input id="overviewSearchInput" type="text" placeholder="매장 검색">
@@ -200,6 +218,7 @@
       </div>
     </div>
 
+    <div id="overviewWeeklyWrap">
     <div class="overview-table-card">
       <div class="overview-table-head">
         <div class="overview-table-title">매장별 주간 현황</div>
@@ -224,6 +243,21 @@
           </thead>
           <tbody id="overviewTableBody"></tbody>
         </table>
+      </div>
+    </div>
+    </div>
+
+    <div id="overviewTrendWrap">
+      <div class="overview-table-card">
+        <div class="overview-table-head">
+          <div class="overview-table-title">매장별 최근 4주 Gap% 추이</div>
+        </div>
+        <div class="overview-table-wrap">
+          <table class="overview-table">
+            <thead id="overviewTrendHead"></thead>
+            <tbody id="overviewTrendBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -454,6 +488,7 @@ let overviewWeeks = [];
 let overviewLoaded = false;
 let overviewSortKey = 'gap_pct';
 let overviewSortDirection = 'desc';
+let overviewMode = 'weekly';
 
 function overviewN1(v) {
   return Number(v || 0).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
@@ -553,6 +588,167 @@ function renderOverviewWeekOptions() {
     }
     select.appendChild(opt);
   });
+}
+
+
+function setOverviewMode(mode) {
+  overviewMode = mode === 'trend' ? 'trend' : 'weekly';
+  document.querySelectorAll('.overview-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.overviewMode === overviewMode);
+  });
+  const weekly = document.getElementById('overviewWeeklyWrap');
+  const trend = document.getElementById('overviewTrendWrap');
+  if (weekly) weekly.style.display = overviewMode === 'weekly' ? 'block' : 'none';
+  if (trend) trend.style.display = overviewMode === 'trend' ? 'block' : 'none';
+  renderOverview();
+}
+
+function getTrendWeeks() {
+  const selected = document.getElementById('overviewWeekSelect')?.value || '';
+  const available = [...overviewWeeks].sort((a,b) => String(a.weekStart).localeCompare(String(b.weekStart)));
+  if (!available.length) return [];
+  let endIndex = selected ? available.findIndex(w => w.weekStart === selected) : available.length - 1;
+  if (endIndex < 0) endIndex = available.length - 1;
+  return available.slice(Math.max(0, endIndex - 3), endIndex + 1);
+}
+
+function shortWeekLabel(weekStart) {
+  if (!weekStart) return '-';
+  const d = new Date(weekStart + 'T00:00:00');
+  return `${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function bindOverviewDetailLinks() {
+  document.querySelectorAll('.overview-store-link, .overview-week-link').forEach(link => {
+    if (link.dataset.detailBound) return;
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      openOverviewStoreDetail(link.dataset.store, link.dataset.week);
+    });
+    link.dataset.detailBound = '1';
+  });
+}
+
+async function openOverviewStoreDetail(storeName, weekStart) {
+  if (!storeName) return;
+  const statusEl = document.getElementById('overviewLoadStatus');
+  if (statusEl) statusEl.textContent = `${storeName} 상세 진단 불러오는 중...`;
+
+  try {
+    const url = `/api/store-week-detail?store=${encodeURIComponent(storeName)}&weekStart=${encodeURIComponent(weekStart || '')}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '상세 진단 불러오기 실패');
+
+    const totalResult = data.record?.result;
+    if (!totalResult) throw new Error('저장된 상세 진단 결과가 없습니다.');
+
+    diagnosisResultsByScope.total = totalResult;
+    diagnosisResultsByScope.kitchen = makeScopedDiagnosisResult(totalResult, 'kitchen');
+    diagnosisResultsByScope.hall = makeScopedDiagnosisResult(totalResult, 'hall');
+
+    activeDiagnosisScope = 'total';
+    lastResult = totalResult;
+
+    document.getElementById('uploadBox').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('reuploadLink').style.display = 'inline-block';
+
+    const bar = document.getElementById('viewingStoreBar');
+    if (bar) {
+      bar.style.display = 'block';
+      bar.innerHTML = `<a href="#" id="overviewBackLinkRuntime" style="color:#4a6cf7;text-decoration:none;font-weight:bold;">← 종합현황으로</a>
+        · <strong>${overviewEscapeHtml(storeName)}</strong>
+        · ${overviewEscapeHtml(data.weekLabel || weekStart || '')}`;
+      const back = document.getElementById('overviewBackLinkRuntime');
+      if (back) back.onclick = (e) => { e.preventDefault(); activateMainView('overview'); };
+    }
+
+    refreshScopeTabs();
+    renderApp(totalResult);
+    activateMainView('glance');
+    if (statusEl) statusEl.textContent = '';
+  } catch (err) {
+    if (statusEl) statusEl.textContent = '오류: ' + err.message;
+    alert(err.message);
+  }
+}
+
+function renderOverviewTrend() {
+  const head = document.getElementById('overviewTrendHead');
+  const body = document.getElementById('overviewTrendBody');
+  if (!head || !body) return;
+
+  const weeks = getTrendWeeks();
+  if (!weeks.length) {
+    head.innerHTML = '';
+    body.innerHTML = '<tr><td class="overview-empty">저장된 주차 데이터가 없습니다.</td></tr>';
+    return;
+  }
+
+  head.innerHTML = `<tr>
+    <th>매장</th>
+    ${weeks.map(w => `<th>${shortWeekLabel(w.weekStart)} Gap%</th>`).join('')}
+    <th>4주 변화</th>
+    <th>현재 상태</th>
+  </tr>`;
+
+  const keyword = (document.getElementById('overviewSearchInput')?.value || '').trim().toLowerCase();
+  const statusFilter = document.getElementById('overviewStatusFilter')?.value || 'all';
+
+  const storeMap = new Map();
+  overviewRows.forEach(row => {
+    if (!weeks.some(w => w.weekStart === row.week_start)) return;
+    if (!storeMap.has(row.store_name)) storeMap.set(row.store_name, {});
+    storeMap.get(row.store_name)[row.week_start] = row;
+  });
+
+  let stores = [...storeMap.keys()].filter(store => {
+    if (keyword && !String(store).toLowerCase().includes(keyword)) return false;
+    const latestWeek = weeks[weeks.length - 1].weekStart;
+    const latestRow = storeMap.get(store)[latestWeek];
+    if (!latestRow) return statusFilter === 'all';
+    const status = overviewStatus(latestRow.gap_pct).key;
+    return statusFilter === 'all' || status === statusFilter;
+  });
+
+  stores.sort((a,b) => {
+    const latestWeek = weeks[weeks.length - 1].weekStart;
+    const ar = storeMap.get(a)[latestWeek];
+    const br = storeMap.get(b)[latestWeek];
+    return Number(br?.gap_pct || -999999) - Number(ar?.gap_pct || -999999);
+  });
+
+  if (!stores.length) {
+    body.innerHTML = `<tr><td colspan="${weeks.length + 3}" class="overview-empty">조건에 맞는 매장이 없습니다.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = stores.map(store => {
+    const byWeek = storeMap.get(store);
+    const weekRows = weeks.map(w => byWeek[w.weekStart] || null);
+    const availableRows = weekRows.filter(Boolean);
+    const first = availableRows[0] || null;
+    const latest = availableRows[availableRows.length - 1] || null;
+    const delta = first && latest ? Number(latest.gap_pct || 0) - Number(first.gap_pct || 0) : null;
+    const trendCls = delta === null ? 'overview-trend-flat' : delta > 0 ? 'overview-trend-bad' : delta < 0 ? 'overview-trend-good' : 'overview-trend-flat';
+    const trendText = delta === null ? '-' : (delta > 0 ? '+' : '') + delta.toFixed(1) + '%p';
+    const latestStatus = latest ? overviewStatus(latest.gap_pct) : null;
+    const latestWeekStart = latest?.week_start || weeks[weeks.length - 1].weekStart;
+
+    return `<tr>
+      <td><a href="#" class="overview-store-link" data-store="${overviewEscapeHtml(store)}" data-week="${overviewEscapeHtml(latestWeekStart)}">${overviewEscapeHtml(store)}</a></td>
+      ${weeks.map((w, idx) => {
+        const row = weekRows[idx];
+        if (!row) return '<td>-</td>';
+        return `<td class="${overviewGapClass(row.gap_pct)}"><a href="#" class="overview-week-link" data-store="${overviewEscapeHtml(store)}" data-week="${overviewEscapeHtml(w.weekStart)}">${overviewPct(row.gap_pct)}</a></td>`;
+      }).join('')}
+      <td class="${trendCls}">${trendText}</td>
+      <td>${latestStatus ? `<span class="overview-status ${latestStatus.cls}">${latestStatus.label}</span>` : '-'}</td>
+    </tr>`;
+  }).join('');
+
+  bindOverviewDetailLinks();
 }
 
 function getOverviewFilteredRows() {
@@ -660,7 +856,7 @@ function renderOverview() {
 
   body.innerHTML = rows.map(row => `
     <tr>
-      <td><span class="overview-store">${overviewEscapeHtml(row.store_name || '-')}</span></td>
+      <td><a href="#" class="overview-store-link" data-store="${overviewEscapeHtml(row.store_name || '')}" data-week="${overviewEscapeHtml(row.week_start || '')}">${overviewEscapeHtml(row.store_name || '-')}</a></td>
       <td><span class="overview-status ${overviewStatus(row.gap_pct).cls}">${overviewStatus(row.gap_pct).label}</span></td>
       <td>${overviewSales(row.expected_sales)}</td>
       <td>${Math.round(Number(row.guest_count || 0)).toLocaleString('ko-KR')}</td>
@@ -674,6 +870,8 @@ function renderOverview() {
       <td>${overviewFormatSavedAt(row.updated_at || row.saved_at)}</td>
     </tr>
   `).join('');
+  bindOverviewDetailLinks();
+  if (overviewMode === 'trend') renderOverviewTrend();
 }
 
 function activateMainView(viewName) {
@@ -719,6 +917,11 @@ function setupOverviewControls() {
     th.dataset.bound = '1';
   });
   updateOverviewSortMarks();
+  document.querySelectorAll('.overview-mode-btn').forEach(btn => {
+    if (btn.dataset.bound) return;
+    btn.addEventListener('click', () => setOverviewMode(btn.dataset.overviewMode));
+    btn.dataset.bound = '1';
+  });
   if (backLink && !backLink.dataset.bound) {
     backLink.addEventListener('click', e => {
       e.preventDefault();

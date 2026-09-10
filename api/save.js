@@ -7,9 +7,7 @@ function requireEnv(name) {
 }
 
 async function upsertWeeklySummary(summary) {
-  if (!summary) {
-    throw new Error('adminWeeklySummary가 필요합니다.');
-  }
+  if (!summary) throw new Error('adminWeeklySummary가 필요합니다.');
 
   const supabaseUrl = requireEnv('SUPABASE_URL');
   const supabaseSecretKey = requireEnv('SUPABASE_SECRET_KEY');
@@ -19,35 +17,23 @@ async function upsertWeeklySummary(summary) {
     week_start: summary.weekStart,
     week_end: summary.weekEnd,
     week_label: summary.weekLabel || null,
-
     model_version: summary.modelVersion || null,
     config_version: summary.configVersion || null,
-
     expected_sales: Math.round(Number(summary.expectedSales || 0)),
     guest_count: Math.round(Number(summary.guestCount || 0)),
-
     actual_hours: Number(summary.actualHours || 0),
     standard_hours: Number(summary.standardHours || 0),
     gap_hours: Number(summary.gapHours || 0),
-    gap_pct: summary.gapPct === null || summary.gapPct === undefined
-      ? null : Number(summary.gapPct),
-
+    gap_pct: summary.gapPct == null ? null : Number(summary.gapPct),
     kitchen_actual_hours: Number(summary.kitchenActualHours || 0),
     kitchen_standard_hours: Number(summary.kitchenStandardHours || 0),
     kitchen_gap_hours: Number(summary.kitchenGapHours || 0),
-    kitchen_gap_pct: summary.kitchenGapPct === null || summary.kitchenGapPct === undefined
-      ? null : Number(summary.kitchenGapPct),
-
+    kitchen_gap_pct: summary.kitchenGapPct == null ? null : Number(summary.kitchenGapPct),
     hall_actual_hours: Number(summary.hallActualHours || 0),
     hall_standard_hours: Number(summary.hallStandardHours || 0),
     hall_gap_hours: Number(summary.hallGapHours || 0),
-    hall_gap_pct: summary.hallGapPct === null || summary.hallGapPct === undefined
-      ? null : Number(summary.hallGapPct),
-
-    labor_productivity:
-      summary.laborProductivity === null || summary.laborProductivity === undefined
-        ? null : Number(summary.laborProductivity),
-
+    hall_gap_pct: summary.hallGapPct == null ? null : Number(summary.hallGapPct),
+    labor_productivity: summary.laborProductivity == null ? null : Number(summary.laborProductivity),
     saved_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -86,42 +72,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    const {
-      storeName,
-      headline,
-      weeklySummary,
-      result,
-      adminWeeklySummary
-    } = req.body || {};
-
+    const { storeName, headline, weeklySummary, result, adminWeeklySummary } = req.body || {};
     if (!storeName) {
       res.status(400).json({ error: 'storeName이 필요합니다.' });
       return;
     }
 
-    // 1) 관리자 종합현황용 Supabase 주차 요약 저장
-    //    같은 매장 + 같은 week_start는 UPSERT로 최신값 갱신
     const savedWeeklySummary = await upsertWeeklySummary({
       ...adminWeeklySummary,
       storeName
     });
 
-    // 2) 기존 Vercel KV 상세 저장은 그대로 유지
     const record = {
       storeName,
       headline: headline || null,
       weeklySummary: weeklySummary || null,
       result: result || null,
+      adminWeeklySummary: adminWeeklySummary || null,
       savedAt: new Date().toISOString(),
     };
 
     await kv.set('store:' + storeName, record);
     await kv.sadd('store-index', storeName);
 
-    res.status(200).json({
-      ok: true,
-      weeklyStoreSummary: savedWeeklySummary
-    });
+    const weekStart = String(adminWeeklySummary?.weekStart || '').trim();
+    if (weekStart) {
+      const weekKey = `store-week:${storeName}:${weekStart}`;
+      await kv.set(weekKey, record);
+      await kv.sadd('store-week-index', weekKey);
+    }
+
+    res.status(200).json({ ok: true, weeklyStoreSummary: savedWeeklySummary });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
