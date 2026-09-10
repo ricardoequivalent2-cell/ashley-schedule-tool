@@ -144,7 +144,7 @@
 #glancePartBars .diverge-col-header{padding:0 14px 6px;font-size:11px;color:#9AA2B1;font-weight:700}
 #glancePartBars .diverge-surface{padding:4px 8px;background:#FBFBFD}
 #glancePartBars .diverge-row{min-height:46px;height:auto !important;padding:6px 8px;border-radius:8px;border-top:0 !important;margin:3px 0}
-#glancePartBars .diverge-row.is-over{background:#FFF1F1;border:1px solid #F2CACA !important}
+#glancePartBars .diverge-row.is-over{border:1px solid #F2CACA !important}
 #glancePartBars .diverge-row.is-under{background:#F7FAFE;border:1px solid #E3ECF7 !important}
 #glancePartBars .diverge-row.is-ok{background:#FAFAFC;border:1px solid #EEEEF2 !important}
 #glancePartBars .diverge-part-name{font-size:14px;font-weight:800}
@@ -168,7 +168,7 @@
   padding:14px 15px;
   border:1px solid #F0D0D0;
   border-radius:11px;
-  background:#FFF7F7;
+  background:#FFF;
 }
 .cause-card:first-child{ margin-top:14px; }
 .cause-card-head{
@@ -238,6 +238,14 @@
   background:#F6FAF7;
   color:#557060;
   font-size:13px;
+}
+
+
+/* Severity visualization */
+#glancePartBars .diverge-row,
+.cause-card,
+.cause-chip{
+  transition: background .15s ease, border-color .15s ease;
 }
 
 </style>
@@ -1856,6 +1864,28 @@ function displaySignedHours(value) {
   return (n > 0 ? '+' : '') + n + 'h';
 }
 
+function severityRatio(value, maxValue) {
+  const v = Math.max(0, Number(value || 0));
+  const m = Math.max(0.0001, Number(maxValue || 0));
+  return Math.max(0, Math.min(1, v / m));
+}
+function overRowStyle(value, maxValue) {
+  if (Number(value || 0) <= 0) return '';
+  const r = severityRatio(value, maxValue);
+  const alpha = 0.06 + 0.18 * r;
+  const borderAlpha = 0.16 + 0.34 * r;
+  return 'background:rgba(190,55,55,' + alpha.toFixed(3) + ');' +
+         'border-color:rgba(190,55,55,' + borderAlpha.toFixed(3) + ') !important;';
+}
+function causeSeverityStyle(value, maxValue) {
+  if (Number(value || 0) <= 0) return '';
+  const r = severityRatio(value, maxValue);
+  const alpha = 0.05 + 0.20 * r;
+  const borderAlpha = 0.15 + 0.35 * r;
+  return 'background:rgba(190,55,55,' + alpha.toFixed(3) + ');' +
+         'border-color:rgba(190,55,55,' + borderAlpha.toFixed(3) + ') !important;';
+}
+
 function round4(value) {
   return Math.round(Number(value || 0) * 10000) / 10000;
 }
@@ -2797,12 +2827,19 @@ async function autoSaveDiagnosisResult(storeName) {
       const scoped = glancePartScope === 'hall'
         ? allGaps.filter(g => g.part === '홀')
         : allGaps.filter(g => g.part !== '홀');
-      const ranked = scoped.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+      const ranked = scoped.slice().sort((a, b) => {
+        const aOver = a.gap > 0 ? 1 : 0;
+        const bOver = b.gap > 0 ? 1 : 0;
+        if (aOver !== bOver) return bOver - aOver;
+        if (aOver) return b.gap - a.gap;
+        return a.gap - b.gap;
+      });
       if (!ranked.length) {
         el.innerHTML = '<div class="part-gap-empty">표시할 파트 진단이 없습니다.</div>';
         return;
       }
       const maxAbs = Math.max(1, ...ranked.map(g => Math.abs(g.gap)));
+      const maxOver = Math.max(1, ...ranked.filter(g => g.gap > 0).map(g => g.gap));
 
       const rows = ranked.map(g => {
         const isOver = g.gap > 0.05, isUnder = g.gap < -0.05;
@@ -2815,7 +2852,7 @@ async function autoSaveDiagnosisResult(storeName) {
           ? ('left:50%; width:' + halfWidthPct + '%; background:' + color + ';')
           : ('left:' + (50 - halfWidthPct) + '%; width:' + halfWidthPct + '%; background:' + color + ';');
         return (
-          '<div class="diverge-row ' + rowClass + '">' +
+          '<div class="diverge-row ' + rowClass + '" style="' + overRowStyle(g.gap, maxOver) + '">' +
             '<div class="diverge-part-name">' + g.part + '</div>' +
             '<div class="part-hour-cell">목표 <b>' + displayHours(g.target) + 'h</b></div>' +
             '<div class="part-hour-cell">실제 <b>' + displayHours(g.actual) + 'h</b></div>' +
@@ -2851,6 +2888,8 @@ async function autoSaveDiagnosisResult(storeName) {
         .filter(g => g.gap > 0.5)
         .sort((a, b) => b.gap - a.gap)
         .slice(0, 4);
+
+      const maxPartGap = Math.max(1, ...overParts.map(x => x.gap));
 
       if (!overParts.length) {
         el.innerHTML =
@@ -2892,10 +2931,11 @@ async function autoSaveDiagnosisResult(storeName) {
       el.innerHTML = overParts.map((g, i) => {
         const causes = collectCauseBuckets(g.part);
         const topCauses = causes.slice(0, 3);
+        const maxCauseGap = Math.max(1, ...topCauses.map(x => x.diff));
 
         const causeHtml = topCauses.length
           ? topCauses.map((c, idx) =>
-              '<div class="cause-chip' + (idx === 0 ? ' primary' : '') + '">' +
+              '<div class="cause-chip' + (idx === 0 ? ' primary' : '') + '" style="' + causeSeverityStyle(c.diff, maxCauseGap) + '">' +
                 '<span class="cause-chip-label">' + c.dayType + ' · ' + c.block + '</span>' +
                 '<b>' + displaySignedHours(c.diff) + '</b>' +
               '</div>'
@@ -2903,7 +2943,7 @@ async function autoSaveDiagnosisResult(storeName) {
           : '<div class="cause-no-detail">특정 시간대 집중 없이 여러 구간에 분산되어 있습니다.</div>';
 
         return (
-          '<div class="cause-card">' +
+          '<div class="cause-card" style="' + causeSeverityStyle(g.gap, maxPartGap) + '">' +
             '<div class="cause-card-head">' +
               '<div><span class="cause-rank">0' + (i + 1) + '</span><span class="cause-part">' + g.part + '</span></div>' +
               '<div class="cause-total">' + displaySignedHours(g.gap) + ' 과다</div>' +
