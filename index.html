@@ -26,6 +26,56 @@
 .dual-upload-file-name.selected{color:#4A6CF7;font-weight:600}
 .dual-upload-action{display:flex;justify-content:center;margin-top:18px}
 @media(max-width:760px){.dual-upload-grid{grid-template-columns:1fr}.dual-upload-box{min-height:0;padding:22px 16px 26px}}
+
+/* ===== 통합 종합현황 ===== */
+.overview-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
+.overview-toolbar select,.overview-toolbar input{
+  height:40px;border:1px solid #D9DEE8;border-radius:9px;background:#fff;
+  color:#30384A;padding:0 12px;font-size:13px;outline:none
+}
+.overview-toolbar select{min-width:230px}
+.overview-toolbar input{width:250px}
+.overview-refresh{
+  height:40px;padding:0 14px;border:1px solid #D9DEE8;border-radius:9px;
+  background:#fff;color:#4E5668;font-size:13px;font-weight:700;cursor:pointer
+}
+#overviewLoadStatus{margin-left:auto;color:#8B93A5;font-size:12px}
+.overview-kpi-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.overview-kpi{
+  background:#fff;border:1px solid #E5E8EE;border-radius:12px;padding:17px 18px
+}
+.overview-kpi-label{font-size:12px;color:#8B93A5;margin-bottom:8px}
+.overview-kpi-value{font-size:25px;font-weight:800;color:#252B39;letter-spacing:-.4px}
+.overview-kpi-hint{font-size:11px;color:#A7AEBD;margin-top:5px}
+.overview-table-card{background:#fff;border:1px solid #E5E8EE;border-radius:12px;overflow:hidden}
+.overview-table-head{
+  padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid #EEF0F4
+}
+.overview-table-title{font-size:14px;font-weight:800;color:#30384A}
+.overview-table-wrap{overflow:auto}
+.overview-table{border-collapse:collapse;width:100%;min-width:1080px}
+.overview-table th,.overview-table td{
+  border-bottom:1px solid #EEF0F4;padding:13px 12px;text-align:right;white-space:nowrap;font-size:12px
+}
+.overview-table th{background:#FAFBFC;color:#8B93A5;font-weight:700}
+.overview-table th:first-child,.overview-table td:first-child{text-align:left}
+.overview-table tbody tr:hover{background:#FAFBFF}
+.overview-table tbody tr:last-child td{border-bottom:0}
+.overview-store{font-weight:800;color:#272D3A}
+.overview-gap-plus{color:#D6452F;font-weight:800}
+.overview-gap-minus{color:#17845B;font-weight:800}
+.overview-gap-zero{color:#566071;font-weight:800}
+.overview-pill{
+  display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;
+  background:#F1F3F7;color:#667085;font-size:11px;font-weight:700
+}
+.overview-empty{padding:50px 16px !important;text-align:center !important;color:#A7AEBD}
+@media(max-width:900px){
+  .overview-kpi-row{grid-template-columns:repeat(2,1fr)}
+  #overviewLoadStatus{width:100%;margin-left:0}
+}
+
 </style>
 </head>
 <body>
@@ -34,6 +84,7 @@
     <div class="sidebar-brand">애슐리 진단</div>
     <div class="sidebar-sub">스케줄링 사전 피드백</div>
     <div class="sidebar-section-label">General</div>
+    <button class="nav-btn" data-view="overview">종합현황</button>
     <button class="nav-btn active" data-view="glance">요약</button>
     <button class="nav-btn" data-view="weekly">주간진단</button>
     <button class="nav-btn" data-view="daily">일간진단</button>
@@ -43,14 +94,13 @@
     <button class="nav-btn" data-view="backdata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>백데이터</button>
     <div class="sidebar-divider"></div>
     <a id="reuploadLink" href="#" style="display:none; padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px;">다른 파일 업로드</a> <span id="autoSaveStatus" style="margin-left:10px;font-size:12px;color:#667085;"></span>
-    <a href="admin.html" style="padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px; display:block;">관리자 페이지</a>
   </nav>
   <main class="main-content">
 
-  <div class="sub" style="color:#888; font-size:13px; margin-bottom:20px;">파일만 올리면 바로 진단됩니다. 계산은 브라우저 안에서 처리되며, "결과 저장"을 누른 경우에만 요약 결과가 중앙 관리자 페이지로 전송됩니다.</div>
+  <div class="sub" style="color:#888; font-size:13px; margin-bottom:20px;">UP 파일을 진단하면 결과가 자동 저장되며, 종합현황에서 주차별 매장 상태를 확인할 수 있습니다.</div>
 
   <div id="viewingStoreBar" style="display:none; background:#eaf2fb; border-radius:8px; padding:12px 18px; margin-bottom:16px; font-size:13px;">
-    <a href="admin.html" style="color:#4a6cf7; text-decoration:none; font-weight:bold;">← 관리자 페이지로</a>
+    <a href="#" id="overviewBackLink" style="color:#4a6cf7; text-decoration:none; font-weight:bold;">← 종합현황으로</a>
     <span style="color:#555;"> · 저장된 결과를 보고 있습니다: <b id="viewingStoreName"></b></span>
   </div>
 
@@ -90,6 +140,69 @@
   </div>
 
   <div id="app">
+
+
+  <!-- ===================== 종합현황 (전 매장 주차별) ===================== -->
+  <div class="view-panel" id="view-overview">
+    <div class="daily-page-title">종합현황</div>
+    <div class="daily-page-sub">각 매장에서 진단한 스케줄 결과를 주차별로 모아 비교합니다.</div>
+
+    <div class="overview-toolbar">
+      <select id="overviewWeekSelect"></select>
+      <input id="overviewSearchInput" type="text" placeholder="매장 검색">
+      <button class="overview-refresh" id="overviewRefreshBtn" type="button">새로고침</button>
+      <div id="overviewLoadStatus">불러오는 중...</div>
+    </div>
+
+    <div class="overview-kpi-row">
+      <div class="overview-kpi">
+        <div class="overview-kpi-label">저장 매장</div>
+        <div class="overview-kpi-value" id="overviewKpiStores">-</div>
+        <div class="overview-kpi-hint">선택 주차 기준</div>
+      </div>
+      <div class="overview-kpi">
+        <div class="overview-kpi-label">전체 실제인시</div>
+        <div class="overview-kpi-value" id="overviewKpiActual">-</div>
+        <div class="overview-kpi-hint">전 매장 합계</div>
+      </div>
+      <div class="overview-kpi">
+        <div class="overview-kpi-label">전체 표준인시</div>
+        <div class="overview-kpi-value" id="overviewKpiStandard">-</div>
+        <div class="overview-kpi-hint">전 매장 합계</div>
+      </div>
+      <div class="overview-kpi">
+        <div class="overview-kpi-label">전체 Gap</div>
+        <div class="overview-kpi-value" id="overviewKpiGap">-</div>
+        <div class="overview-kpi-hint">실제 - 표준</div>
+      </div>
+    </div>
+
+    <div class="overview-table-card">
+      <div class="overview-table-head">
+        <div class="overview-table-title">매장별 주간 현황</div>
+      </div>
+      <div class="overview-table-wrap">
+        <table class="overview-table">
+          <thead>
+            <tr>
+              <th>매장</th>
+              <th>예상매출</th>
+              <th>객수</th>
+              <th>실제인시</th>
+              <th>표준인시</th>
+              <th>Gap</th>
+              <th>Gap%</th>
+              <th>주방 Gap</th>
+              <th>홀 Gap</th>
+              <th>모델</th>
+              <th>최종 저장</th>
+            </tr>
+          </thead>
+          <tbody id="overviewTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <!-- ===================== 한눈에 (1페이지 요약) ===================== -->
   <div class="view-panel active" id="view-glance">
@@ -309,6 +422,215 @@
 </div>
 
   <script>
+
+
+// ==================== 종합현황 (전 매장 주차별) ====================
+let overviewRows = [];
+let overviewWeeks = [];
+let overviewLoaded = false;
+
+function overviewN1(v) {
+  return Number(v || 0).toLocaleString('ko-KR', { maximumFractionDigits: 1 });
+}
+function overviewSales(v) {
+  const n = Number(v || 0);
+  if (n >= 100000000) return (n / 100000000).toFixed(2) + '억';
+  if (n >= 10000) return Math.round(n / 10000).toLocaleString('ko-KR') + '만';
+  return Math.round(n).toLocaleString('ko-KR');
+}
+function overviewGapClass(v) {
+  return Number(v) > 0 ? 'overview-gap-plus' :
+         Number(v) < 0 ? 'overview-gap-minus' : 'overview-gap-zero';
+}
+function overviewSignHours(v) {
+  const n = Number(v || 0);
+  return (n > 0 ? '+' : '') + overviewN1(n) + 'h';
+}
+function overviewPct(v) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '-';
+  const n = Number(v);
+  return (n > 0 ? '+' : '') + n.toFixed(1) + '%';
+}
+function overviewFormatSavedAt(iso) {
+  if (!iso) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false
+  }).format(new Date(iso));
+}
+function overviewEscapeHtml(value) {
+  return String(value)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'",'&#039;');
+}
+
+async function loadOverviewData(force = false) {
+  if (overviewLoaded && !force) {
+    renderOverview();
+    return;
+  }
+
+  const statusEl = document.getElementById('overviewLoadStatus');
+  if (statusEl) statusEl.textContent = '불러오는 중...';
+
+  try {
+    const res = await fetch('/api/admin-weekly-summary');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '조회 실패');
+
+    overviewRows = data.rows || [];
+    overviewWeeks = data.weeks || [];
+    overviewLoaded = true;
+
+    renderOverviewWeekOptions();
+    renderOverview();
+
+    if (statusEl) statusEl.textContent = `총 ${overviewRows.length}개 주차별 매장 데이터`;
+  } catch (err) {
+    if (statusEl) statusEl.textContent = '오류: ' + err.message;
+    const body = document.getElementById('overviewTableBody');
+    if (body) {
+      body.innerHTML = '<tr><td colspan="11" class="overview-empty">데이터를 불러오지 못했습니다.</td></tr>';
+    }
+  }
+}
+
+function renderOverviewWeekOptions() {
+  const select = document.getElementById('overviewWeekSelect');
+  if (!select) return;
+
+  const current = select.value;
+  select.innerHTML = '';
+
+  if (!overviewWeeks.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '저장된 주차 없음';
+    select.appendChild(opt);
+    return;
+  }
+
+  overviewWeeks.forEach((week, i) => {
+    const opt = document.createElement('option');
+    opt.value = week.weekStart;
+    opt.textContent = week.weekLabel;
+    if ((current && current === week.weekStart) || (!current && i === 0)) {
+      opt.selected = true;
+    }
+    select.appendChild(opt);
+  });
+}
+
+function getOverviewFilteredRows() {
+  const weekStart = document.getElementById('overviewWeekSelect')?.value || '';
+  const keyword = (document.getElementById('overviewSearchInput')?.value || '').trim().toLowerCase();
+
+  return overviewRows.filter(row => {
+    const sameWeek = !weekStart || row.week_start === weekStart;
+    const matches = !keyword || String(row.store_name || '').toLowerCase().includes(keyword);
+    return sameWeek && matches;
+  });
+}
+
+function renderOverview() {
+  const rows = getOverviewFilteredRows();
+
+  const actual = rows.reduce((sum, row) => sum + Number(row.actual_hours || 0), 0);
+  const standard = rows.reduce((sum, row) => sum + Number(row.standard_hours || 0), 0);
+  const gap = actual - standard;
+
+  const storesEl = document.getElementById('overviewKpiStores');
+  const actualEl = document.getElementById('overviewKpiActual');
+  const standardEl = document.getElementById('overviewKpiStandard');
+  const gapEl = document.getElementById('overviewKpiGap');
+
+  if (storesEl) storesEl.textContent = rows.length + '개';
+  if (actualEl) actualEl.textContent = overviewN1(actual) + 'h';
+  if (standardEl) standardEl.textContent = overviewN1(standard) + 'h';
+  if (gapEl) {
+    gapEl.textContent = overviewSignHours(gap);
+    gapEl.className = 'overview-kpi-value ' + overviewGapClass(gap);
+  }
+
+  const body = document.getElementById('overviewTableBody');
+  if (!body) return;
+
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="11" class="overview-empty">선택한 주차에 저장된 매장이 없습니다.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = rows.map(row => `
+    <tr>
+      <td><span class="overview-store">${overviewEscapeHtml(row.store_name || '-')}</span></td>
+      <td>${overviewSales(row.expected_sales)}</td>
+      <td>${Math.round(Number(row.guest_count || 0)).toLocaleString('ko-KR')}</td>
+      <td>${overviewN1(row.actual_hours)}h</td>
+      <td>${overviewN1(row.standard_hours)}h</td>
+      <td class="${overviewGapClass(row.gap_hours)}">${overviewSignHours(row.gap_hours)}</td>
+      <td class="${overviewGapClass(row.gap_pct)}">${overviewPct(row.gap_pct)}</td>
+      <td class="${overviewGapClass(row.kitchen_gap_hours)}">${overviewSignHours(row.kitchen_gap_hours)}</td>
+      <td class="${overviewGapClass(row.hall_gap_hours)}">${overviewSignHours(row.hall_gap_hours)}</td>
+      <td><span class="overview-pill">V${overviewEscapeHtml(row.model_version || '-')}</span></td>
+      <td>${overviewFormatSavedAt(row.updated_at || row.saved_at)}</td>
+    </tr>
+  `).join('');
+}
+
+function activateMainView(viewName) {
+  const btn = document.querySelector(`.nav-btn[data-view="${viewName}"]`);
+  if (!btn) return;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('view-' + viewName);
+  if (panel) panel.classList.add('active');
+
+  if (viewName === 'overview') {
+    loadOverviewData(false);
+  }
+}
+
+function setupOverviewControls() {
+  const weekSelect = document.getElementById('overviewWeekSelect');
+  const searchInput = document.getElementById('overviewSearchInput');
+  const refreshBtn = document.getElementById('overviewRefreshBtn');
+  const backLink = document.getElementById('overviewBackLink');
+
+  if (weekSelect && !weekSelect.dataset.bound) {
+    weekSelect.addEventListener('change', renderOverview);
+    weekSelect.dataset.bound = '1';
+  }
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.addEventListener('input', renderOverview);
+    searchInput.dataset.bound = '1';
+  }
+  if (refreshBtn && !refreshBtn.dataset.bound) {
+    refreshBtn.addEventListener('click', () => loadOverviewData(true));
+    refreshBtn.dataset.bound = '1';
+  }
+  if (backLink && !backLink.dataset.bound) {
+    backLink.addEventListener('click', e => {
+      e.preventDefault();
+      activateMainView('overview');
+    });
+    backLink.dataset.bound = '1';
+  }
+
+  // 진단 전에도 종합현황 탭을 사용할 수 있도록 전역 네비게이션 연결
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    if (btn.dataset.overviewGlobalBound) return;
+    btn.addEventListener('click', () => {
+      if (btn.dataset.view === 'overview') {
+        activateMainView('overview');
+      }
+    });
+    btn.dataset.overviewGlobalBound = '1';
+  });
+}
+
 
 // ==================== CONFIG (Code.gs 최신본과 동일) ====================
 const COLOR_TO_PART_DEFAULT = {
@@ -1213,6 +1535,7 @@ async function autoSaveDiagnosisResult(storeName) {
     autoSaveStatusEl.textContent = `✓ ${savedWeek} 자동 저장 완료`;
   }
 
+  overviewLoaded = false;
   console.log('[STEP B3] weekly_store_summary auto-saved', adminWeeklySummary);
   return data;
 }
@@ -2656,7 +2979,9 @@ async function autoSaveDiagnosisResult(storeName) {
           btns.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-          document.getElementById('view-' + btn.dataset.view).classList.add('active');
+          const panel = document.getElementById('view-' + btn.dataset.view);
+          if (panel) panel.classList.add('active');
+          if (btn.dataset.view === 'overview') loadOverviewData(false);
         };
       });
     }
@@ -2751,16 +3076,18 @@ async function autoSaveDiagnosisResult(storeName) {
         const record = (data.stores || []).find(s => s.storeName === storeName);
         if (!record || !record.result) {
           document.getElementById('viewingStoreBar').innerHTML =
-            '<a href="admin.html" style="color:#4a6cf7;">← 관리자 페이지로</a> · 저장된 결과를 찾을 수 없습니다: ' + storeName;
+            '<a href="#" onclick="activateMainView(\'overview\');return false;" style="color:#4a6cf7;">← 종합현황으로</a> · 저장된 결과를 찾을 수 없습니다: ' + storeName;
           return;
         }
         document.getElementById('app').style.display = 'block';
         renderApp(record.result);
       } catch (err) {
         document.getElementById('viewingStoreBar').innerHTML =
-          '<a href="admin.html" style="color:#4a6cf7;">← 관리자 페이지로</a> · 오류: ' + err.message;
+          '<a href="#" onclick="activateMainView(\'overview\');return false;" style="color:#4a6cf7;">← 종합현황으로</a> · 오류: ' + err.message;
       }
     })();
-  </script>
+  
+setupOverviewControls();
+</script>
 </body>
 </html>
