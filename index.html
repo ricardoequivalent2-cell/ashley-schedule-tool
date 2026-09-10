@@ -10,6 +10,23 @@
   <script src="./js/up-parser.js"></script>
   <script src="./js/common-utils.js"></script>
   <script src="./js/up-diagnosis-adapter.js"></script>
+<style>
+.dual-upload-box{min-height:350px;padding:28px 28px 30px;box-sizing:border-box}
+.dual-upload-heading{text-align:center;font-weight:700;font-size:16px;margin:2px 0 8px}
+.dual-upload-guide{text-align:center;font-size:12px;color:#8B93A5;margin-bottom:22px}
+.dual-upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.dual-upload-card{padding:16px;border:1px solid #E4E7EC;border-radius:12px;background:#FAFBFC}
+.dual-upload-title{text-align:center;font-size:13px;font-weight:700;margin-bottom:10px}
+.up-drop-zone{min-height:118px;border:1.5px dashed #C8CFDD;border-radius:10px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.15s ease;user-select:none}
+.up-drop-zone:hover,.up-drop-zone.drag-over{border-color:#4A6CF7;background:#F5F7FF}
+.drop-icon{width:30px;height:30px;border-radius:50%;background:#EEF2FF;color:#4A6CF7;display:flex;align-items:center;justify-content:center;font-weight:800;margin-bottom:7px}
+.drop-main{font-size:13px;font-weight:600;color:#30384A}
+.drop-sub{font-size:11px;color:#9AA2B2;margin-top:4px}
+.dual-upload-file-name{text-align:center;font-size:11px;color:#8B93A5;margin-top:8px;min-height:16px;overflow-wrap:anywhere}
+.dual-upload-file-name.selected{color:#4A6CF7;font-weight:600}
+.dual-upload-action{display:flex;justify-content:center;margin-top:18px}
+@media(max-width:760px){.dual-upload-grid{grid-template-columns:1fr}.dual-upload-box{min-height:0;padding:22px 16px 26px}}
+</style>
 </head>
 <body>
 <div class="app-shell">
@@ -37,25 +54,37 @@
     <span style="color:#555;"> · 저장된 결과를 보고 있습니다: <b id="viewingStoreName"></b></span>
   </div>
 
-  <div class="upload-box" id="uploadBox">
-    <div style="font-weight:700; margin-bottom:4px;">파트정보 UP 파일 업로드</div>
-    <div style="font-size:12px;color:#999;margin-bottom:14px;">현장 운영 방식에 맞춰 <b>주방 스케줄</b>과 <b>홀 스케줄</b>로 구분해 올릴 수 있습니다. 단, 시스템은 업로드 위치가 아니라 <b>UP 내부 오전파트/오후파트</b>를 기준으로 실제 주방·홀을 자동 분류합니다.</div>
+  <div class="upload-box dual-upload-box" id="uploadBox">
+    <div class="dual-upload-heading">스케줄 UP 파일 업로드</div>
+    <div class="dual-upload-guide">주방 스케줄과 홀 스케줄을 각각 업로드해주세요. 통합해서 관리하고 있다면 하나만 올리셔도 됩니다.</div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-      <label style="display:block;padding:14px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">주방 스케줄 UP</div>
-        <input type="file" id="kitchenFileInput" accept=".up" style="width:100%;">
-        <div id="kitchenFileStatus" style="font-size:11px;color:#8B93A5;margin-top:6px;">선택 안 됨</div>
-      </label>
-      <label style="display:block;padding:14px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">홀 스케줄 UP</div>
-        <input type="file" id="hallFileInput" accept=".up" style="width:100%;">
-        <div id="hallFileStatus" style="font-size:11px;color:#8B93A5;margin-top:6px;">선택 안 됨</div>
-      </label>
+    <div class="dual-upload-grid">
+      <div class="dual-upload-card">
+        <div class="dual-upload-title">주방 스케줄 UP</div>
+        <label class="up-drop-zone" id="kitchenDropZone" for="kitchenFileInput">
+          <input type="file" id="kitchenFileInput" accept=".up" hidden>
+          <div class="drop-icon">↑</div>
+          <div class="drop-main">UP 파일을 여기에 끌어다 놓으세요</div>
+          <div class="drop-sub">또는 클릭해서 파일 선택</div>
+        </label>
+        <div id="kitchenFileStatus" class="dual-upload-file-name">선택 안 됨</div>
+      </div>
+
+      <div class="dual-upload-card">
+        <div class="dual-upload-title">홀 스케줄 UP</div>
+        <label class="up-drop-zone" id="hallDropZone" for="hallFileInput">
+          <input type="file" id="hallFileInput" accept=".up" hidden>
+          <div class="drop-icon">↑</div>
+          <div class="drop-main">UP 파일을 여기에 끌어다 놓으세요</div>
+          <div class="drop-sub">또는 클릭해서 파일 선택</div>
+        </label>
+        <div id="hallFileStatus" class="dual-upload-file-name">선택 안 됨</div>
+      </div>
     </div>
 
-    <button id="runDiagnosisBtn" type="button" style="padding:9px 18px;background:#4a6cf7;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer;">진단 시작</button>
-    <div style="font-size:11px;color:#999;margin-top:8px;">한 파일만 올려도 진단됩니다. 두 파일을 올리면 먼저 통합한 뒤 중복을 제거하고, 내부 파트값으로 <b>전체 / 주방 / 홀</b>을 자동 분류합니다.</div>
+    <div class="dual-upload-action">
+      <button id="runDiagnosisBtn" type="button" style="padding:9px 18px;background:#4a6cf7;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer;">진단 시작</button>
+    </div>
     <div id="status" style="margin-top:10px;"></div>
     <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
       <label style="font-size:13px; color:#555;">매장명: </label>
@@ -600,6 +629,63 @@ function updateSelectedFileLabels() {
     kitchenFile ? kitchenFile.name : '선택 안 됨';
   document.getElementById('hallFileStatus').textContent =
     hallFile ? hallFile.name : '선택 안 됨';
+}
+
+function refreshUploadFileStyle() {
+  ['kitchen', 'hall'].forEach(prefix => {
+    const input = document.getElementById(prefix + 'FileInput');
+    const status = document.getElementById(prefix + 'FileStatus');
+    if (input && status) status.classList.toggle('selected', !!(input.files && input.files[0]));
+  });
+}
+
+function assignDroppedUpFile(input, file) {
+  if (!file) return;
+  if (!/\.up$/i.test(file.name || '')) {
+    const statusEl = document.getElementById('status');
+    statusEl.className = 'error';
+    statusEl.textContent = '오류: .up 파일만 업로드할 수 있습니다.';
+    return;
+  }
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  input.files = dt.files;
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function initDualUpDropZones() {
+  [
+    ['kitchenFileInput', 'kitchenDropZone'],
+    ['hallFileInput', 'hallDropZone']
+  ].forEach(([inputId, zoneId]) => {
+    const input = document.getElementById(inputId);
+    const zone = document.getElementById(zoneId);
+    if (!input || !zone) return;
+
+    input.addEventListener('change', refreshUploadFileStyle);
+
+    ['dragenter', 'dragover'].forEach(type => zone.addEventListener(type, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.add('drag-over');
+    }));
+    ['dragleave', 'drop'].forEach(type => zone.addEventListener(type, e => {
+      e.preventDefault();
+      e.stopPropagation();
+      zone.classList.remove('drag-over');
+    }));
+    zone.addEventListener('drop', e => {
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      assignDroppedUpFile(input, file);
+    });
+  });
+  refreshUploadFileStyle();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDualUpDropZones);
+} else {
+  initDualUpDropZones();
 }
 
 function mergeParsedUpData(firstParsed, secondParsed) {
