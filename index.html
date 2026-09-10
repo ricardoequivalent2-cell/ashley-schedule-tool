@@ -157,6 +157,89 @@
 #glancePartBars .diverge-badge{font-size:12px;font-weight:800;text-align:right}
 #glancePartBars .part-gap-empty{padding:28px 12px;text-align:center;color:#9AA2B1;font-size:13px}
 
+
+/* 요약 우측: 문제 발생 위치 */
+.glance-main-right .section-sub{
+  font-size:13px;
+  color:#7D8697;
+}
+.cause-card{
+  margin-top:12px;
+  padding:14px 15px;
+  border:1px solid #F0D0D0;
+  border-radius:11px;
+  background:#FFF7F7;
+}
+.cause-card:first-child{ margin-top:14px; }
+.cause-card-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.cause-rank{
+  display:inline-block;
+  width:28px;
+  font-size:11px;
+  color:#B0B6C2;
+  font-weight:700;
+}
+.cause-part{
+  font-size:16px;
+  color:#252A34;
+  font-weight:800;
+}
+.cause-total{
+  font-size:15px;
+  color:#B33F3F;
+  font-weight:800;
+}
+.cause-card-label{
+  margin:10px 0 7px 28px;
+  font-size:11px;
+  color:#9AA2B1;
+  font-weight:700;
+}
+.cause-chip-wrap{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-left:28px;
+}
+.cause-chip{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 10px;
+  border-radius:8px;
+  background:#FFFFFF;
+  border:1px solid #E9E9EE;
+  font-size:12px;
+  color:#5E6675;
+}
+.cause-chip.primary{
+  background:#FCE8E8;
+  border-color:#EABABA;
+}
+.cause-chip b{
+  color:#A34848;
+  font-size:13px;
+}
+.cause-chip-label{ font-weight:700; }
+.cause-no-detail{
+  font-size:12px;
+  color:#8B93A5;
+  padding:4px 0;
+}
+.cause-empty{
+  margin-top:14px;
+  padding:18px;
+  border-radius:10px;
+  background:#F6FAF7;
+  color:#557060;
+  font-size:13px;
+}
+
 </style>
 </head>
 <body>
@@ -344,21 +427,9 @@
       <div class="section-card glance-main-right">
         <div class="glance-summary-stack">
           <div class="summary-section">
-            <div class="section-title">주요 진단</div>
+            <div class="section-title">문제 발생 위치</div>
+            <div class="section-sub" style="margin-top:4px;">과다 파트가 <b>평일/주말 · 어느 시간대</b>에서 발생했는지 보여줍니다.</div>
             <div id="glanceComments"></div>
-          </div>
-          <div class="summary-section">
-            <div class="glance-mini-title">운영 효율 요약</div>
-            <div id="glanceEfficiencySummary"></div>
-          </div>
-          <div class="summary-section compact-rank-card">
-            <div class="section-title-row" style="margin-bottom:6px;">
-              <div class="glance-mini-title" style="margin-bottom:0;">반복 과다 TOP 3</div>
-              <div class="drill-link-sub">
-                <span onclick="document.querySelector('[data-view=weekly]').click();">상세보기</span>
-              </div>
-            </div>
-            <div id="glanceTop3"></div>
           </div>
         </div>
       </div>
@@ -1977,7 +2048,7 @@ async function autoSaveDiagnosisResult(storeName) {
         '</div>';
 
       const divIds = [
-        'glanceDonut','glanceComments','glanceEfficiencySummary','glanceTop3',
+        'glanceDonut','glanceComments',
         'glanceHallScoreCards','glanceHallBlockChart','glanceScoreCards','glanceBlockChart',
         'weeklyDayBlockHeatmap','partRanking','weeklyComments',
         'dailyDonut','dailyComments','heatmapContainer','compareTableContainer','dailyPartRanking'
@@ -2769,32 +2840,76 @@ async function autoSaveDiagnosisResult(storeName) {
         '</div>';
     }
 
-    // 이번 주 가장 문제 큰 요일/시간대/파트 - 요약 화면의 핵심 코멘트
+    // 요약 우측: 파트 중복 순위가 아니라 '문제가 어디에서 발생했는지'를 보여준다.
+    // 좌측에서 이미 파트별 총 Gap을 보여주므로, 우측은 평일/주말 × 시간대 원인에 집중한다.
     function renderGlanceComments() {
       const el = document.getElementById('glanceComments');
-      const gaps = computeWeekPartGaps();
-      const ranked = gaps.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap)).slice(0, 3);
+      if (!el) return;
 
-      if (!ranked.length) {
-        el.innerHTML = '<div style="font-size:12.5px; color:#9AA1B0; padding:6px 0;">이번 주는 뚜렷한 과다 없이 전반적으로 안정적입니다.</div>';
+      const gaps = computeWeekPartGaps();
+      const overParts = gaps
+        .filter(g => g.gap > 0.5)
+        .sort((a, b) => b.gap - a.gap)
+        .slice(0, 4);
+
+      if (!overParts.length) {
+        el.innerHTML =
+          '<div class="cause-empty">이번 주 2차목표 대비 뚜렷한 과다 파트가 없습니다.</div>';
         return;
       }
-      const ordinalKo = ['', '', '두 번째로', '세 번째로', '네 번째로', '다섯 번째로'];
-      const seenCount = { '과다': 0, '절감': 0 };
-      el.innerHTML = ranked.map((g, i) => {
-        const dir = g.gap > 0 ? '과다' : '절감';
-        seenCount[dir]++;
-        const ord = seenCount[dir];
-        const meaning = ord === 1
-          ? (dir === '과다' ? '가장 큰 인력 과다' : '가장 큰 인시 절감')
-          : ordinalKo[ord] + ' 큰 ' + (dir === '과다' ? '축소 필요 파트' : '인시 절감 파트');
-        const color = g.gap > 0 ? '#A34848' : '#2C6690';
+
+      function collectCauseBuckets(part) {
+        const bucketMap = {};
+        dateHeaders.forEach(d => {
+          const dayType = isWeekendDay(d) ? '주말' : '평일';
+
+          if (part === '홀') {
+            (hallBlockDiagnosis[d] || []).forEach(b => {
+              const diff = Number(b.netDiffHours || 0);
+              if (diff <= 0) return;
+              const key = dayType + '|' + b.name;
+              if (!bucketMap[key]) bucketMap[key] = { dayType, block: b.name, diff: 0, days: 0 };
+              bucketMap[key].diff += diff;
+              bucketMap[key].days += 1;
+            });
+          } else {
+            (blockDiagnosis[d] || []).forEach(b => {
+              const diff = Number((b.partDiffHours && b.partDiffHours[part]) || 0);
+              if (diff <= 0) return;
+              const key = dayType + '|' + b.name;
+              if (!bucketMap[key]) bucketMap[key] = { dayType, block: b.name, diff: 0, days: 0 };
+              bucketMap[key].diff += diff;
+              bucketMap[key].days += 1;
+            });
+          }
+        });
+
+        return Object.values(bucketMap)
+          .filter(x => x.diff > 0.5)
+          .sort((a, b) => b.diff - a.diff);
+      }
+
+      el.innerHTML = overParts.map((g, i) => {
+        const causes = collectCauseBuckets(g.part);
+        const topCauses = causes.slice(0, 3);
+
+        const causeHtml = topCauses.length
+          ? topCauses.map((c, idx) =>
+              '<div class="cause-chip' + (idx === 0 ? ' primary' : '') + '">' +
+                '<span class="cause-chip-label">' + c.dayType + ' · ' + c.block + '</span>' +
+                '<b>' + displaySignedHours(c.diff) + '</b>' +
+              '</div>'
+            ).join('')
+          : '<div class="cause-no-detail">특정 시간대 집중 없이 여러 구간에 분산되어 있습니다.</div>';
+
         return (
-          '<div class="insight-row">' +
-            '<div class="insight-rank">0' + (i + 1) + '</div>' +
-            '<div class="insight-part">' + g.part + '</div>' +
-            '<div class="insight-val" style="color:' + color + ';">' + displaySignedHours(g.gap) + '</div>' +
-            '<div class="insight-meaning">' + meaning + '</div>' +
+          '<div class="cause-card">' +
+            '<div class="cause-card-head">' +
+              '<div><span class="cause-rank">0' + (i + 1) + '</span><span class="cause-part">' + g.part + '</span></div>' +
+              '<div class="cause-total">' + displaySignedHours(g.gap) + ' 과다</div>' +
+            '</div>' +
+            '<div class="cause-card-label">주요 발생 구간</div>' +
+            '<div class="cause-chip-wrap">' + causeHtml + '</div>' +
           '</div>'
         );
       }).join('');
@@ -2848,8 +2963,8 @@ async function autoSaveDiagnosisResult(storeName) {
         const bg = isOver ? '#F7E3E3' : (isUnder ? '#DCEEFB' : '#E3F1E8');
         const fg = isOver ? '#A34848' : (isUnder ? '#2C6690' : '#3D8361');
         html += '<tr class="row-actual group-start"><td>' + d + '</td><td>' + (t.salesVal || 0).toLocaleString() + '원</td>' +
-          '<td>' + t.target2 + 'h</td><td>' + t.actualTotal + 'h</td>' +
-          '<td style="color:' + fg + '; font-weight:700;">' + (gap > 0 ? '+' : '') + gap + 'h</td>' +
+          '<td>' + displayHours(t.target2) + 'h</td><td>' + displayHours(t.actualTotal) + 'h</td>' +
+          '<td style="color:' + fg + '; font-weight:700;">' + displaySignedHours(gap) + '</td>' +
           '<td><span class="kpi-badge" style="background:' + bg + '; color:' + fg + ';">' + label + '</span></td></tr>';
       });
       html += '</table>';
@@ -3334,9 +3449,7 @@ async function autoSaveDiagnosisResult(storeName) {
     }
 
     function renderGlanceAll() {
-      renderGlanceTop3();
       renderPartRanking();
-      renderGlanceEfficiencySummary();
       renderGlanceHallScoreCards();
       renderGlanceBlockChart('glanceHallBlockChart', hallBlockDiagnosis);
       renderGlanceScoreCards();
