@@ -533,8 +533,7 @@ function overviewStatus(gapPct) {
   return { key:'excess', label:'과다', cls:'overview-status-excess' };
 }
 function overviewSignHours(v) {
-  const n = Number(v || 0);
-  return (n > 0 ? '+' : '') + overviewN1(n) + 'h';
+  return displaySignedHours(v);
 }
 function overviewPct(v) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '-';
@@ -874,7 +873,7 @@ function renderOverview() {
 
   if (storesEl) storesEl.textContent = weekRows.length + '개';
   if (excessStoresEl) excessStoresEl.textContent = excessStores + '개';
-  if (excessHoursEl) excessHoursEl.textContent = '+' + overviewN1(excessHours) + 'h';
+  if (excessHoursEl) excessHoursEl.textContent = displaySignedHours(excessHours);
   if (gapPctEl) {
     gapPctEl.textContent = overviewPct(gapPct);
     gapPctEl.className = 'overview-kpi-value ' + overviewGapClass(gapPct);
@@ -1737,12 +1736,22 @@ function buildHeadlineSummary(result) {
   candidates.sort((a, b) => b.diff - a.diff);
   const top = candidates[0];
   const partText = top.part ? (top.part + ' 파트 중심, ') : '';
-  return top.source + ' ' + top.block + ' 과다 (' + partText + '주간 +' + top.diff + 'h)';
+  return top.source + ' ' + top.block + ' 과다 (' + partText + '주간 ' + displaySignedHours(top.diff) + ')';
 }
 
 
 function round1(value) {
   return Math.round(Number(value || 0) * 10) / 10;
+}
+
+// UX 표시용 시간: 계약/스케줄 단위에 맞춰 모든 '시간(h)'은 정수 반올림.
+// 계산 원본은 소수값을 그대로 유지하고, 화면에 보여줄 때만 반올림한다.
+function displayHours(value) {
+  return Math.round(Number(value || 0));
+}
+function displaySignedHours(value) {
+  const n = displayHours(value);
+  return (n > 0 ? '+' : '') + n + 'h';
 }
 
 function round4(value) {
@@ -2075,7 +2084,7 @@ async function autoSaveDiagnosisResult(storeName) {
 
       banner.innerHTML =
         '<div class="verdict-text">' + dateLabel + ' — ' + headline + '</div>' +
-        '<div class="tier-numbers"><b>' + t.actualTotal + 'h</b> (BHAG ' + t.target2 + 'h) · 주방' + t.kitchenActualHours + 'h · 홀' + t.hallActualHours + 'h' +
+        '<div class="tier-numbers"><b>' + displayHours(t.actualTotal) + 'h</b> (BHAG ' + displayHours(t.target2) + 'h) · 주방 ' + displayHours(t.kitchenActualHours) + 'h · 홀 ' + displayHours(t.hallActualHours) + 'h' +
         improveHtml + '</div>';
     }
 
@@ -2109,7 +2118,7 @@ async function autoSaveDiagnosisResult(storeName) {
             '<div class="block-name">' + b.name + '</div>' +
             '<div class="block-time">' + b.timeLabel + '</div>' +
             '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
-            '<div class="block-numbers">' + b.actualHours + 'h/' + b.standardHours + 'h</div>' +
+            '<div class="block-numbers">' + displayHours(b.actualHours) + 'h/' + displayHours(b.standardHours) + 'h</div>' +
           '</div>'
         );
       }).join('');
@@ -2147,10 +2156,10 @@ async function autoSaveDiagnosisResult(storeName) {
     }
     function diffPhrase(actualHours, standardHours, longForm) {
       const diff = actualHours - standardHours;
-      const abs = Math.round(Math.abs(diff) * 10) / 10;
+      const abs = displayHours(Math.abs(diff));
       const pct = placementRate(actualHours, standardHours);
       const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
-      const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
+      const core = abs === 0 ? '기준과 동일' : (sign + abs + 'h');
       const pctText = pct !== null ? (' · 배치율 ' + pct + '%') : '';
       return (longForm ? '기준대비 ' : '') + core + pctText;
     }
@@ -2161,10 +2170,10 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function blockDiffPhrase(actualHours, standardHours) {
       const diff = actualHours - standardHours;
-      const abs = Math.round(Math.abs(diff) * 10) / 10;
+      const abs = displayHours(Math.abs(diff));
       const ratio = placementRate(actualHours, standardHours);
       const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
-      const core = abs < 0.1 ? '기준과 동일' : (sign + abs + 'h');
+      const core = abs === 0 ? '기준과 동일' : (sign + abs + 'h');
       const ratioText = ratio !== null ? (' · 배치율 ' + ratio + '%') : '';
       return core + ratioText;
     }
@@ -2267,8 +2276,8 @@ async function autoSaveDiagnosisResult(storeName) {
       const cards = [
         { icon: '₩', bg: '#EDE9F9', fg: '#5B3FA0', label: '예상 매출', value: (t.salesVal || 0).toLocaleString() + '원' },
         { icon: '人', bg: '#DCEEFB', fg: '#2C6690', label: '예상 객수', value: t.guestCount + '명' },
-        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '2차 목표(BHAG) 총인시', value: t.target2 + 'h' },
-        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: t.actualTotal + 'h' },
+        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '2차 목표(BHAG) 총인시', value: displayHours(t.target2) + 'h' },
+        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: displayHours(t.actualTotal) + 'h' },
       ];
       let html = cards.map(c =>
         '<div class="kpi-card-5">' +
@@ -2280,7 +2289,7 @@ async function autoSaveDiagnosisResult(storeName) {
         '<div class="kpi-card-5">' +
           '<div class="kpi-icon" style="background:' + gapBg + '; color:' + gapFg + ';">!</div>' +
           '<div><div class="kpi-label">진단 결과 (종합)</div>' +
-          '<div class="kpi-value">' + (gap > 0 ? '+' : '') + gap + 'h' +
+          '<div class="kpi-value">' + displaySignedHours(gap) +
           '<span class="kpi-badge" style="background:' + gapBg + '; color:' + gapFg + ';">' + gapLabel + '</span></div></div>' +
         '</div>';
       el.innerHTML = html;
@@ -2478,21 +2487,30 @@ async function autoSaveDiagnosisResult(storeName) {
     function renderDailyPartRanking(dateLabel) {
       const el = document.getElementById('dailyPartRanking');
       const dayHeatmap = heatmap[dateLabel];
-      if (!dayHeatmap) { el.innerHTML = ''; return; }
+      const dayStd = standardSchedule[dateLabel];
+      const t = tierDiagnosis[dateLabel];
+      if (!dayHeatmap || !dayStd || !t) { el.innerHTML = ''; return; }
 
       const cols = getDailyDisplayParts();
       const totals = {};
-      cols.forEach(p => { totals[p] = 0; });
+      cols.forEach(p => { totals[p] = { actual: 0, target: 0 }; });
 
       slots.forEach(s => {
         cols.forEach(p => {
-          totals[p] += getDailyDiffValue(dayHeatmap, s, p);
+          const stdCount = getDailyStandardValue(dayStd, s, p);
+          const diffRaw = getDailyDiffValue(dayHeatmap, s, p);
+          const actualRawCount = diffRaw + stdCount;
+          const scale = (p === '홀') ? (t.hallScaleFactor || 1) : (t.kitchenScaleFactor || 1);
+          totals[p].actual += actualRawCount * 0.5 * scale;
+          totals[p].target += stdCount * 0.5;
         });
       });
 
       const ranked = cols.map(p => ({
         part: p,
-        diff: Math.round(totals[p] * 10) / 10
+        actual: totals[p].actual,
+        target: totals[p].target,
+        diff: totals[p].actual - totals[p].target
       })).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
 
       const maxAbs = Math.max(1, ...ranked.map(r => Math.abs(r.diff)));
@@ -2507,8 +2525,11 @@ async function autoSaveDiagnosisResult(storeName) {
         return (
           '<div class="part-rank-row">' +
             '<div class="part-rank-head">' +
-              '<span style="font-weight:600;">' + r.part + '</span>' +
-              '<span>' + (r.diff > 0 ? '+' : '') + r.diff + 'h &nbsp; ' +
+              '<span style="font-weight:600;">' + r.part +
+                '<span style="font-size:11px;color:#8B93A5;font-weight:400;margin-left:8px;">목표 ' +
+                displayHours(r.target) + 'h · 실제 ' + displayHours(r.actual) + 'h</span>' +
+              '</span>' +
+              '<span>' + displaySignedHours(r.diff) + ' &nbsp; ' +
                 '<b style="color:' + verdictColor + ';">' + verdictLabel + '</b></span>' +
             '</div>' +
             '<div class="part-rank-bar-bg"><div class="part-rank-bar-fill" style="width:' +
@@ -2553,7 +2574,7 @@ async function autoSaveDiagnosisResult(storeName) {
       const bg = isOver ? '#F7E3E3' : (isUnder ? '#DCEEFB' : '#E3F1E8');
 
       const numEl = document.getElementById('execGapNumber');
-      numEl.textContent = (gap > 0 ? '+' : '') + gap + 'h';
+      numEl.textContent = displaySignedHours(gap);
       numEl.style.color = color;
       const wordEl = document.getElementById('execGapWord');
       wordEl.textContent = word;
@@ -2585,8 +2606,8 @@ async function autoSaveDiagnosisResult(storeName) {
       const cards = [
         { icon: '₩', bg: '#EDE9F9', fg: '#5B3FA0', label: '주간 예상 매출', value: totalSales.toLocaleString() + '원' },
         { icon: '人', bg: '#DCEEFB', fg: '#2C6690', label: '주간 예상 객수', value: w.totalGuest + '명' },
-        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '2차 목표(BHAG) 총인시', value: w.totalTarget2 + 'h' },
-        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: w.totalActual + 'h' },
+        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '2차 목표(BHAG) 총인시', value: displayHours(w.totalTarget2) + 'h' },
+        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: displayHours(w.totalActual) + 'h' },
       ];
       let html = cards.map(c =>
         '<div class="kpi-card-5">' +
@@ -2598,7 +2619,7 @@ async function autoSaveDiagnosisResult(storeName) {
         '<div class="kpi-card-5">' +
           '<div class="kpi-icon" style="background:' + gapBg + '; color:' + gapFg + ';">!</div>' +
           '<div><div class="kpi-label">2차목표 대비 Gap</div>' +
-          '<div class="kpi-value">' + (gap > 0 ? '+' : '') + gap + 'h' +
+          '<div class="kpi-value">' + displaySignedHours(gap) +
           '<span class="kpi-badge" style="background:' + gapBg + '; color:' + gapFg + ';">' + gapLabel + '</span></div></div>' +
         '</div>';
       el.innerHTML = html;
@@ -2629,7 +2650,7 @@ async function autoSaveDiagnosisResult(storeName) {
     function computeWeekPartGaps() {
       const cols = PARTS.concat(['홀']);
       const totals = {};
-      cols.forEach(p => { totals[p] = 0; });
+      cols.forEach(p => { totals[p] = { actual: 0, target: 0 }; });
       dateHeaders.forEach(d => {
         const dayHeatmap = heatmap[d], dayStd = standardSchedule[d], t = tierDiagnosis[d];
         if (!dayHeatmap || !dayStd || !t) return;
@@ -2639,23 +2660,27 @@ async function autoSaveDiagnosisResult(storeName) {
             const diffRaw = (dayHeatmap[s] && dayHeatmap[s][p]) || 0;
             const actualRawCount = diffRaw + stdCount; // 원본 raw 실배치 인원(보정 전) 역산
             const scale = (p === '홀') ? (t.hallScaleFactor || 1) : (t.kitchenScaleFactor || 1);
-            const actualHours = actualRawCount * 0.5 * scale;
-            const stdHours = stdCount * 0.5;
-            totals[p] += (actualHours - stdHours);
+            totals[p].actual += actualRawCount * 0.5 * scale;
+            totals[p].target += stdCount * 0.5;
           });
         });
       });
-      return cols.map(p => ({ part: p, gap: Math.round(totals[p] * 10) / 10 }));
+      return cols.map(p => ({
+        part: p,
+        actual: totals[p].actual,
+        target: totals[p].target,
+        gap: totals[p].actual - totals[p].target
+      }));
     }
 
     function renderGlancePartGapSummary() {
       const el = document.getElementById('glanceDonut');
       const subEl = document.getElementById('glanceGapSub');
       const gaps = computeWeekPartGaps();
-      const totalGap = Math.round(gaps.reduce((s, g) => s + g.gap, 0) * 10) / 10;
+      const totalGap = gaps.reduce((s, g) => s + g.gap, 0);
       const totalWord = Math.abs(totalGap) < 0.5 ? '적정' : (totalGap > 0 ? '과다' : '절감');
       const totalColor = Math.abs(totalGap) < 0.5 ? '#3D8361' : (totalGap > 0 ? '#A34848' : '#2C6690');
-      subEl.innerHTML = '이번 주 <b style="color:' + totalColor + ';">' + (totalGap > 0 ? '+' : '') + totalGap + 'h ' + totalWord + '</b>';
+      subEl.innerHTML = '이번 주 <b style="color:' + totalColor + ';">' + displaySignedHours(totalGap) + ' ' + totalWord + '</b> · 모든 시간은 정수 반올림 표시';
 
       const ranked = gaps.slice().sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
       const maxAbs = Math.max(1, ...ranked.map(g => Math.abs(g.gap)));
@@ -2671,8 +2696,10 @@ async function autoSaveDiagnosisResult(storeName) {
           : ('left:' + (50 - halfWidthPct) + '%; width:' + halfWidthPct + '%;');
         return (
           '<div class="diverge-row">' +
-            '<div class="diverge-part-name">' + g.part + '</div>' +
-            '<div class="diverge-gap-num" style="color:' + color + ';">' + (g.gap > 0 ? '+' : '') + g.gap + 'h</div>' +
+            '<div class="diverge-part-name">' + g.part +
+              '<div style="font-size:11px;color:#8B93A5;margin-top:2px;">목표 ' + displayHours(g.target) + 'h · 실제 ' + displayHours(g.actual) + 'h</div>' +
+            '</div>' +
+            '<div class="diverge-gap-num" style="color:' + color + ';">' + displaySignedHours(g.gap) + '</div>' +
             '<div class="diverge-track"><div class="diverge-mini-baseline"></div><div class="diverge-fill" style="' + style + ' background:' + color + ';"></div></div>' +
             '<div class="diverge-badge" style="color:' + badgeFg + ';">' + action + '</div>' +
           '</div>'
@@ -2742,10 +2769,10 @@ async function autoSaveDiagnosisResult(storeName) {
 
       const rateColor = (v) => v === null ? '#6B7280' : (v < 100 ? '#2C6690' : (v > 100 ? '#A34848' : '#6B7280'));
       const items = [
-        { label: '홀 배치효율', value: hallRate === null ? '-' : hallRate + '%', color: rateColor(hallRate), sub: '실제 ' + weeklySummary.totalHall + 'h · 기준 ' + hallStd + 'h' },
-        { label: '주방 배치효율', value: kitchenRate === null ? '-' : kitchenRate + '%', color: rateColor(kitchenRate), sub: '실제 ' + weeklySummary.totalKitchen + 'h · 기준 ' + kitchenStd + 'h' },
-        { label: '절감 인시', value: savingHours + 'h', color: '#2C6690', sub: '기준 대비 절감 합계' },
-        { label: '과다 인시', value: '+' + overHours + 'h', color: '#A34848', sub: '기준 대비 과다 합계' },
+        { label: '홀 배치효율', value: hallRate === null ? '-' : hallRate + '%', color: rateColor(hallRate), sub: '실제 ' + displayHours(weeklySummary.totalHall) + 'h · 기준 ' + displayHours(hallStd) + 'h' },
+        { label: '주방 배치효율', value: kitchenRate === null ? '-' : kitchenRate + '%', color: rateColor(kitchenRate), sub: '실제 ' + displayHours(weeklySummary.totalKitchen) + 'h · 기준 ' + displayHours(kitchenStd) + 'h' },
+        { label: '절감 인시', value: displayHours(savingHours) + 'h', color: '#2C6690', sub: '기준 대비 절감 합계' },
+        { label: '과다 인시', value: displaySignedHours(overHours), color: '#A34848', sub: '기준 대비 과다 합계' },
       ];
       el.innerHTML = '<div class="glance-efficiency-list">' + items.map(x =>
         '<div class="glance-efficiency-line">' +
@@ -2837,7 +2864,7 @@ async function autoSaveDiagnosisResult(storeName) {
         if (gap > worstDayGap) { worstDayGap = gap; worstDay = d; }
       });
       if (worstDay) {
-        comments.push({ bg: '#EDE9F9', fg: '#5B3FA0', text: worstDay + '의 기준 대비 Gap이 이번 주 가장 큽니다 (+' + Math.round(worstDayGap * 10) / 10 + 'h).' });
+        comments.push({ bg: '#EDE9F9', fg: '#5B3FA0', text: worstDay + '의 기준 대비 Gap이 이번 주 가장 큽니다 (' + displaySignedHours(worstDayGap) + ').' });
       }
 
       if (!comments.length) {
@@ -3114,7 +3141,7 @@ async function autoSaveDiagnosisResult(storeName) {
           '<div class="part-rank-row">' +
             '<div class="part-rank-head">' +
               '<span style="font-weight:600;">' + r.part + '</span>' +
-              '<span>' + (r.totalDiff > 0 ? '+' : '') + r.totalDiff + 'h &nbsp; <b style="color:' + verdictColor + ';">' + verdictLabel + '</b> &nbsp; <span style="color:#999;">(' + r.days + '일 반복)</span></span>' +
+              '<span>' + displaySignedHours(r.totalDiff) + ' &nbsp; <b style="color:' + verdictColor + ';">' + verdictLabel + '</b> &nbsp; <span style="color:#999;">(' + r.days + '일 반복)</span></span>' +
             '</div>' +
             '<div class="part-rank-bar-bg"><div class="part-rank-bar-fill" style="width:' + pct + '%; background:' + barColor + ';"></div></div>' +
           '</div>'
