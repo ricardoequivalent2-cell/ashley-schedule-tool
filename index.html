@@ -32,6 +32,27 @@
 /* STEP C5: 종합현황을 기존 진단 레이아웃 안에 유지 */
 
 /* STEP C6/C7 */
+
+/* STEP C8: 종합현황 가독성 개선 */
+#view-overview .daily-page-title{font-size:28px}
+#view-overview .daily-page-sub{font-size:15px}
+#view-overview .overview-toolbar select,
+#view-overview .overview-toolbar input,
+#view-overview .overview-refresh{font-size:14px}
+#view-overview .overview-kpi-label{font-size:14px}
+#view-overview .overview-kpi-value{font-size:28px}
+#view-overview .overview-kpi-hint{font-size:12px}
+#view-overview .overview-table-title{font-size:16px}
+#view-overview .overview-table th{font-size:13px}
+#view-overview .overview-table td{font-size:14px}
+#view-overview .overview-status{font-size:12px;min-width:54px;padding:6px 10px}
+#view-overview .overview-pill{font-size:12px}
+#view-overview .overview-mode-btn{font-size:13px}
+#view-overview .overview-table th,
+#view-overview .overview-table td{padding:15px 13px}
+#view-overview .overview-table tbody tr.overview-click-row{cursor:pointer}
+#view-overview .overview-table tbody tr.overview-click-row:hover{background:#F4F7FF}
+
 .overview-mode-tabs{display:inline-flex;gap:4px;padding:4px;background:#F2F4F7;border-radius:10px;margin-bottom:14px}
 .overview-mode-btn{border:0;background:transparent;color:#667085;padding:8px 13px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}
 .overview-mode-btn.active{background:#fff;color:#202838;box-shadow:0 1px 3px rgba(16,24,40,.08)}
@@ -623,9 +644,20 @@ function bindOverviewDetailLinks() {
     if (link.dataset.detailBound) return;
     link.addEventListener('click', e => {
       e.preventDefault();
+      e.stopPropagation();
       openOverviewStoreDetail(link.dataset.store, link.dataset.week);
     });
     link.dataset.detailBound = '1';
+  });
+
+  document.querySelectorAll('.overview-click-row').forEach(row => {
+    if (row.dataset.rowBound) return;
+    row.title = '클릭하면 상세 진단으로 이동합니다.';
+    row.addEventListener('click', e => {
+      if (e.target.closest('a,button,input,select')) return;
+      openOverviewStoreDetail(row.dataset.store, row.dataset.week);
+    });
+    row.dataset.rowBound = '1';
   });
 }
 
@@ -736,7 +768,7 @@ function renderOverviewTrend() {
     const latestStatus = latest ? overviewStatus(latest.gap_pct) : null;
     const latestWeekStart = latest?.week_start || weeks[weeks.length - 1].weekStart;
 
-    return `<tr>
+    return `<tr class="overview-click-row" data-store="${overviewEscapeHtml(store)}" data-week="${overviewEscapeHtml(latestWeekStart)}">
       <td><a href="#" class="overview-store-link" data-store="${overviewEscapeHtml(store)}" data-week="${overviewEscapeHtml(latestWeekStart)}">${overviewEscapeHtml(store)}</a></td>
       ${weeks.map((w, idx) => {
         const row = weekRows[idx];
@@ -855,7 +887,7 @@ function renderOverview() {
   }
 
   body.innerHTML = rows.map(row => `
-    <tr>
+    <tr class="overview-click-row" data-store="${overviewEscapeHtml(row.store_name || '')}" data-week="${overviewEscapeHtml(row.week_start || '')}">
       <td><a href="#" class="overview-store-link" data-store="${overviewEscapeHtml(row.store_name || '')}" data-week="${overviewEscapeHtml(row.week_start || '')}">${overviewEscapeHtml(row.store_name || '-')}</a></td>
       <td><span class="overview-status ${overviewStatus(row.gap_pct).cls}">${overviewStatus(row.gap_pct).label}</span></td>
       <td>${overviewSales(row.expected_sales)}</td>
