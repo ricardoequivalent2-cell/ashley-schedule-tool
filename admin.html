@@ -1,166 +1,158 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>애슐리 스케줄 인건비 모니터</title>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>애슐리 진단 · 관리자 종합현황</title>
+  <link rel="stylesheet" href="./css/dashboard.css">
 <style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-    color: #182230;
-    background: #f6f7f4;
+  *{box-sizing:border-box}
+  body{margin:0}
+  .admin-page{padding-bottom:36px}
+  .admin-title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
+  .admin-title-copy{min-width:0}
+  .admin-page-title{font-size:24px;font-weight:800;color:#232938;line-height:1.25;margin-bottom:6px}
+  .admin-page-sub{font-size:13px;color:#8B93A5;line-height:1.6}
+  .admin-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .admin-toolbar select,.admin-toolbar input{
+    height:40px;border:1px solid #D9DEE8;border-radius:9px;background:#fff;
+    color:#30384A;padding:0 12px;font-size:13px;outline:none
   }
-  .topbar {
-    background: #fff;
-    border-bottom: 1px solid #e4e7ec;
-    padding: 18px 28px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 20px;
+  .admin-toolbar select{min-width:230px}
+  .admin-toolbar input{width:250px}
+  .admin-refresh{
+    height:40px;padding:0 14px;border:1px solid #D9DEE8;border-radius:9px;
+    background:#fff;color:#4E5668;font-size:13px;font-weight:700;cursor:pointer
   }
-  .brand { display: flex; gap: 14px; align-items: center; }
-  .logo {
-    width: 44px; height: 44px; border-radius: 12px;
-    background: #182230; color: white;
-    display: grid; place-items: center;
-    font-size: 20px; font-weight: 800;
+  #status{margin-left:auto;color:#8B93A5;font-size:12px}
+  .admin-kpi-row{
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px
   }
-  h1 { margin: 0 0 4px; font-size: 22px; }
-  .sub { color: #667085; font-size: 13px; }
-  .back {
-    text-decoration: none; color: #344054; font-weight: 700;
-    border: 1px solid #d0d5dd; border-radius: 10px; padding: 10px 14px;
-    background: white;
+  .admin-kpi{
+    background:#fff;border:1px solid #E5E8EE;border-radius:12px;padding:17px 18px
   }
-  main { padding: 24px 28px 40px; max-width: 1680px; margin: 0 auto; }
-  .toolbar {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-    margin-bottom: 18px;
+  .admin-kpi-label{font-size:12px;color:#8B93A5;margin-bottom:8px}
+  .admin-kpi-value{font-size:25px;font-weight:800;color:#252B39;letter-spacing:-.4px}
+  .admin-kpi-hint{font-size:11px;color:#A7AEBD;margin-top:5px}
+  .admin-table-card{
+    background:#fff;border:1px solid #E5E8EE;border-radius:12px;overflow:hidden
   }
-  select, input {
-    height: 42px; border: 1px solid #d0d5dd; border-radius: 9px;
-    background: white; padding: 0 12px; font-size: 14px;
+  .admin-table-head{
+    padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid #EEF0F4
   }
-  #weekSelect { min-width: 230px; }
-  #searchInput { width: 260px; }
-  .refresh {
-    height: 42px; border: 1px solid #d0d5dd; border-radius: 9px;
-    background: white; padding: 0 14px; cursor: pointer; font-weight: 700;
+  .admin-table-title{font-size:14px;font-weight:800;color:#30384A}
+  .admin-table-wrap{overflow:auto}
+  .admin-table{border-collapse:collapse;width:100%;min-width:1160px}
+  .admin-table th,.admin-table td{
+    border-bottom:1px solid #EEF0F4;padding:13px 12px;text-align:right;white-space:nowrap;font-size:12px
   }
-  #status { margin-left: auto; color: #667085; font-size: 13px; }
-  .cards {
-    display: grid; grid-template-columns: repeat(4, minmax(180px,1fr));
-    gap: 14px; margin-bottom: 18px;
+  .admin-table th{background:#FAFBFC;color:#8B93A5;font-weight:700}
+  .admin-table th:first-child,.admin-table td:first-child{text-align:left}
+  .admin-table tbody tr:hover{background:#FAFBFF}
+  .admin-table tbody tr:last-child td{border-bottom:0}
+  .store{font-weight:800;color:#272D3A}
+  .gap-plus{color:#D6452F;font-weight:800}
+  .gap-minus{color:#17845B;font-weight:800}
+  .gap-zero{color:#566071;font-weight:800}
+  .pill{
+    display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;
+    background:#F1F3F7;color:#667085;font-size:11px;font-weight:700
   }
-  .card {
-    background: white; border: 1px solid #e4e7ec; border-radius: 14px;
-    padding: 18px 20px;
+  .empty{padding:50px 16px !important;text-align:center !important;color:#A7AEBD}
+  .admin-nav-link{
+    padding:11px 12px;font-size:13px;color:rgba(255,255,255,.55);text-decoration:none;
+    border-radius:10px;display:block
   }
-  .card .label { color: #667085; font-size: 13px; margin-bottom: 8px; }
-  .card .value { font-size: 28px; font-weight: 800; }
-  .card .hint { color: #98a2b3; font-size: 12px; margin-top: 4px; }
-  .table-wrap {
-    background: white; border: 1px solid #e4e7ec; border-radius: 14px;
-    overflow: auto;
-  }
-  table {
-    border-collapse: collapse; width: 100%; min-width: 1280px;
-  }
-  th, td {
-    border-bottom: 1px solid #eaecf0;
-    padding: 12px 11px; text-align: right; white-space: nowrap;
-    font-size: 13px;
-  }
-  th {
-    position: sticky; top: 0; z-index: 1;
-    background: #fcfcfd; color: #667085; font-size: 12px;
-  }
-  th:first-child, td:first-child { text-align: left; }
-  tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: #fafafa; }
-  .store { font-weight: 800; color: #101828; }
-  .gap-plus { color: #d92d20; font-weight: 800; }
-  .gap-minus { color: #067647; font-weight: 800; }
-  .gap-zero { color: #475467; font-weight: 800; }
-  .empty { padding: 54px 20px; text-align: center; color: #98a2b3; }
-  .pill {
-    display: inline-flex; padding: 4px 8px; border-radius: 999px;
-    font-size: 11px; font-weight: 700; background: #f2f4f7; color: #475467;
-  }
-  @media (max-width: 900px) {
-    .cards { grid-template-columns: repeat(2, 1fr); }
-    #status { width: 100%; margin-left: 0; }
+  .admin-nav-link:hover{background:rgba(255,255,255,.06);color:#fff}
+  @media(max-width:900px){
+    .admin-kpi-row{grid-template-columns:repeat(2,1fr)}
+    #status{width:100%;margin-left:0}
   }
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <div class="logo">A</div>
-    <div>
-      <h1>애슐리 스케줄 인건비 모니터</h1>
-      <div class="sub">매장에서 진단한 결과를 주차별로 모아봅니다.</div>
-    </div>
-  </div>
-  <a class="back" href="/">매장 진단으로</a>
-</header>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="sidebar-brand">애슐리 진단</div>
+    <div class="sidebar-sub">스케줄링 사전 피드백</div>
 
-<main>
-  <div class="toolbar">
-    <select id="weekSelect"></select>
-    <input id="searchInput" type="text" placeholder="매장 검색">
-    <button class="refresh" id="refreshBtn">새로고침</button>
-    <div id="status">불러오는 중...</div>
-  </div>
+    <div class="sidebar-section-label">Administrator</div>
+    <button class="nav-btn active" type="button">종합현황</button>
 
-  <section class="cards">
-    <div class="card">
-      <div class="label">저장 매장</div>
-      <div class="value" id="kpiStores">-</div>
-      <div class="hint">선택 주차 기준</div>
-    </div>
-    <div class="card">
-      <div class="label">전체 실제인시</div>
-      <div class="value" id="kpiActual">-</div>
-      <div class="hint">전 매장 합계</div>
-    </div>
-    <div class="card">
-      <div class="label">전체 표준인시</div>
-      <div class="value" id="kpiStandard">-</div>
-      <div class="hint">전 매장 합계</div>
-    </div>
-    <div class="card">
-      <div class="label">전체 Gap</div>
-      <div class="value" id="kpiGap">-</div>
-      <div class="hint">실제 - 표준</div>
-    </div>
-  </section>
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-divider"></div>
+    <a class="admin-nav-link" href="/">매장 진단으로</a>
+  </nav>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>매장</th>
-          <th>예상매출</th>
-          <th>객수</th>
-          <th>실제인시</th>
-          <th>표준인시</th>
-          <th>Gap</th>
-          <th>Gap%</th>
-          <th>주방 Gap</th>
-          <th>홀 Gap</th>
-          <th>인시생산성</th>
-          <th>모델</th>
-          <th>최종 저장</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody"></tbody>
-    </table>
-  </div>
-</main>
+  <main class="main-content">
+    <div class="admin-page">
+      <div class="admin-title-row">
+        <div class="admin-title-copy">
+          <div class="admin-page-title">종합현황</div>
+          <div class="admin-page-sub">매장에서 진단한 스케줄 결과를 주차별로 모아 비교합니다.</div>
+        </div>
+      </div>
+
+      <div class="admin-toolbar">
+        <select id="weekSelect"></select>
+        <input id="searchInput" type="text" placeholder="매장 검색">
+        <button class="admin-refresh" id="refreshBtn">새로고침</button>
+        <div id="status">불러오는 중...</div>
+      </div>
+
+      <div class="admin-kpi-row">
+        <div class="admin-kpi">
+          <div class="admin-kpi-label">저장 매장</div>
+          <div class="admin-kpi-value" id="kpiStores">-</div>
+          <div class="admin-kpi-hint">선택 주차 기준</div>
+        </div>
+        <div class="admin-kpi">
+          <div class="admin-kpi-label">전체 실제인시</div>
+          <div class="admin-kpi-value" id="kpiActual">-</div>
+          <div class="admin-kpi-hint">전 매장 합계</div>
+        </div>
+        <div class="admin-kpi">
+          <div class="admin-kpi-label">전체 표준인시</div>
+          <div class="admin-kpi-value" id="kpiStandard">-</div>
+          <div class="admin-kpi-hint">전 매장 합계</div>
+        </div>
+        <div class="admin-kpi">
+          <div class="admin-kpi-label">전체 Gap</div>
+          <div class="admin-kpi-value" id="kpiGap">-</div>
+          <div class="admin-kpi-hint">실제 - 표준</div>
+        </div>
+      </div>
+
+      <div class="admin-table-card">
+        <div class="admin-table-head">
+          <div class="admin-table-title">매장별 주간 현황</div>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>매장</th>
+                <th>예상매출</th>
+                <th>객수</th>
+                <th>실제인시</th>
+                <th>표준인시</th>
+                <th>Gap</th>
+                <th>Gap%</th>
+                <th>주방 Gap</th>
+                <th>홀 Gap</th>
+                <th>모델</th>
+                <th>최종 저장</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
 
 <script>
 let allRows = [];
@@ -210,7 +202,7 @@ async function loadData() {
   } catch (err) {
     status.textContent = '오류: ' + err.message;
     document.getElementById('tableBody').innerHTML =
-      `<tr><td colspan="12" class="empty">데이터를 불러오지 못했습니다.</td></tr>`;
+      `<tr><td colspan="11" class="empty">데이터를 불러오지 못했습니다.</td></tr>`;
   }
 }
 
@@ -267,7 +259,7 @@ function render() {
   const body = document.getElementById('tableBody');
 
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="12" class="empty">선택한 주차에 저장된 매장이 없습니다.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="11" class="empty">선택한 주차에 저장된 매장이 없습니다.</td></tr>`;
     return;
   }
 
@@ -282,7 +274,6 @@ function render() {
       <td class="${gapClass(row.gap_pct)}">${pct(row.gap_pct)}</td>
       <td class="${gapClass(row.kitchen_gap_hours)}">${sign1(row.kitchen_gap_hours)}</td>
       <td class="${gapClass(row.hall_gap_hours)}">${sign1(row.hall_gap_hours)}</td>
-      <td>${won(row.labor_productivity)}</td>
       <td><span class="pill">V${escapeHtml(row.model_version || '-')}</span></td>
       <td>${formatSavedAt(row.updated_at || row.saved_at)}</td>
     </tr>
