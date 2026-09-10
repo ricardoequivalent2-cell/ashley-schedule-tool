@@ -42,7 +42,7 @@
     <div class="sidebar-divider"></div>
     <button class="nav-btn" data-view="backdata"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>백데이터</button>
     <div class="sidebar-divider"></div>
-    <a id="reuploadLink" href="#" style="display:none; padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px;">다른 파일 업로드</a>
+    <a id="reuploadLink" href="#" style="display:none; padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px;">다른 파일 업로드</a> <span id="autoSaveStatus" style="margin-left:10px;font-size:12px;color:#667085;"></span>
     <a href="admin.html" style="padding:11px 12px; font-size:13px; color:rgba(255,255,255,0.55); text-decoration:none; border-radius:10px; display:block;">관리자 페이지</a>
   </nav>
   <main class="main-content">
@@ -86,12 +86,7 @@
       <button id="runDiagnosisBtn" type="button" style="padding:9px 18px;background:#4a6cf7;color:#fff;border:0;border-radius:8px;font-weight:700;cursor:pointer;">진단 시작</button>
     </div>
     <div id="status" style="margin-top:10px;"></div>
-    <div id="saveBox" style="display:none; margin-top:16px; padding-top:16px; border-top:1px dashed #ccc;">
-      <label style="font-size:13px; color:#555;">매장명: </label>
-      <input type="text" id="storeNameInput" style="padding:6px 10px; border:1px solid #ccc; border-radius:6px; font-size:13px; width:200px;">
-      <button id="saveBtn" style="margin-left:8px; padding:7px 16px; background:#4a6cf7; color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">결과 저장 (관리자 페이지에 반영)</button>
-      <div id="saveStatus" style="font-size:12px; color:#666; margin-top:8px;"></div>
-    </div>
+  </div>
   </div>
 
   <div id="app">
@@ -1030,7 +1025,6 @@ async function handleDualUpload() {
         .trim();
     }
     guessedName = guessedName || '이름없는매장';
-    document.getElementById('storeNameInput').value = guessedName;
 
     previousSnapshot = null;
     try {
@@ -1047,8 +1041,17 @@ async function handleDualUpload() {
     refreshScopeTabs();
     renderApp(lastResult);
 
-    document.getElementById('saveBox').style.display = 'block';
-    document.getElementById('saveStatus').textContent = '';
+    // 진단이 정상 완료되면 UP에서 추출한 매장명으로 관리자 결과를 자동 저장한다.
+    // 저장 실패가 진단 결과 화면 자체를 막지는 않도록 별도로 처리한다.
+    try {
+      await autoSaveDiagnosisResult(guessedName);
+    } catch (saveErr) {
+      const autoSaveStatusEl = document.getElementById('autoSaveStatus');
+      if (autoSaveStatusEl) {
+        autoSaveStatusEl.textContent = '⚠ 관리자 자동 저장 실패: ' + saveErr.message;
+      }
+      console.error('[STEP B3] auto save failed', saveErr);
+    }
 
     console.log('[DUAL-UP V2 STEP1] merged parsed', mergedParsed);
     console.log('[DUAL-UP V2 STEP1] merged actuals', mergedActuals);
@@ -1173,53 +1176,46 @@ function buildWeeklyAdminSummary(storeName) {
   };
 }
 
-document.getElementById('saveBtn').addEventListener('click', async () => {
-  const storeName = document.getElementById('storeNameInput').value.trim();
-  const saveStatusEl = document.getElementById('saveStatus');
+async function autoSaveDiagnosisResult(storeName) {
+  const autoSaveStatusEl = document.getElementById('autoSaveStatus');
 
-  if (!storeName) {
-    saveStatusEl.textContent = '매장명을 입력해주세요.';
-    return;
-  }
-  if (!lastResult || !diagnosisResultsByScope.total) {
-    saveStatusEl.textContent = '먼저 파일을 진단해주세요.';
-    return;
+  if (!storeName || !lastResult || !diagnosisResultsByScope.total) {
+    throw new Error('자동 저장에 필요한 매장명 또는 진단 결과가 없습니다.');
   }
 
-  saveStatusEl.textContent = '저장 중...';
-
-  try {
-    // 어떤 조직 탭을 보고 있든 저장 기준은 항상 "전체" 진단 결과
-    const totalResult = diagnosisResultsByScope.total;
-    const adminWeeklySummary = buildWeeklyAdminSummary(storeName);
-
-    const payload = {
-      storeName,
-      headline: buildHeadlineSummary(totalResult),
-      weeklySummary: totalResult.weeklySummary,
-      result: totalResult,
-      adminWeeklySummary
-    };
-
-    const res = await fetch('/api/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '저장 실패');
-
-    const savedWeek = adminWeeklySummary.weekLabel;
-    saveStatusEl.textContent =
-      `저장 완료 · ${savedWeek} 관리자 종합현황에 반영됨`;
-
-    console.log('[STEP B2] weekly_store_summary saved', adminWeeklySummary);
-  } catch (err) {
-    saveStatusEl.textContent = '❌ 저장 실패: ' + err.message;
-    console.error('[STEP B2] save failed', err);
+  if (autoSaveStatusEl) {
+    autoSaveStatusEl.textContent = '관리자 종합현황 저장 중...';
   }
-});
+
+  // 어떤 조직 탭을 보고 있든 저장 기준은 항상 전체 진단 결과
+  const totalResult = diagnosisResultsByScope.total;
+  const adminWeeklySummary = buildWeeklyAdminSummary(storeName);
+
+  const payload = {
+    storeName,
+    headline: buildHeadlineSummary(totalResult),
+    weeklySummary: totalResult.weeklySummary,
+    result: totalResult,
+    adminWeeklySummary
+  };
+
+  const res = await fetch('/api/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || '자동 저장 실패');
+
+  const savedWeek = adminWeeklySummary.weekLabel;
+  if (autoSaveStatusEl) {
+    autoSaveStatusEl.textContent = `✓ ${savedWeek} 자동 저장 완료`;
+  }
+
+  console.log('[STEP B3] weekly_store_summary auto-saved', adminWeeklySummary);
+  return data;
+}
 
     function renderApp(data) {
     const dateHeaders = data.dateHeaders;
