@@ -11,6 +11,8 @@ let STANDARD_MODEL_SOURCE_INFO = {
   reason: null,
 };
 let standardModelLoadPromise = null;
+let ACTIVE_STANDARD_SLOT_LABELS = [];
+let ACTIVE_STANDARD_PARTS = [];
 
 function getStandardModels() {
   if (!Array.isArray(ACTIVE_STANDARD_MODELS) || ACTIVE_STANDARD_MODELS.length === 0) {
@@ -23,9 +25,25 @@ function getStandardModelSourceInfo() {
   return { ...STANDARD_MODEL_SOURCE_INFO };
 }
 
+function getStandardModelSlotLabels() {
+  if (!Array.isArray(ACTIVE_STANDARD_SLOT_LABELS) || ACTIVE_STANDARD_SLOT_LABELS.length !== 27) {
+    throw new Error('기준모델 30분 시간 라벨이 아직 로드되지 않았습니다.');
+  }
+  return ACTIVE_STANDARD_SLOT_LABELS.slice();
+}
+
+function getStandardModelParts() {
+  if (!Array.isArray(ACTIVE_STANDARD_PARTS) || ACTIVE_STANDARD_PARTS.length === 0) {
+    throw new Error('기준모델 파트 목록이 아직 로드되지 않았습니다.');
+  }
+  return ACTIVE_STANDARD_PARTS.slice();
+}
+
 function isValidSupabaseModelPayload(data) {
   if (!data || data.ok !== true || !Array.isArray(data.models)) return false;
   if (data.modelCount !== 16 || data.slotCount !== 432) return false;
+  if (!Array.isArray(data.slotLabels) || data.slotLabels.length !== 27) return false;
+  if (!Array.isArray(data.parts) || data.parts.length !== 8) return false;
   if (data.matchesExpected !== true) return false;
 
   return data.models.every(model => {
@@ -50,6 +68,9 @@ async function loadStandardModelsFromSupabase() {
   if (!isValidSupabaseModelPayload(data)) {
     throw new Error('Supabase 기준모델 검증 실패 (16개 모델 / 432개 슬롯 조건 불일치)');
   }
+
+  ACTIVE_STANDARD_SLOT_LABELS = data.slotLabels.map(String);
+  ACTIVE_STANDARD_PARTS = data.parts.map(String);
 
   ACTIVE_STANDARD_MODELS = data.models.map(model => ({
     title: model.title,
@@ -80,6 +101,8 @@ async function ensureStandardModelsLoaded() {
       // 로컬 fallback 금지:
       // 기준모델을 못 읽으면 잘못된 구버전 계산 대신 진단을 중단한다.
       ACTIVE_STANDARD_MODELS = [];
+      ACTIVE_STANDARD_SLOT_LABELS = [];
+      ACTIVE_STANDARD_PARTS = [];
       STANDARD_MODEL_SOURCE_INFO = {
         source: 'error',
         modelCount: 0,

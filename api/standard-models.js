@@ -67,8 +67,10 @@ export default async function handler(req, res) {
 
     const slotRows = await slotsResponse.json();
     const slotsByModelId = new Map();
+    const globalSlotLabels = [];
 
     for (const slot of slotRows) {
+      if (!globalSlotLabels.includes(slot.slot_time)) globalSlotLabels.push(slot.slot_time);
       if (!slotsByModelId.has(slot.model_id)) {
         slotsByModelId.set(slot.model_id, []);
       }
@@ -117,6 +119,8 @@ export default async function handler(req, res) {
         slotCount: 432,
       },
       matchesExpected: models.length === 16 && slotCount === 432,
+      slotLabels: globalSlotLabels,
+      parts: ['스시','콜드','베이커리','핫','그릴','피파','DMO','홀'],
       models,
     });
   } catch (error) {

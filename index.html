@@ -3641,7 +3641,8 @@ async function autoSaveDiagnosisResult(storeName) {
         await Promise.all([
           ensureStandardModelsLoaded(),
           ensureDiagnosisConfigLoaded(),
-          ensurePartAllocationLoaded()
+          ensurePartAllocationLoaded(),
+          window.AshleyStandardTimetable ? window.AshleyStandardTimetable.ensureLoaded() : Promise.reject(new Error('정석 시간표 계산 모듈이 로드되지 않았습니다.'))
         ]);
         if (token !== standardRenderToken) return;
         if (!window.AshleyStandardTimetable) throw new Error('정석 시간표 계산 모듈이 로드되지 않았습니다.');
