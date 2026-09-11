@@ -9,7 +9,7 @@
 (function (global) {
   let ACTIVE_TIMETABLE_CONFIG = null;
   let timetableConfigPromise = null;
-  let masterCache = null;
+  let masterCache = new Map();
 
   async function ensureTimetableConfigLoaded() {
     if (ACTIVE_TIMETABLE_CONFIG) return ACTIVE_TIMETABLE_CONFIG;
@@ -26,7 +26,7 @@
         throw new Error('Supabase 정석 시간표 V2 설정 검증 실패');
       }
       ACTIVE_TIMETABLE_CONFIG = data.config;
-      masterCache = null;
+      masterCache = new Map();
       return ACTIVE_TIMETABLE_CONFIG;
     }).finally(() => {
       timetableConfigPromise = null;
@@ -181,14 +181,16 @@
     };
   }
 
-  function rawTimetableForSales(sales, parts, slots, cfg) {
+  function rawTimetableForSales(sales, parts, slots, cfg, guestUnitPriceOverride) {
     if (typeof getPartAllocationRatios !== 'function') throw new Error('Part Allocation V1.0 로더를 찾을 수 없습니다.');
     if (typeof getActiveDiagnosisConfig !== 'function' || typeof tierHoursDaily !== 'function') {
       throw new Error('표준인시 V1.0 계산기준을 찾을 수 없습니다.');
     }
 
     const diagnosisConfig = getActiveDiagnosisConfig();
-    const guestCount = sales / Number(cfg.mixedGuestUnitPrice);
+    const guestUnitPrice = Number(guestUnitPriceOverride || cfg.mixedGuestUnitPrice);
+    if (!(guestUnitPrice > 0)) throw new Error('객단가 기준이 올바르지 않습니다.');
+    const guestCount = sales / guestUnitPrice;
     const target2 = tierHoursDaily(diagnosisConfig.CURVE.TIERS['2차목표'], guestCount, diagnosisConfig.CURVE);
     const partRatios = getPartAllocationRatios(sales);
     const allocation = interpolateAllocation(sales, parts, cfg);
@@ -201,10 +203,10 @@
       rawByPart[part] = allocation.byPart[part].map(ratio => partHours[part] * ratio / slotHours);
     });
 
-    return { sales, guestCount, target2, partRatios, partHours, rawByPart, allocation, slots };
+    return { sales, guestCount, guestUnitPrice, target2, partRatios, partHours, rawByPart, allocation, slots };
   }
 
-  function buildMaster() {
+  function buildMaster(guestUnitPriceOverride) {
     if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
 
     const cfg = ACTIVE_TIMETABLE_CONFIG;
@@ -217,7 +219,7 @@
     parts.forEach(part => { previousByPart[part] = slots.map(() => 0); });
 
     for (let sales = Number(cfg.salesMinWon); sales <= Number(cfg.salesMaxWon); sales += Number(cfg.salesStepWon)) {
-      const raw = rawTimetableForSales(sales, parts, slots, cfg);
+      const raw = rawTimetableForSales(sales, parts, slots, cfg, guestUnitPriceOverride);
       const hcByPart = {};
       const roundedPartHours = {};
       const forcedCarryHoursByPart = {};
@@ -238,7 +240,7 @@
       master.set(sales, {
         sales,
         guestCount: raw.guestCount,
-        guestUnitPrice: Number(cfg.mixedGuestUnitPrice),
+        guestUnitPrice: Number(raw.guestUnitPrice),
         target2: raw.target2,
         roundedTotalHours,
         totalHourDiff: roundedTotalHours - raw.target2,
@@ -265,12 +267,15 @@
     return master;
   }
 
-  function getMaster() {
-    if (!masterCache) masterCache = buildMaster();
-    return masterCache;
+  function getMaster(guestUnitPriceOverride) {
+    if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
+    const price = Number(guestUnitPriceOverride || ACTIVE_TIMETABLE_CONFIG.mixedGuestUnitPrice);
+    const key = String(price);
+    if (!masterCache.has(key)) masterCache.set(key, buildMaster(price));
+    return masterCache.get(key);
   }
 
-  function buildStandardTimetable(salesWon) {
+  function buildStandardTimetable(salesWon, guestUnitPriceOverride) {
     if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
     const cfg = ACTIVE_TIMETABLE_CONFIG;
     const step = Number(cfg.salesStepWon);
@@ -278,9 +283,15 @@
     const max = Number(cfg.salesMaxWon);
     const rounded = Math.round((Number(salesWon) || min) / step) * step;
     const sales = Math.max(min, Math.min(max, rounded));
-    const result = getMaster().get(sales);
+    const result = getMaster(guestUnitPriceOverride).get(sales);
     if (!result) throw new Error('선택 매출의 정석 시간표를 찾을 수 없습니다: ' + sales);
     return result;
+  }
+
+  // 일간/주간 진단은 평일·주말 객단가가 이미 DB model_config에 있으므로
+  // 동일한 V2 알고리즘을 쓰되 해당 일자의 객단가 기준으로 별도 master를 계산한다.
+  function buildForDiagnosis(salesWon, guestUnitPrice) {
+    return buildStandardTimetable(salesWon, guestUnitPrice);
   }
 
   async function ensureLoaded() {
@@ -290,12 +301,13 @@
 
   function invalidate() {
     ACTIVE_TIMETABLE_CONFIG = null;
-    masterCache = null;
+    masterCache = new Map();
   }
 
   global.AshleyStandardTimetable = {
     ensureLoaded,
     build: buildStandardTimetable,
+    buildForDiagnosis,
     invalidate,
     getConfig: () => ACTIVE_TIMETABLE_CONFIG ? { ...ACTIVE_TIMETABLE_CONFIG } : null,
   };

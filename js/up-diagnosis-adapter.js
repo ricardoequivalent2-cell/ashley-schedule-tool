@@ -18,6 +18,11 @@
       throw new Error('UP 파싱 결과가 없습니다.');
     }
 
+    if (!global.AshleyStandardTimetable) {
+      throw new Error('정석 시간표 V2 계산 모듈을 찾을 수 없습니다.');
+    }
+    await global.AshleyStandardTimetable.ensureLoaded();
+
     const rawModels = getStandardModels();
     if (typeof getActiveDiagnosisConfig !== 'function') {
       throw new Error('계산기준 로더(config-source.js)를 찾을 수 없습니다.');
@@ -149,47 +154,48 @@
       const target1 = tierHoursDaily(calcConfig.CURVE.TIERS['1차목표'], guestCount, calcConfig.CURVE);
       const target2 = tierHoursDaily(calcConfig.CURVE.TIERS['2차목표'], guestCount, calcConfig.CURVE);
 
-      // V1.0 기준: 총량은 2차목표(BHAG), 파트 배분은 Part Allocation,
-      // 시간대 배분은 Time Allocation(매출구간 대표평균)을 사용한다.
-      const partRatios = getPartAllocationRatios(salesVal);
+      // V2 기준 통일:
+      // - 총량 진단 경계는 기존 2차목표(BHAG) 곡선을 유지한다.
+      // - 파트/30분/시간대 진단의 표준배치는 '정석 시간표 V2'를 그대로 사용한다.
+      // - 정석 시간표 V2는 Supabase의 Part Allocation + 30분 BP + 운영시간(09:00~22:00)
+      //   + 0.5HC + 매출 증가 시 슬롯별 HC 비감소 규칙을 적용한다.
+      // - 일간 진단에서는 혼합 객단가가 아니라 해당 일자의 평일/주말 객단가를 사용한다.
       const allTargetParts = PARTS.concat(['홀']);
-      const partTarget2Hours = {};
-      allTargetParts.forEach(part => {
-        partTarget2Hours[part] = target2 * (partRatios[part] || 0);
-      });
+      const timetable = global.AshleyStandardTimetable.buildForDiagnosis(salesVal, price);
 
       standardSchedule[label] = {};
       heatmap[label] = {};
       slots.forEach(slot => {
         standardSchedule[label][slot] = {};
         heatmap[label][slot] = {};
-      });
-
-      // DB의 5개 시간대 비율을 해당 시간대의 30분 슬롯에 균등 분배한다.
-      // 화면 진단은 5개 시간대 합계가 기준이며, 30분 값은 내부 호환용이다.
-      allTargetParts.forEach(part => {
-        const bandRatios = getTimeAllocationRatios(salesVal, part);
-        SHIFT_BLOCKS.forEach(block => {
-          const blockSlots = slots.filter(slot => slot >= block.startMin && slot < block.endMin);
-          if (!blockSlots.length) return;
-          const bandHours = partTarget2Hours[part] * (bandRatios[block.name] || 0);
-          const headcountPerSlot = bandHours / (blockSlots.length * hourPerSlot);
-          blockSlots.forEach(slot => {
-            standardSchedule[label][slot][part] = headcountPerSlot;
-          });
+        allTargetParts.forEach(part => {
+          standardSchedule[label][slot][part] = 0;
         });
       });
 
-      // 계산 검증: 전체 표준시간표 인시는 2차목표와 일치해야 한다.
+      const timetableIndexByLabel = {};
+      (timetable.slots || []).forEach((slotLabel, index) => {
+        timetableIndexByLabel[String(slotLabel).slice(0, 5)] = index;
+      });
+
+      slots.forEach(slot => {
+        const labelText = minToLabel(slot);
+        const idx = timetableIndexByLabel[labelText];
+        if (idx === undefined) return; // 예: 08:30은 DB 운영시간 밖이므로 표준 HC=0
+        allTargetParts.forEach(part => {
+          standardSchedule[label][slot][part] = Number(((timetable.hcByPart || {})[part] || [])[idx] || 0);
+        });
+      });
+
+      // V2는 0.5HC 및 단조증가 보정 때문에 표시 인시가 곡선 Target2와 소폭 다를 수 있다.
+      // 진단 상세/문제위치는 실제 화면에 보이는 정석 시간표 합계를 사용하고,
+      // 총인시 상태판정은 원래의 연속형 Target2 곡선을 유지한다.
       let scheduleTargetHours = 0;
       slots.forEach(slot => {
         allTargetParts.forEach(part => {
           scheduleTargetHours += ((standardSchedule[label][slot] || {})[part] || 0) * hourPerSlot;
         });
       });
-      if (Math.abs(scheduleTargetHours - target2) > 0.01) {
-        throw new Error(`2차목표 시간배분 검증 실패: ${label} / 목표 ${target2.toFixed(2)}h / 배분 ${scheduleTargetHours.toFixed(2)}h`);
-      }
 
       // ----------------------------------------
       // 총인시 진단: UP 근무시간 합계를 그대로 사용
@@ -209,6 +215,8 @@
         hurdle: round1(hurdle),
         target1: round1(target1),
         target2: round1(target2),
+        standardScheduleHours: round1(scheduleTargetHours),
+        standardScheduleSales: Number(timetable.sales || 0),
         verdict,
         kitchenActualHours: round1(h.kitchen),
         hallActualHours: round1(h.hall),

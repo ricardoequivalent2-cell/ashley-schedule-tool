@@ -1756,6 +1756,12 @@ async function parseAndDiagnoseSingle(file) {
     throw new Error('파트정보 UP(.up) 파일만 업로드할 수 있습니다.');
   }
 
+  await Promise.all([
+    ensureStandardModelsLoaded(),
+    ensureDiagnosisConfigLoaded(),
+    ensurePartAllocationLoaded(),
+    window.AshleyStandardTimetable ? window.AshleyStandardTimetable.ensureLoaded() : Promise.reject(new Error('정석 시간표 V2 모듈이 로드되지 않았습니다.'))
+  ]);
   const parsed = await window.AshleyUpParser.parseUpFile(file);
   const actuals = window.AshleyUpParser.buildThirtyMinuteActuals(parsed, {
     slotSizeMin: 30,
@@ -1791,7 +1797,9 @@ async function handleDualUpload() {
     const modelSourceInfo = await ensureStandardModelsLoaded();
     const configSourceInfo = await ensureDiagnosisConfigLoaded();
     const partAllocationSourceInfo = await ensurePartAllocationLoaded();
-    const timeAllocationSourceInfo = await ensureTimeAllocationLoaded();
+    const timetableSourceInfo = window.AshleyStandardTimetable
+      ? await window.AshleyStandardTimetable.ensureLoaded()
+      : (() => { throw new Error('정석 시간표 V2 모듈이 로드되지 않았습니다.'); })();
 
     // STEP1 핵심:
     // 업로드 칸 이름으로 주방/홀을 판정하지 않는다.
@@ -1847,7 +1855,8 @@ async function handleDualUpload() {
     statusEl.textContent =
       `완료 (${detectedScopes}${duplicateText}` +
       ` · 기준모델: ${modelSourceInfo.source === 'supabase' ? 'Supabase DB' : modelSourceInfo.source}` +
-      ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : configSourceInfo.source})`;
+      ` · 계산기준: ${configSourceInfo.source === 'supabase' ? 'Supabase DB' : configSourceInfo.source}` +
+      ` · 정석시간표: ${timetableSourceInfo.source === 'supabase' ? 'Supabase DB' : timetableSourceInfo.source})`;
 
     let guessedName = String(mergedParsed.storeName || '').trim();
     if (!guessedName) {
