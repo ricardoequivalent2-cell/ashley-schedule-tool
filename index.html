@@ -8,7 +8,6 @@
   <script src="./js/diagnosis-engine.js"></script>
   <script src="./js/config-source.js"></script>
   <script src="./js/part-allocation-source.js"></script>
-  <script src="./js/time-allocation-source.js"></script>
   <script src="./js/standard-timetable-source.js"></script>
   <script src="./js/up-parser.js"></script>
   <script src="./js/common-utils.js"></script>
@@ -1750,27 +1749,6 @@ function setDiagnosisScope(scope) {
   renderApp(result);
 }
 
-async function parseAndDiagnoseSingle(file) {
-  if (!file) return null;
-  if (!/\.up$/i.test(file.name)) {
-    throw new Error('파트정보 UP(.up) 파일만 업로드할 수 있습니다.');
-  }
-
-  await Promise.all([
-    ensureStandardModelsLoaded(),
-    ensureDiagnosisConfigLoaded(),
-    ensurePartAllocationLoaded(),
-    window.AshleyStandardTimetable ? window.AshleyStandardTimetable.ensureLoaded() : Promise.reject(new Error('정석 시간표 V2 모듈이 로드되지 않았습니다.'))
-  ]);
-  const parsed = await window.AshleyUpParser.parseUpFile(file);
-  const actuals = window.AshleyUpParser.buildThirtyMinuteActuals(parsed, {
-    slotSizeMin: 30,
-    slotStartMin: 8 * 60 + 30,
-    slotEndMin: 22 * 60
-  });
-  const result = await window.AshleyUpDiagnosisAdapter.computeDiagnosisFromUp(parsed, actuals);
-  return { parsed, actuals, result };
-}
 
 async function handleDualUpload() {
   const kitchenFile = document.getElementById('kitchenFileInput').files[0];
@@ -2185,29 +2163,6 @@ async function autoSaveDiagnosisResult(storeName) {
       });
     }
 
-    function verdictClass(verdict) {
-      if (verdict.indexOf('즉시개선') !== -1 || verdict.indexOf('과다') !== -1) return 'verdict-미달';
-      if (verdict.indexOf('2차목표') !== -1 && verdict.indexOf('달성') !== -1) return 'verdict-달성';
-      if (verdict.indexOf('양호') !== -1) return 'verdict-달성';
-      if (verdict.indexOf('개선 필요') !== -1) return 'verdict-충족';
-      return 'verdict-충족';
-    }
-
-    function renderTrendTable() {
-      const table = document.getElementById('trendTable');
-      let html = '<tr><th>날짜</th><th>예상객수</th><th>주방 사용계획시간</th><th>홀 사용계획시간</th><th>매장전체 사용계획시간</th><th>목표</th><th>판정</th></tr>';
-      dateHeaders.forEach(d => {
-        const t = tierDiagnosis[d];
-        if (!t) return;
-        html += '<tr><td>' + d + '</td><td>' + t.guestCount + '명</td>' +
-          '<td>' + t.kitchenActualHours + 'h</td>' +
-          '<td>' + t.hallActualHours + 'h</td>' +
-          '<td>' + t.actualTotal + 'h</td>' +
-          '<td>' + t.target2 + 'h</td>' +
-          '<td><span class="verdict-badge ' + verdictClass(t.verdict) + '">' + levelPhrase(t.verdict) + '</span></td></tr>';
-      });
-      table.innerHTML = html;
-    }
 
     // 가장 심각한 시간대(순차이 절대값 최대)을 찾아 "자극적인 한마디" 헤드라인 문구를 만듦
     // 헤드라인은 "더 쓰고 있음(과다)"만 문제로 취급 - "덜 쓰고 있음(부족)"은 문제로 안 봄
@@ -2219,142 +2174,7 @@ async function autoSaveDiagnosisResult(storeName) {
       });
       return worst;
     }
-    function headlineClassFor(absDiff) {
-      if (absDiff >= 2) return 'hl-critical';
-      if (absDiff >= 0.5) return 'hl-warning';
-      return 'hl-ok';
-    }
 
-    function renderDailyHeadline(dateLabel) {
-      const el = document.getElementById('dailyHeadline');
-      const blocks = blockDiagnosis[dateLabel];
-      if (!blocks || !blocks.length) { el.innerHTML = ''; return; }
-      const worst = findWorstBlock(blocks);
-      if (!worst) {
-        el.className = 'headline-banner hl-ok';
-        el.innerHTML = '' + dateLabel + ', 과다 사용 블록 없이 무난합니다';
-        return;
-      }
-      const absDiff = worst.netDiffHours;
-      el.className = 'headline-banner ' + headlineClassFor(absDiff);
-      const culprit = worst.worstOver;
-      const partText = culprit ? culprit.part : '';
-      el.innerHTML =
-        '오늘 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
-        '에서 ' + absDiff + 'h 더 쓰고 있음' +
-        '<span class="headline-sub">' + worst.action + '</span>';
-    }
-
-    function dayLabelToWeekday(label) {
-      const parts = label.trim().split(' ');
-      return parts[parts.length - 1]; // "8/17 월" -> "월"
-    }
-
-    function renderWeeklyHeadline() {
-      const el = document.getElementById('weeklyHeadline');
-      if (!weeklyBlockSummary.length) { el.innerHTML = ''; return; }
-      const worst = findWorstBlock(weeklyBlockSummary);
-      if (!worst) {
-        el.className = 'headline-banner hl-ok';
-        el.innerHTML = '이번 주는 과다 사용 블록 없이 전반적으로 무난합니다';
-        return;
-      }
-      const absDiff = worst.netDiffHours;
-      el.className = 'headline-banner ' + headlineClassFor(absDiff);
-      const partText = worst.topOverPart;
-      const dayLabels = worst.topOverDayLabels;
-      const weekdaysStr = (dayLabels && dayLabels.length) ? dayLabels.map(dayLabelToWeekday).join(', ') : '';
-
-      el.innerHTML =
-        '이번 주 가장 시급한 문제: ' + worst.name + (partText ? (' ' + partText + '파트') : '') +
-        '에서 ' + absDiff + 'h 더 쓰고 있음' +
-        (weekdaysStr ? '<span class="headline-sub">요일: ' + weekdaysStr + '</span>' : '');
-    }
-
-    function renderTierBanner(dateLabel) {
-      const banner = document.getElementById('tierBanner');
-      const t = tierDiagnosis[dateLabel];
-      if (!t) { banner.innerHTML = ''; return; }
-      const cls = verdictClass(t.verdict);
-      banner.className = 'tier-banner ' + cls;
-
-      const headline = diffPhrase(t.actualTotal, t.target2, true) + ' · ' + levelPhrase(t.verdict);
-
-      const improveHtml = t.verdictImproves
-        ? '<div style="margin-top:8px; padding:8px 12px; background:rgba(255,255,255,0.6); border-radius:6px; font-size:12px;">' +
-            '💡 주방 히트맵상 <b>과다로 잡힌 ' + t.kitchenWasteHours + 'h</b>를 줄이면 → ' +
-            '사용계획시간 ' + t.hypotheticalTotal + 'h, <b>' + t.hypotheticalVerdict + '</b>로 개선 가능' +
-          '</div>'
-        : (t.kitchenWasteHours > 0
-            ? '<div style="margin-top:8px; font-size:12px; color:#666;">주방 히트맵상 과다분 ' + t.kitchenWasteHours + 'h 있으나, 제거해도 등급 구간은 동일</div>'
-            : '');
-
-      banner.innerHTML =
-        '<div class="verdict-text">' + dateLabel + ' — ' + headline + '</div>' +
-        '<div class="tier-numbers"><b>' + displayHours(t.actualTotal) + 'h</b> (BHAG ' + displayHours(t.target2) + 'h) · 주방 ' + displayHours(t.kitchenActualHours) + 'h · 홀 ' + displayHours(t.hallActualHours) + 'h' +
-        improveHtml + '</div>';
-    }
-
-    function renderBlockDiagnosis(dateLabel) {
-      const container = document.getElementById('blockDiagnosis');
-      const blocks = blockDiagnosis[dateLabel];
-      if (!blocks) { container.innerHTML = ''; return; }
-
-      container.innerHTML = blocks.map(b => {
-        const badgeText = blockDiffPhrase(b.actualHours, b.standardHours);
-        return (
-          '<div class="block-card verdict-' + b.verdict + '">' +
-            '<div class="block-name">' + b.name + '</div>' +
-            '<div class="block-time">' + b.timeLabel + '</div>' +
-            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
-            '<div class="block-numbers">' + b.action + ' · ' + b.actualHours + 'h/' + b.standardHours + 'h</div>' +
-          '</div>'
-        );
-      }).join('');
-    }
-
-    function renderHallBlockDiagnosis(dateLabel) {
-      const container = document.getElementById('hallBlockDiagnosis');
-      const blocks = hallBlockDiagnosis[dateLabel];
-      if (!blocks) { container.innerHTML = ''; return; }
-
-      container.innerHTML = blocks.map(b => {
-        const badgeText = blockDiffPhrase(b.actualHours, b.standardHours);
-        return (
-          '<div class="block-card verdict-' + b.verdict + '">' +
-            '<div class="block-name">' + b.name + '</div>' +
-            '<div class="block-time">' + b.timeLabel + '</div>' +
-            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
-            '<div class="block-numbers">' + displayHours(b.actualHours) + 'h/' + displayHours(b.standardHours) + 'h</div>' +
-          '</div>'
-        );
-      }).join('');
-    }
-
-    function renderCompareSection(dateLabel) {
-      const container = document.getElementById('compareSection');
-      const t = tierDiagnosis[dateLabel];
-      if (!t) { container.innerHTML = ''; return; }
-
-      const maxVal = Math.max(t.kitchenActualHours, t.hallActualHours, 1);
-      const kitchenPct = Math.round((t.kitchenActualHours / maxVal) * 100);
-      const hallPct = Math.round((t.hallActualHours / maxVal) * 100);
-
-      container.innerHTML =
-        '<div class="compare-row">' +
-          '<div class="compare-label">주방</div>' +
-          '<div class="compare-bar-bg"><div class="compare-bar-fill kitchen" style="width:' + kitchenPct + '%;">' +
-            t.kitchenActualHours + 'h</div></div>' +
-        '</div>' +
-        '<div class="compare-row">' +
-          '<div class="compare-label">홀</div>' +
-          '<div class="compare-bar-bg"><div class="compare-bar-fill hall" style="width:' + hallPct + '%;">' +
-            t.hallActualHours + 'h</div></div>' +
-        '</div>' +
-        (t.observedKitchenRatio !== null
-          ? '<div style="font-size:12px; color:#888;">실측 비중: 주방 ' + t.observedKitchenRatio + '% · 홀 ' + (100 - t.observedKitchenRatio).toFixed(1) + '%</div>'
-          : '');
-    }
 
     // 기준대비 Gap + 배치율(실제 ÷ 기준 × 100)을 함께 표시
     // 100% 미만 = 기준보다 적게 배치, 100% 초과 = 기준보다 많이 배치
@@ -2370,24 +2190,6 @@ async function autoSaveDiagnosisResult(storeName) {
       const pctText = pct !== null ? (' · 배치율 ' + pct + '%') : '';
       return (longForm ? '기준대비 ' : '') + core + pctText;
     }
-    function diffPhraseCompact(actualHours, standardHours) {
-      const pct = placementRate(actualHours, standardHours);
-      return pct !== null ? (pct + '%') : '-';
-    }
-
-    function blockDiffPhrase(actualHours, standardHours) {
-      const diff = actualHours - standardHours;
-      const abs = displayHours(Math.abs(diff));
-      const ratio = placementRate(actualHours, standardHours);
-      const sign = diff > 0 ? '+' : (diff < 0 ? '-' : '');
-      const core = abs === 0 ? '기준과 동일' : (sign + abs + 'h');
-      const ratioText = ratio !== null ? (' · 배치율 ' + ratio + '%') : '';
-      return core + ratioText;
-    }
-    function blockDiffCompact(actualHours, standardHours) {
-      const ratio = placementRate(actualHours, standardHours);
-      return ratio !== null ? (ratio + '%') : '-';
-    }
 
     // 매장전체 3단계 verdict 문자열(최소허들/1차/2차) -> "~수준입니다" 짧은 상태문구
     // UX의 목표·Gap·절감량은 2차목표(BHAG) 기준. 1차목표/최소허들은 상태 판정 경계로만 사용.
@@ -2396,12 +2198,6 @@ async function autoSaveDiagnosisResult(storeName) {
       return achieved ? '목표 달성입니다' : '목표 초과입니다';
     }
     // 시간대(단일기준) verdict -> 중립적 상태문구 (초과/미달처럼 합불 느낌 나는 단어 지양)
-    function blockLevelPhrase(verdict) {
-      if (verdict === '과다') return '기준보다 넉넉하게 배치됐어요';
-      if (verdict === '부족') return '기준보다 적게 배치됐어요';
-      return '기준과 비슷하게 배치됐어요';
-    }
-
     function minToLabel(min) {
       const h = Math.floor(min / 60), m = min % 60;
       return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
@@ -2434,36 +2230,6 @@ async function autoSaveDiagnosisResult(storeName) {
         table.appendChild(tr);
       });
       container.appendChild(table);
-    }
-
-    function renderPriorityList(dateLabel) {
-      const container = document.getElementById('priorityList');
-      container.innerHTML = '';
-      const items = (data.priorityList && data.priorityList[dateLabel]) || [];
-
-      if (items.length === 0) {
-        container.innerHTML = '<div class="priority-empty">이 날짜엔 임계치를 넘는 과부족이 없습니다. 스케줄이 기준선에 잘 맞아요.</div>';
-        return;
-      }
-
-      items.forEach(d => {
-        const card = document.createElement('div');
-        card.className = 'priority-card';
-        const rankClass = d.rank === 1 ? 'rank-1' : (d.rank === 2 ? 'rank-2' : '');
-        const namesHtml = (d.names && d.names.length > 0)
-          ? '<div class="priority-names">현재 배치: <b>' + d.names.join(', ') + '</b></div>'
-          : '';
-        card.innerHTML =
-          '<div class="priority-rank ' + rankClass + '">' + d.rank + '</div>' +
-          '<div class="priority-body">' +
-            '<div class="priority-headline">' + d.time + ' · ' + d.part + ' — ' +
-              '<span class="type-' + d.type + '">' + d.type + ' ' + Math.abs(d.diff) + '명</span>' +
-            '</div>' +
-            '<div class="priority-detail">실배치 ' + d.actual + '명 / 기준 ' + d.standard + '명 · ' + d.action + '</div>' +
-            namesHtml +
-          '</div>';
-        container.appendChild(card);
-      });
     }
 
     // ==================== 신규 일간 대시보드 컴포넌트 (레퍼런스 디자인) ====================
@@ -3030,42 +2796,6 @@ async function autoSaveDiagnosisResult(storeName) {
       }).join('');
     }
 
-    function renderGlanceEfficiencySummary() {
-      const el = document.getElementById('glanceEfficiencySummary');
-      if (!el) return;
-      let kitchenStd = 0, hallStd = 0;
-      dateHeaders.forEach(d => {
-        const dayStd = standardSchedule[d];
-        if (!dayStd) return;
-        slots.forEach(s => {
-          PARTS.forEach(p => { kitchenStd += ((dayStd[s] && dayStd[s][p]) || 0) * 0.5; });
-          hallStd += ((dayStd[s] && dayStd[s]['홀']) || 0) * 0.5;
-        });
-      });
-      kitchenStd = Math.round(kitchenStd * 10) / 10;
-      hallStd = Math.round(hallStd * 10) / 10;
-      const kitchenRate = kitchenStd > 0 ? Math.round((weeklySummary.totalKitchen / kitchenStd) * 1000) / 10 : null;
-      const hallRate = hallStd > 0 ? Math.round((weeklySummary.totalHall / hallStd) * 1000) / 10 : null;
-      const gaps = computeWeekPartGaps();
-      const savingHours = Math.round(gaps.filter(g => g.gap < 0).reduce((s, g) => s + (-g.gap), 0) * 10) / 10;
-      const overHours = Math.round(gaps.filter(g => g.gap > 0).reduce((s, g) => s + g.gap, 0) * 10) / 10;
-
-      const rateColor = (v) => v === null ? '#6B7280' : (v < 100 ? '#2C6690' : (v > 100 ? '#A34848' : '#6B7280'));
-      const items = [
-        { label: '홀 배치효율', value: hallRate === null ? '-' : hallRate + '%', color: rateColor(hallRate), sub: '실제 ' + displayHours(weeklySummary.totalHall) + 'h · 기준 ' + displayHours(hallStd) + 'h' },
-        { label: '주방 배치효율', value: kitchenRate === null ? '-' : kitchenRate + '%', color: rateColor(kitchenRate), sub: '실제 ' + displayHours(weeklySummary.totalKitchen) + 'h · 기준 ' + displayHours(kitchenStd) + 'h' },
-        { label: '절감 인시', value: displayHours(savingHours) + 'h', color: '#2C6690', sub: '기준 대비 절감 합계' },
-        { label: '과다 인시', value: displaySignedHours(overHours), color: '#A34848', sub: '기준 대비 과다 합계' },
-      ];
-      el.innerHTML = '<div class="glance-efficiency-list">' + items.map(x =>
-        '<div class="glance-efficiency-line">' +
-          '<div class="glance-efficiency-label">' + x.label + '</div>' +
-          '<div class="glance-efficiency-value" style="color:' + x.color + ';">' + x.value + '</div>' +
-          '<div class="glance-efficiency-sub">' + x.sub + '</div>' +
-        '</div>'
-      ).join('') + '</div>';
-    }
-
     // 주간진단 - 요일별 진단 테이블 (월~일: 예상매출/목표/실제/Gap/상태)
     function renderWeeklyDayTable() {
       const el = document.getElementById('weeklyDayTable');
@@ -3161,78 +2891,6 @@ async function autoSaveDiagnosisResult(storeName) {
       ).join('');
     }
 
-    function renderWeeklyBanner() {
-      const el = document.getElementById('weeklyBanner');
-      if (!weeklySummary) { el.innerHTML = ''; return; }
-      const w = weeklySummary;
-      el.className = 'summary-banner ' + verdictClass(w.verdict);
-      const headline = diffPhrase(w.totalActual, w.totalTarget2, true) + ' · ' + levelPhrase(w.verdict);
-      el.innerHTML =
-        '<div class="summary-title">이번 주 전체</div>' +
-        '<div class="summary-verdict">' + headline + '</div>' +
-        '<div class="summary-numbers"><b>' + w.totalActual + 'h</b> (2차목표 ' + w.totalTarget2 + 'h) · 주방' + w.totalKitchen + 'h · 홀' + w.totalHall + 'h</div>';
-    }
-
-    function dayTokens(labels) {
-      return (labels || []).map(l => l.trim().split(' ').pop()).join(',');
-    }
-
-    function renderWeeklyBlockDiagnosis() {
-      const container = document.getElementById('weeklyBlockDiagnosis');
-      if (!weeklyBlockSummary.length) { container.innerHTML = ''; return; }
-
-      container.innerHTML = weeklyBlockSummary.map(b => {
-        const badgeText = blockDiffPhrase(b.totalActualHours, b.totalStandardHours);
-        const overText = '많음' + b.overDays + (b.overDays >= 1 ? '(' + dayTokens(b.allOverDayLabels) + ')' : '');
-        const underText = '적음' + b.underDays + (b.underDays >= 1 ? '(' + dayTokens(b.allUnderDayLabels) + ')' : '');
-        return (
-          '<div class="block-card verdict-' + b.verdict + '">' +
-            '<div class="block-name">' + b.name + '</div>' +
-            '<div class="block-time">' + overText + '·' + underText + '·적정' + b.okDays + '</div>' +
-            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
-            '<div class="block-numbers">' + b.action + ' · ' + b.totalActualHours + 'h/' + b.totalStandardHours + 'h</div>' +
-          '</div>'
-        );
-      }).join('');
-    }
-
-    function renderWeeklyHallBlockDiagnosis() {
-      const container = document.getElementById('weeklyHallBlockDiagnosis');
-      if (!weeklyHallBlockSummary.length) { container.innerHTML = ''; return; }
-
-      container.innerHTML = weeklyHallBlockSummary.map(b => {
-        const badgeText = blockDiffPhrase(b.totalActualHours, b.totalStandardHours);
-        const overText = '많음' + b.overDays + (b.overDays >= 1 ? '(' + dayTokens(b.allOverDayLabels) + ')' : '');
-        const underText = '적음' + b.underDays + (b.underDays >= 1 ? '(' + dayTokens(b.allUnderDayLabels) + ')' : '');
-        return (
-          '<div class="block-card verdict-' + b.verdict + '">' +
-            '<div class="block-name">' + b.name + '</div>' +
-            '<div class="block-time">' + overText + '·' + underText + '·적정' + b.okDays + '</div>' +
-            '<div class="block-verdict"><span class="badge-' + b.verdict + '">' + badgeText + '</span></div>' +
-            '<div class="block-numbers">' + b.totalActualHours + 'h/' + b.totalStandardHours + 'h</div>' +
-          '</div>'
-        );
-      }).join('');
-    }
-
-    function renderWeekBlockMatrix() {
-      const table = document.getElementById('weekBlockMatrix');
-      if (!dateHeaders.length) { table.innerHTML = ''; return; }
-
-      const blockNames = weeklyBlockSummary.map(b => b.name);
-      let html = '<tr><th>날짜</th>' + blockNames.map(n => '<th>' + n + '</th>').join('') + '</tr>';
-
-      dateHeaders.forEach(d => {
-        const dayBlocks = blockDiagnosis[d] || [];
-        html += '<tr><td>' + d + '</td>' + blockNames.map(name => {
-          const b = dayBlocks.find(x => x.name === name);
-          if (!b) return '<td>-</td>';
-          const label = blockDiffCompact(b.actualHours, b.standardHours);
-          return '<td><span class="matrix-badge ' + b.verdict + '">' + label + '</span></td>';
-        }).join('') + '</tr>';
-      });
-      table.innerHTML = html;
-    }
 
     // ==================== 한눈에(1페이지 요약) ====================
     const GLANCE_BLOCKS = [
@@ -3246,126 +2904,6 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function isWeekendDay(label) { return /[토일]\s*$/.test(label.trim()); }
 
-    function computeStoreCharacterization() {
-      const candidates = [];
-      weeklyBlockSummary.forEach(b => {
-        if (b.verdict === '과다') candidates.push({ source: '주방', block: b.name, part: b.topOverPart, diff: b.netDiffHours });
-      });
-      weeklyHallBlockSummary.forEach(b => {
-        if (b.verdict === '과다') candidates.push({ source: '홀', block: b.name, part: null, diff: b.netDiffHours });
-      });
-      if (!candidates.length) return '이번 주 뚜렷한 과다 문제가 없는 매장입니다';
-      candidates.sort((a, b) => b.diff - a.diff);
-      const top = candidates[0];
-      const partText = top.part ? (top.part + ' 파트 중심, ') : '';
-      return '이 매장은 <b>' + top.source + ' ' + top.block + '</b> 시간대 과다 인력 운용이 심한 매장입니다 (' + partText + '주간 +' + top.diff + 'h)';
-    }
-
-    function computeOverHoursFromSummaries(wbs, whbs) {
-      let total = 0;
-      (wbs || []).forEach(b => { if (b.verdict === '과다') total += b.netDiffHours; });
-      (whbs || []).forEach(b => { if (b.verdict === '과다') total += b.netDiffHours; });
-      return Math.round(total * 10) / 10;
-    }
-
-    function renderKPICards() {
-      const container = document.getElementById('kpiCards');
-      const AVG_WAGE = 14650; // 혼합 평균시급(원/h)
-
-      const overHours = computeOverHoursFromSummaries(weeklyBlockSummary, weeklyHallBlockSummary);
-      const allBlocks = weeklyBlockSummary.concat(weeklyHallBlockSummary); // 10개(주방5+홀5)
-      const okCount = allBlocks.filter(b => b.verdict === '적정').length;
-      const okRatio = allBlocks.length ? Math.round(okCount / allBlocks.length * 100) : 0;
-      const targetRatio = (weeklySummary && weeklySummary.totalActual > 0) ? Math.round(weeklySummary.totalTarget2 / weeklySummary.totalActual * 1000) / 10 : 0;
-      const savingWon = Math.round(overHours * AVG_WAGE);
-
-      // 가장 심한 파트(반복일수 포함) - computeStoreCharacterization과 동일 후보군 재사용
-      const candidates = [];
-      weeklyBlockSummary.forEach(b => { if (b.verdict === '과다') candidates.push({ block: b.name, part: b.topOverPart, count: b.topOverCount, days: b.overDays }); });
-      weeklyHallBlockSummary.forEach(b => { if (b.verdict === '과다') candidates.push({ block: b.name, part: null, count: 0, days: b.overDays }); });
-      let worstPartText = '해당 없음';
-      if (candidates.length) {
-        candidates.sort((a, b) => b.count - a.count);
-        const w = candidates[0];
-        worstPartText = w.part ? (w.part + ' · ' + w.count + '일 반복') : (w.block + ' · ' + w.days + '일 반복');
-      }
-
-      // 지난 저장 대비 추세 (previousSnapshot 있을 때만)
-      let trendCardHtml;
-      if (previousSnapshot && previousSnapshot.weeklyBlockSummary) {
-        const prevOverHours = computeOverHoursFromSummaries(previousSnapshot.weeklyBlockSummary, previousSnapshot.weeklyHallBlockSummary);
-        const diff = Math.round((overHours - prevOverHours) * 10) / 10;
-        const improved = diff <= 0;
-        const bg = improved ? '#E3F1E8' : '#F7E3E3';
-        const fg = improved ? '#3D8361' : '#A34848';
-        trendCardHtml =
-          '<div style="flex:1; background:' + bg + '; border-radius:10px; padding:16px 18px;">' +
-            '<p style="font-size:13px; color:' + fg + '; margin:0 0 6px; font-weight:600;">지난 저장 대비</p>' +
-            '<p style="font-size:12.5px; color:' + fg + '; opacity:0.85; margin:0;">과다시간 ' + prevOverHours + 'h → ' + overHours + 'h' + (improved ? ' · 개선' : ' · 악화') + '</p>' +
-          '</div>';
-      } else {
-        trendCardHtml =
-          '<div style="flex:1; background:#EDECF3; border-radius:10px; padding:16px 18px;">' +
-            '<p style="font-size:13px; color:#4A4560; margin:0 0 6px; font-weight:600;">지난 저장 대비</p>' +
-            '<p style="font-size:12.5px; color:#6E6A80; margin:0;">비교할 이전 저장 기록이 없습니다</p>' +
-          '</div>';
-      }
-
-      container.innerHTML =
-        '<div style="margin-bottom:20px;">' +
-          '<div style="display:flex; gap:14px; margin-bottom:14px;">' +
-            trendCardHtml +
-            '<div style="flex:1; background:#EDE9F9; border-radius:10px; padding:16px 18px;">' +
-              '<p style="font-size:13px; color:#5B3FA0; margin:0 0 6px; font-weight:600;">우리 매장 반복 문제</p>' +
-              '<p style="font-size:12.5px; color:#5B3FA0; opacity:0.85; margin:0;">' + worstPartText + '</p>' +
-            '</div>' +
-            '<div style="flex:1; background:#DCEEFB; border-radius:10px; padding:16px 18px;">' +
-              '<p style="font-size:13px; color:#2C6690; margin:0 0 6px; font-weight:600;">정상 시간대 비율</p>' +
-              '<p style="font-size:12.5px; color:#2C6690; opacity:0.85; margin:0;">8개 중 ' + okCount + '개 적정 (' + okRatio + '%)</p>' +
-            '</div>' +
-          '</div>' +
-          '<div style="display:flex; gap:14px;">' +
-            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
-              '<p style="font-size:11px; color:#9A94A8; margin:0;">이번주 초과시간</p><p style="font-size:16px; color:#2A2740; margin:2px 0 0; font-weight:600;">' + overHours + 'h</p>' +
-            '</div>' +
-            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
-              '<p style="font-size:11px; color:#9A94A8; margin:0;">가장 심한 파트</p><p style="font-size:14px; color:#2A2740; margin:2px 0 0; font-weight:600;">' + worstPartText + '</p>' +
-            '</div>' +
-            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
-              '<p style="font-size:11px; color:#9A94A8; margin:0;">목표 대비</p><p style="font-size:16px; color:#2A2740; margin:2px 0 0; font-weight:600;">' + targetRatio + '점</p>' +
-            '</div>' +
-            '<div style="flex:1; background:#fff; border:1px solid #eee; border-radius:10px; padding:14px 16px;">' +
-              '<p style="font-size:11px; color:#9A94A8; margin:0;">재배치시 절감</p><p style="font-size:14px; color:#2A2740; margin:2px 0 0; font-weight:600;">약 ' + savingWon.toLocaleString() + '원/주</p>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
-    }
-
-    function renderGlanceTop3() {
-      const el = document.getElementById('glanceTop3');
-      const candidates = [];
-      dateHeaders.forEach(label => {
-        (blockDiagnosis[label] || []).forEach(b => {
-          if (b.verdict === '과다' && b.worstOver) {
-            candidates.push({ day: label, block: b.name, part: b.worstOver.part, diff: b.worstOver.diffHours });
-          }
-        });
-      });
-      candidates.sort((a, b) => b.diff - a.diff);
-      const top3 = candidates.slice(0, 3);
-
-      if (!top3.length) {
-        el.innerHTML = '<div style="font-size:12.5px; color:#9AA1B0; padding:6px 0;">이번 주 뚜렷하게 반복되는 과다 문제가 없습니다.</div>';
-        return;
-      }
-      el.innerHTML = top3.map((c, i) => (
-        '<div class="compact-rank-row">' +
-          '<div class="compact-rank-num">0' + (i + 1) + '</div>' +
-          '<div class="compact-rank-meta">' + c.day + ' · ' + c.block + ' · <b>' + c.part + '</b></div>' +
-          '<div class="compact-rank-val" style="color:#A34848;">+' + c.diff + 'h</div>' +
-        '</div>'
-      )).join('');
-    }
 
     function aggregateBlockForGroup(gb, days, sourceDiagnosis) {
       const source = sourceDiagnosis || blockDiagnosis;
@@ -3639,10 +3177,6 @@ async function autoSaveDiagnosisResult(storeName) {
       if (v <= 0 || maxValue <= 0) return '#FFFFFF';
       const alpha = Math.min(1, v / maxValue);
       return 'rgba(74,108,247,' + (0.08 + alpha * 0.54).toFixed(2) + ')';
-    }
-
-    function standardSalesLabel(salesWon) {
-      return Math.round(Number(salesWon || 0) / 10_000).toLocaleString('ko-KR') + '만원';
     }
 
     async function renderStandardTimetableV2(salesWon) {

@@ -4,7 +4,7 @@
 //
 // 안전 원칙:
 //   - 총인시 진단: UP의 '근무시간' 합계를 사용하여 항상 실행
-//   - 표준시간표: 예상매출/객수 + 기존 V1 기준모델로 항상 생성
+//   - 표준시간표: DB의 표준모델 + 정석 시간표 V2 기준으로 생성
 //   - 파트진단: V1 표준파트로 설명되지 않는 실제 근무인시가 있으면 자동 차단
 //               (예: '관리'). 해당 인시를 다른 파트로 임의 배분하지 않는다.
 
@@ -23,7 +23,6 @@
     }
     await global.AshleyStandardTimetable.ensureLoaded();
 
-    const rawModels = getStandardModels();
     if (typeof getActiveDiagnosisConfig !== 'function') {
       throw new Error('계산기준 로더(config-source.js)를 찾을 수 없습니다.');
     }
