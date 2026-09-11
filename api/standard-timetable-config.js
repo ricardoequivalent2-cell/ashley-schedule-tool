@@ -11,7 +11,7 @@ export default async function handler(req, res) {
 
   try {
     const url = new URL('/rest/v1/standard_timetable_config_v2', supabaseUrl);
-    url.searchParams.set('select','version,is_active,mixed_guest_unit_price,sales_min_won,sales_max_won,sales_step_won,slot_minutes,hc_step,monotonic_enabled');
+    url.searchParams.set('select','version,is_active,mixed_guest_unit_price,sales_min_won,sales_max_won,sales_step_won,slot_minutes,hc_step,monotonic_enabled,operating_start_time,operating_end_time');
     url.searchParams.set('version','eq.2.0');
     url.searchParams.set('is_active','eq.true');
     url.searchParams.set('limit','1');
@@ -31,6 +31,8 @@ export default async function handler(req, res) {
       slotMinutes: Number(row.slot_minutes),
       hcStep: Number(row.hc_step),
       monotonicEnabled: row.monotonic_enabled === true,
+      operatingStartTime: String(row.operating_start_time || ''),
+      operatingEndTime: String(row.operating_end_time || ''),
     };
 
     const valid =
@@ -40,7 +42,9 @@ export default async function handler(req, res) {
       Number.isFinite(config.salesMaxWon) && config.salesMaxWon >= config.salesMinWon &&
       Number.isFinite(config.salesStepWon) && config.salesStepWon > 0 &&
       Number.isFinite(config.slotMinutes) && config.slotMinutes > 0 &&
-      Number.isFinite(config.hcStep) && config.hcStep > 0;
+      Number.isFinite(config.hcStep) && config.hcStep > 0 &&
+      /^\d{2}:\d{2}/.test(config.operatingStartTime) &&
+      /^\d{2}:\d{2}/.test(config.operatingEndTime);
 
     if(!valid) throw new Error('정석 시간표 V2 설정값 검증 실패');
 

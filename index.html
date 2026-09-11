@@ -3603,12 +3603,20 @@ async function autoSaveDiagnosisResult(storeName) {
       renderStandardTimetableV2(standardSelectedSalesWon);
     }
 
-    function standardBandMeta(index) {
-      if (index < 5) return { name:'오픈', cls:'band-open', start:index===0 };
-      if (index < 11) return { name:'런치피크', cls:'band-lunch', start:index===5 };
-      if (index < 17) return { name:'스윙', cls:'band-swing', start:index===11 };
-      if (index < 23) return { name:'디너', cls:'band-dinner', start:index===17 };
-      return { name:'마감', cls:'band-close', start:index===23 };
+    function standardBandMeta(slot, previousSlot) {
+      const [h, m] = String(slot || '').slice(0,5).split(':').map(Number);
+      const minute = h * 60 + m;
+      let meta;
+      if (minute < 11 * 60) meta = { name:'오픈', cls:'band-open' };
+      else if (minute < 14 * 60) meta = { name:'런치피크', cls:'band-lunch' };
+      else if (minute < 17 * 60) meta = { name:'스윙', cls:'band-swing' };
+      else if (minute < 20 * 60) meta = { name:'디너', cls:'band-dinner' };
+      else meta = { name:'마감', cls:'band-close' };
+      if (!previousSlot) return { ...meta, start:true };
+      const [ph, pm] = String(previousSlot).slice(0,5).split(':').map(Number);
+      const prevMinute = ph * 60 + pm;
+      const prevName = prevMinute < 11*60 ? '오픈' : prevMinute < 14*60 ? '런치피크' : prevMinute < 17*60 ? '스윙' : prevMinute < 20*60 ? '디너' : '마감';
+      return { ...meta, start:prevName !== meta.name };
     }
 
     function standardHcLabel(value) {
@@ -3662,7 +3670,7 @@ async function autoSaveDiagnosisResult(storeName) {
         html += '<th class="total-col">총 HC</th></tr></thead><tbody>';
 
         t.slots.forEach((slot, index) => {
-          const meta = standardBandMeta(index);
+          const meta = standardBandMeta(slot, index > 0 ? t.slots[index - 1] : null);
           const rowStart = meta.start ? ' class="band-row-start"' : '';
           html += '<tr' + rowStart + '><th class="time-col ' + meta.cls + '">' + slot + '</th>';
           t.parts.forEach(part => {

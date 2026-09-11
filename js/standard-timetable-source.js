@@ -40,24 +40,47 @@
     return getStandardModelParts();
   }
 
-  function getSlotLabels() {
+  function timeToMinutes(value) {
+    const text = String(value || '').slice(0, 5);
+    const [h, m] = text.split(':').map(Number);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN;
+  }
+
+  function getAllSlotLabels() {
     if (typeof getStandardModelSlotLabels !== 'function') throw new Error('DB 30분 슬롯 라벨 로더를 찾을 수 없습니다.');
     return getStandardModelSlotLabels().map(label => String(label).slice(0, 5));
+  }
+
+  function getActiveSlotIndexes(cfg) {
+    const all = getAllSlotLabels();
+    const start = timeToMinutes(cfg.operatingStartTime);
+    const end = timeToMinutes(cfg.operatingEndTime);
+    return all.map((label, index) => ({ label, index, minute: timeToMinutes(label) }))
+      .filter(x => Number.isFinite(x.minute) && x.minute >= start && x.minute < end);
+  }
+
+  function getSlotLabels(cfg) {
+    return getActiveSlotIndexes(cfg).map(x => x.label);
   }
 
   function sortedModelSlots(model) {
     return Object.keys((model && model.table) || {}).sort((a, b) => Number(a) - Number(b));
   }
 
-  function normalizeModelByPart(model, parts) {
+  function normalizeModelByPart(model, parts, cfg) {
     const slotKeys = sortedModelSlots(model);
-    if (slotKeys.length !== 27) {
-      throw new Error('30분 BP 모델 슬롯 수가 27개가 아닙니다: ' + (model && model.title ? model.title : '알 수 없음'));
+    const allLabels = getAllSlotLabels();
+    if (slotKeys.length !== allLabels.length) {
+      throw new Error('30분 BP 모델 슬롯 수와 DB 슬롯 라벨 수가 일치하지 않습니다: ' + (model && model.title ? model.title : '알 수 없음'));
     }
+
+    const active = getActiveSlotIndexes(cfg);
+    if (!active.length) throw new Error('DB 운영시간에 포함되는 30분 슬롯이 없습니다.');
 
     const allocation = {};
     parts.forEach(part => {
-      const values = slotKeys.map(key => Number(((model.table || {})[key] || {})[part] || 0));
+      // 운영시간 밖 슬롯(예: 08:30)은 먼저 제외하고, 남은 운영시간만 다시 100%로 정규화한다.
+      const values = active.map(x => Number(((model.table || {})[slotKeys[x.index]] || {})[part] || 0));
       const total = values.reduce((sum, value) => sum + value, 0);
       allocation[part] = total > 0 ? values.map(value => value / total) : values.map(() => 0);
     });
@@ -65,13 +88,13 @@
     return { title: model.title, sales: Number(model.sales), allocation };
   }
 
-  function getNormalizedAnchors(parts) {
+  function getNormalizedAnchors(parts, cfg) {
     if (typeof getStandardModels !== 'function') throw new Error('30분 BP 모델 로더를 찾을 수 없습니다.');
-    return getStandardModels().map(model => normalizeModelByPart(model, parts)).sort((a, b) => a.sales - b.sales);
+    return getStandardModels().map(model => normalizeModelByPart(model, parts, cfg)).sort((a, b) => a.sales - b.sales);
   }
 
-  function interpolateAllocation(salesWon, parts) {
-    const anchors = getNormalizedAnchors(parts);
+  function interpolateAllocation(salesWon, parts, cfg) {
+    const anchors = getNormalizedAnchors(parts, cfg);
     const sales = Number(salesWon) || 0;
     if (!anchors.length) throw new Error('30분 BP 모델이 없습니다.');
 
@@ -168,7 +191,7 @@
     const guestCount = sales / Number(cfg.mixedGuestUnitPrice);
     const target2 = tierHoursDaily(diagnosisConfig.CURVE.TIERS['2차목표'], guestCount, diagnosisConfig.CURVE);
     const partRatios = getPartAllocationRatios(sales);
-    const allocation = interpolateAllocation(sales, parts);
+    const allocation = interpolateAllocation(sales, parts, cfg);
     const slotHours = Number(cfg.slotMinutes) / 60;
 
     const rawByPart = {};
@@ -186,7 +209,7 @@
 
     const cfg = ACTIVE_TIMETABLE_CONFIG;
     const parts = getParts();
-    const slots = getSlotLabels();
+    const slots = getSlotLabels(cfg);
     const hcStep = Number(cfg.hcStep);
     const slotHours = Number(cfg.slotMinutes) / 60;
     const master = new Map();
