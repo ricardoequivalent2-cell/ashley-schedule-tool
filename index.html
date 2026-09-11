@@ -263,7 +263,7 @@
 .standard-sales-range-wrap{position:relative;padding:4px 2px 0}
 .standard-sales-range{width:100%;accent-color:#4A6CF7;cursor:pointer}
 .standard-sales-marks{display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:#A2A9B7}
-.standard-kpi-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.standard-kpi-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .standard-mini-kpi{background:#fff;border:1px solid #E8EBF0;border-radius:12px;padding:13px 15px}
 .standard-mini-kpi .k{font-size:10.5px;color:#98A0AE;font-weight:700;margin-bottom:5px}
 .standard-mini-kpi .v{font-size:18px;color:#30384A;font-weight:800}
@@ -273,19 +273,17 @@
 .standard-table-title{font-size:15px;font-weight:800;color:#30384A}
 .standard-table-note{font-size:11px;color:#98A0AE}
 .standard-timetable-scroll{overflow-x:auto;overflow-y:hidden;border:1px solid #EEF0F4;border-radius:10px;background:#fff;scrollbar-width:thin}
-.standard-timetable{border-collapse:separate;border-spacing:0;min-width:1260px;width:100%;table-layout:fixed;font-size:10.5px}
-.standard-timetable th,.standard-timetable td{height:35px;padding:0 4px;text-align:center;border-right:1px solid #F0F2F5;border-bottom:1px solid #F0F2F5;white-space:nowrap}
-.standard-timetable thead th{background:#F8F9FB;color:#737C8D;font-weight:750}
-.standard-timetable .part-col{position:sticky;left:0;z-index:4;width:74px;min-width:74px;background:#fff!important;text-align:left;padding-left:12px;font-weight:800;color:#3E4657;box-shadow:5px 0 8px rgba(28,39,60,.035)}
-.standard-timetable thead .part-col{z-index:6;background:#F8F9FB!important}
-.standard-timetable .slot-col{width:38px;min-width:38px;font-size:9.5px}
-.standard-timetable .band-head{height:28px;font-size:10px;letter-spacing:-.1px;background:#F4F6FA}
-.standard-timetable .band-open{background:#F3F7FF}.standard-timetable .band-lunch{background:#FFF8EB}.standard-timetable .band-swing{background:#F7F5FF}.standard-timetable .band-dinner{background:#FFF3F3}.standard-timetable .band-close{background:#F1FAF6}
-.standard-timetable .band-start{border-left:2px solid #D6DBE5}
-.standard-timetable .total-col{width:66px;min-width:66px;background:#FBFCFE;font-weight:800;color:#4B5565}
-.standard-timetable .total-row th,.standard-timetable .total-row td{background:#F8FAFD;font-weight:800;color:#3E4657}
-.standard-timetable .hc-cell{font-variant-numeric:tabular-nums;font-weight:700;color:#334155}
-.standard-source-note{font-size:11px;color:#8F97A7;line-height:1.65;background:#FAFBFD;border-radius:9px;padding:9px 12px;margin-top:10px}
+.standard-timetable{border-collapse:separate;border-spacing:0;min-width:820px;width:100%;table-layout:fixed;font-size:11px}
+.standard-timetable th,.standard-timetable td{height:31px;padding:0 7px;text-align:center;border-right:1px solid #F0F2F5;border-bottom:1px solid #F0F2F5;white-space:nowrap}
+.standard-timetable thead th{height:38px;background:#F8F9FB;color:#5F6879;font-weight:800}
+.standard-timetable .time-col{position:sticky;left:0;z-index:4;width:88px;min-width:88px;background:#fff;text-align:left;padding-left:14px;font-weight:850;color:#30384A;box-shadow:5px 0 8px rgba(28,39,60,.035)}
+.standard-timetable thead .time-col{z-index:6;background:#F8F9FB}
+.standard-timetable .part-head{font-size:10.5px;letter-spacing:-.15px}
+.standard-timetable .band-open{background:#F3F7FF!important}.standard-timetable .band-lunch{background:#FFF8EB!important}.standard-timetable .band-swing{background:#F7F5FF!important}.standard-timetable .band-dinner{background:#FFF3F3!important}.standard-timetable .band-close{background:#F1FAF6!important}
+.standard-timetable tr.band-row-start th,.standard-timetable tr.band-row-start td{border-top:2px solid #D6DBE5}
+.standard-timetable .total-col{width:72px;min-width:72px;background:#FBFCFE;font-weight:850;color:#4B5565}
+.standard-timetable .total-row th,.standard-timetable .total-row td{height:36px;background:#F8FAFD;font-weight:850;color:#3E4657;border-top:2px solid #D6DBE5}
+.standard-timetable .hc-cell{font-variant-numeric:tabular-nums;font-weight:750;color:#334155}
 @media(max-width:900px){.standard-kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.standard-v2-header{align-items:flex-start;flex-direction:column}.standard-sales-value{font-size:22px}}
 
 </style>
@@ -619,15 +617,14 @@
     </div>
 
     <div class="standard-kpi-strip">
-      <div class="standard-mini-kpi"><div class="k">추정 객수</div><div class="v" id="standardGuestCount">-</div><div class="s">혼합 객단가 22,400원</div></div>
+      <div class="standard-mini-kpi"><div class="k">추정 객수</div><div class="v" id="standardGuestCount">-</div></div>
       <div class="standard-mini-kpi"><div class="k">2차목표(BHAG)</div><div class="v" id="standardTargetHours">-</div><div class="s">표준 총인시</div></div>
-      <div class="standard-mini-kpi"><div class="k">표시 시간표 합계</div><div class="v" id="standardRoundedHours">-</div><div class="s">0.5명 단위 보정 후</div></div>
-      <div class="standard-mini-kpi"><div class="k">원본 BP 구간</div><div class="v" id="standardSourceBand" style="font-size:14px;line-height:1.3;">-</div><div class="s" id="standardSourceMethod">-</div></div>
+      <div class="standard-mini-kpi"><div class="k">표시 시간표 합계</div><div class="v" id="standardRoundedHours">-</div></div>
     </div>
 
     <div class="standard-timetable-card">
       <div class="standard-table-head">
-        <div class="standard-table-title">파트 × 30분 정석 배치</div>
+        <div class="standard-table-title">30분 × 파트 정석 배치</div>
         <div class="standard-table-note">셀 숫자 = 필요 인원(HC) · 진할수록 인원이 많음</div>
       </div>
       <div id="standardScheduleContainer"></div>
@@ -3656,51 +3653,32 @@ async function autoSaveDiagnosisResult(storeName) {
         document.getElementById('standardTargetHours').textContent = Math.round(t.target2).toLocaleString('ko-KR') + 'h';
         document.getElementById('standardRoundedHours').textContent = Math.round(t.roundedTotalHours).toLocaleString('ko-KR') + 'h';
 
-        const sourceBand = t.source.lowerSales === t.source.upperSales
-          ? standardSalesLabel(t.source.lowerSales)
-          : standardSalesLabel(t.source.lowerSales) + ' → ' + standardSalesLabel(t.source.upperSales);
-        document.getElementById('standardSourceBand').textContent = sourceBand;
-        document.getElementById('standardSourceMethod').textContent = t.source.method;
-
         let html = '<div class="standard-timetable-scroll"><table class="standard-timetable">';
-        html += '<thead><tr><th class="part-col" rowspan="2">파트</th>';
-        html += '<th class="band-head band-open" colspan="5">오픈</th>';
-        html += '<th class="band-head band-lunch" colspan="6">런치피크</th>';
-        html += '<th class="band-head band-swing" colspan="6">스윙</th>';
-        html += '<th class="band-head band-dinner" colspan="6">디너</th>';
-        html += '<th class="band-head band-close" colspan="4">마감</th>';
-        html += '<th class="total-col" rowspan="2">일인시</th></tr><tr>';
+        html += '<thead><tr><th class="time-col">시간</th>';
+        t.parts.forEach(part => {
+          html += '<th class="part-head">' + part + '</th>';
+        });
+        html += '<th class="total-col">총 HC</th></tr></thead><tbody>';
+
         t.slots.forEach((slot, index) => {
           const meta = standardBandMeta(index);
-          html += '<th class="slot-col ' + meta.cls + (meta.start ? ' band-start' : '') + '">' + slot + '</th>';
-        });
-        html += '</tr></thead><tbody>';
-
-        t.parts.forEach(part => {
-          html += '<tr><th class="part-col">' + part + '</th>';
-          t.slots.forEach((slot, index) => {
+          const rowStart = meta.start ? ' class="band-row-start"' : '';
+          html += '<tr' + rowStart + '><th class="time-col ' + meta.cls + '">' + slot + '</th>';
+          t.parts.forEach(part => {
             const value = Number((t.hcByPart[part] || [])[index] || 0);
-            const meta = standardBandMeta(index);
             const alpha = maxHc > 0 ? value / maxHc : 0;
             const textColor = alpha > 0.72 ? '#FFFFFF' : '#334155';
-            html += '<td class="hc-cell' + (meta.start ? ' band-start' : '') + '" style="background:' + standardHeatColor(value, maxHc) + ';color:' + textColor + ';">' + standardHcLabel(value) + '</td>';
+            html += '<td class="hc-cell" style="background:' + standardHeatColor(value, maxHc) + ';color:' + textColor + ';">' + standardHcLabel(value) + '</td>';
           });
-          html += '<td class="total-col">' + Math.round(Number(t.roundedPartHours[part] || 0)) + 'h</td></tr>';
+          html += '<td class="total-col">' + standardHcLabel(t.slotTotals[index]) + '</td></tr>';
         });
 
-        html += '<tr class="total-row"><th class="part-col">총 HC</th>';
-        t.slotTotals.forEach((value, index) => {
-          const meta = standardBandMeta(index);
-          html += '<td class="' + (meta.start ? 'band-start' : '') + '">' + standardHcLabel(value) + '</td>';
+        html += '<tr class="total-row"><th class="time-col">일인시</th>';
+        t.parts.forEach(part => {
+          html += '<td>' + Math.round(Number(t.roundedPartHours[part] || 0)) + 'h</td>';
         });
         html += '<td class="total-col">' + Math.round(t.roundedTotalHours) + 'h</td></tr>';
         html += '</tbody></table></div>';
-
-        const src = t.source.lowerSales === t.source.upperSales
-          ? '<b>' + t.source.lowerTitle + '</b> (' + standardSalesLabel(t.source.lowerSales) + ') 패턴을 사용했습니다.'
-          : '<b>' + t.source.lowerTitle + '</b> (' + standardSalesLabel(t.source.lowerSales) + ')와 <b>' + t.source.upperTitle + '</b> (' + standardSalesLabel(t.source.upperSales) + ')의 30분 Allocation을 매출 비율로 보간했습니다.';
-        const diff = t.totalHourDiff;
-        html += '<div class="standard-source-note">' + src + ' 총량은 혼합 객단가 <b>22,400원</b>으로 추정한 객수의 2차목표(BHAG)를 적용하고, Part Allocation V1로 파트별 목표인시를 나눈 뒤 30분 BP Allocation에 배분했습니다. 표시값은 0.5명 단위로 보정되어 2차목표와 <b>' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'h</b> 차이입니다.</div>';
         container.innerHTML = html;
       } catch (error) {
         if (token !== standardRenderToken) return;
