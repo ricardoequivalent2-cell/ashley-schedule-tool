@@ -74,7 +74,7 @@
     .glance-main-right .compact-rank-meta { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .glance-main-right .compact-rank-val { font-size:11px; }
 
-    /* 홀/주방 배치효율을 가로 2열로 배치해 세로 공간을 절반 수준으로 축소 */
+    /* 홀/주방 배치율을 가로 2열로 배치해 세로 공간을 절반 수준으로 축소 */
     .glance-efficiency-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-bottom:12px; align-items:start; }
     .glance-efficiency-pair .section-card { margin-bottom:0 !important; min-width:0; }
     .glance-efficiency-pair .glance-day-card { min-width:56px; padding:6px 3px; }
