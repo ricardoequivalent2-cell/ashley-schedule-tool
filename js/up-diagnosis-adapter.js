@@ -205,8 +205,8 @@
       let verdict;
       if (actualTotal > hurdle) verdict = '과다 · 즉시개선';
       else if (actualTotal > target1) verdict = '개선 필요';
-      else if (actualTotal > target2) verdict = '양호 · BHAG 추가개선';
-      else verdict = '2차목표(BHAG) 달성';
+      else if (actualTotal > target2) verdict = '양호 · 가이드라인 추가개선';
+      else verdict = '가이드라인 달성';
 
       tierDiagnosis[label] = {
         guestCount: Math.round(guestCount),
