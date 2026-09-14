@@ -108,8 +108,8 @@
 .overview-table tbody tr:hover{background:#FAFBFF}
 .overview-table tbody tr:last-child td{border-bottom:0}
 .overview-store{font-weight:800;color:#272D3A}
-.overview-gap-plus{color:#C64545;font-weight:800}
-.overview-gap-minus{color:#3D8361;font-weight:800}
+.overview-gap-plus{color:#D6452F;font-weight:800}
+.overview-gap-minus{color:#17845B;font-weight:800}
 .overview-gap-zero{color:#566071;font-weight:800}
 .overview-pill{
   display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;
@@ -121,9 +121,9 @@
   display:inline-flex;align-items:center;justify-content:center;min-width:48px;
   padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800
 }
-.overview-status-normal{background:#E8F3EC;color:#3D8361}
-.overview-status-warning{background:#FFF4D6;color:#B7791F}
-.overview-status-excess{background:#FBECEC;color:#C64545}
+.overview-status-normal{background:#ECFDF3;color:#067647}
+.overview-status-warning{background:#FFFAEB;color:#B54708}
+.overview-status-excess{background:#FEF3F2;color:#B42318}
 
 @media(max-width:900px){
   .overview-kpi-row{grid-template-columns:repeat(2,1fr)}
@@ -365,9 +365,9 @@
       <input id="overviewSearchInput" type="text" placeholder="매장 검색">
       <select id="overviewStatusFilter">
         <option value="all">전체 상태</option>
-        <option value="normal">양호</option>
-        <option value="warning">개선 필요</option>
-        <option value="excess">즉시개선</option>
+        <option value="normal">정상</option>
+        <option value="warning">주의</option>
+        <option value="excess">과다</option>
       </select>
       <button class="overview-refresh" id="overviewRefreshBtn" type="button">새로고침</button>
       <div id="overviewLoadStatus">불러오는 중...</div>
@@ -382,7 +382,7 @@
       <div class="overview-kpi">
         <div class="overview-kpi-label">과다 매장</div>
         <div class="overview-kpi-value overview-gap-plus" id="overviewKpiExcessStores">-</div>
-        <div class="overview-kpi-hint">즉시개선 필요 매장 수</div>
+        <div class="overview-kpi-hint">Gap% 5% 초과</div>
       </div>
       <div class="overview-kpi">
         <div class="overview-kpi-label">총 초과 인시</div>
@@ -390,7 +390,7 @@
         <div class="overview-kpi-hint">Gap이 양수인 매장만 합산</div>
       </div>
       <div class="overview-kpi">
-        <div class="overview-kpi-label">전체 배치율</div>
+        <div class="overview-kpi-label">전체 Gap%</div>
         <div class="overview-kpi-value" id="overviewKpiGapPct">-</div>
         <div class="overview-kpi-hint">전체 실제인시 ÷ 전체 표준인시 기준</div>
       </div>
@@ -412,7 +412,7 @@
               <th class="overview-sortable" data-sort="actual_hours">실제인시 <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="standard_hours">표준인시 <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="gap_hours">Gap <span class="sort-mark"></span></th>
-              <th class="overview-sortable" data-sort="gap_pct">배치율 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="gap_pct">Gap% <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="kitchen_gap_hours">주방 Gap <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="hall_gap_hours">홀 Gap <span class="sort-mark"></span></th>
               <th>모델</th>
@@ -428,7 +428,7 @@
     <div id="overviewTrendWrap">
       <div class="overview-table-card">
         <div class="overview-table-head">
-          <div class="overview-table-title">매장별 최근 4주 배치율 추이</div>
+          <div class="overview-table-title">매장별 최근 4주 Gap% 추이</div>
         </div>
         <div class="overview-table-wrap">
           <table class="overview-table">
@@ -701,34 +701,19 @@ function overviewGapClass(v) {
   return Number(v) > 0 ? 'overview-gap-plus' :
          Number(v) < 0 ? 'overview-gap-minus' : 'overview-gap-zero';
 }
-// 요약/주간진단/일간진단과 동일한 "신호등" 기준(trafficMeta)을 그대로 재사용.
-// gap_pct 임계값 대신, guest_count로 그때그때 target1/hurdle을 계산해서 판정한다.
-function overviewStatus(row) {
-  if (!row) return { key: 'normal', label: '-', cls: 'overview-status-normal' };
-  let config;
-  try {
-    config = getActiveDiagnosisConfig();
-  } catch (e) {
-    return { key: 'normal', label: '-', cls: 'overview-status-normal' };
-  }
-  const guestCount = Number(row.guest_count || 0);
-  const actual = Number(row.actual_hours || 0);
-  const target1 = tierHoursDaily(config.CURVE.TIERS['1차목표'], guestCount, config.CURVE);
-  const hurdle = tierHoursDaily(config.CURVE.TIERS['최소허들'], guestCount, config.CURVE);
-  const meta = trafficMeta(actual, target1, hurdle); // { key:'green'|'yellow'|'red', label, color, bg }
-  const keyMap = { green: 'normal', yellow: 'warning', red: 'excess' };
-  const clsMap = { green: 'overview-status-normal', yellow: 'overview-status-warning', red: 'overview-status-excess' };
-  return { key: keyMap[meta.key], label: meta.label, cls: clsMap[meta.key] };
+function overviewStatus(gapPct) {
+  const n = Number(gapPct || 0);
+  if (n <= 0) return { key:'normal', label:'정상', cls:'overview-status-normal' };
+  if (n <= 5) return { key:'warning', label:'주의', cls:'overview-status-warning' };
+  return { key:'excess', label:'과다', cls:'overview-status-excess' };
 }
 function overviewSignHours(v) {
   return displaySignedHours(v);
 }
-// 요약/일간과 동일한 "배치율"(실제÷기준×100) 표기로 변환해서 보여줌.
-// 색상 판정(overviewGapClass)은 그대로 gap_pct 부호를 사용한다 - 여기선 표시 텍스트만 바꿈.
 function overviewPct(v) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '-';
-  const placementRate = 100 + Number(v);
-  return placementRate.toFixed(1) + '%';
+  const n = Number(v);
+  return (n > 0 ? '+' : '') + n.toFixed(1) + '%';
 }
 function overviewFormatSavedAt(iso) {
   if (!iso) return '-';
@@ -911,7 +896,7 @@ function renderOverviewTrend() {
 
   head.innerHTML = `<tr>
     <th>매장</th>
-    ${weeks.map(w => `<th>${shortWeekLabel(w.weekStart)} 배치율</th>`).join('')}
+    ${weeks.map(w => `<th>${shortWeekLabel(w.weekStart)} Gap%</th>`).join('')}
     <th>4주 변화</th>
     <th>현재 상태</th>
   </tr>`;
@@ -931,7 +916,7 @@ function renderOverviewTrend() {
     const latestWeek = weeks[weeks.length - 1].weekStart;
     const latestRow = storeMap.get(store)[latestWeek];
     if (!latestRow) return statusFilter === 'all';
-    const status = overviewStatus(latestRow).key;
+    const status = overviewStatus(latestRow.gap_pct).key;
     return statusFilter === 'all' || status === statusFilter;
   });
 
@@ -956,7 +941,7 @@ function renderOverviewTrend() {
     const delta = first && latest ? Number(latest.gap_pct || 0) - Number(first.gap_pct || 0) : null;
     const trendCls = delta === null ? 'overview-trend-flat' : delta > 0 ? 'overview-trend-bad' : delta < 0 ? 'overview-trend-good' : 'overview-trend-flat';
     const trendText = delta === null ? '-' : (delta > 0 ? '+' : '') + delta.toFixed(1) + '%p';
-    const latestStatus = latest ? overviewStatus(latest) : null;
+    const latestStatus = latest ? overviewStatus(latest.gap_pct) : null;
     const latestWeekStart = latest?.week_start || weeks[weeks.length - 1].weekStart;
 
     return `<tr class="overview-click-row" data-store="${overviewEscapeHtml(store)}" data-week="${overviewEscapeHtml(latestWeekStart)}">
@@ -982,7 +967,7 @@ function getOverviewFilteredRows() {
   const rows = overviewRows.filter(row => {
     const sameWeek = !weekStart || row.week_start === weekStart;
     const matches = !keyword || String(row.store_name || '').toLowerCase().includes(keyword);
-    const status = overviewStatus(row).key;
+    const status = overviewStatus(row.gap_pct).key;
     const statusMatches = statusFilter === 'all' || status === statusFilter;
     return sameWeek && matches && statusMatches;
   });
@@ -994,8 +979,8 @@ function getOverviewFilteredRows() {
     let bv;
 
     if (overviewSortKey === 'status') {
-      av = statusRank[overviewStatus(a).key] || 0;
-      bv = statusRank[overviewStatus(b).key] || 0;
+      av = statusRank[overviewStatus(a.gap_pct).key] || 0;
+      bv = statusRank[overviewStatus(b.gap_pct).key] || 0;
     } else if (overviewSortKey === 'store_name') {
       av = String(a.store_name || '');
       bv = String(b.store_name || '');
@@ -1053,7 +1038,7 @@ function renderOverview() {
   const standard = weekRows.reduce((sum, row) => sum + Number(row.standard_hours || 0), 0);
   const gap = actual - standard;
   const gapPct = standard > 0 ? (gap / standard * 100) : 0;
-  const excessStores = weekRows.filter(row => overviewStatus(row).key === 'excess').length;
+  const excessStores = weekRows.filter(row => overviewStatus(row.gap_pct).key === 'excess').length;
   const excessHours = weekRows.reduce((sum, row) => sum + Math.max(0, Number(row.gap_hours || 0)), 0);
 
   const storesEl = document.getElementById('overviewKpiStores');
@@ -1080,7 +1065,7 @@ function renderOverview() {
   body.innerHTML = rows.map(row => `
     <tr class="overview-click-row" data-store="${overviewEscapeHtml(row.store_name || '')}" data-week="${overviewEscapeHtml(row.week_start || '')}">
       <td><a href="#" class="overview-store-link" data-store="${overviewEscapeHtml(row.store_name || '')}" data-week="${overviewEscapeHtml(row.week_start || '')}">${overviewEscapeHtml(row.store_name || '-')}</a></td>
-      <td><span class="overview-status ${overviewStatus(row).cls}">${overviewStatus(row).label}</span></td>
+      <td><span class="overview-status ${overviewStatus(row.gap_pct).cls}">${overviewStatus(row.gap_pct).label}</span></td>
       <td>${overviewSales(row.expected_sales)}</td>
       <td>${Math.round(Number(row.guest_count || 0)).toLocaleString('ko-KR')}</td>
       <td>${overviewN1(row.actual_hours)}h</td>
