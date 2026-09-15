@@ -1,0 +1,11 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>FINAL Action Engine Test</title>
+<style>body{font-family:Arial,sans-serif;margin:28px;color:#1f2937}input,button{padding:8px 10px}table{border-collapse:collapse;margin-top:18px}th,td{border:1px solid #ddd;padding:8px 12px;text-align:right}th:first-child,td:first-child{text-align:left}.ok{color:#087443}</style></head><body>
+<h2>FINAL Action 계산 엔진 독립 테스트</h2><p>현재 진단 화면에는 연결하지 않은 검증용 페이지입니다.</p>
+<input id="sales" type="number" value="10000000" step="1000000"><button id="run">계산</button><span id="status"></span>
+<div id="out"></div>
+<script src="./js/diagnosis-engine.js"></script><script src="./js/config-source.js"></script><script src="./js/part-allocation-source.js"></script><script src="./js/action-standard-engine.js"></script>
+<script>
+function f(n,d=4){return Number(n).toLocaleString('ko-KR',{maximumFractionDigits:d});}
+async function run(){const s=document.getElementById('status'); const out=document.getElementById('out'); try{s.textContent=' 로딩 중...'; const r=await calculateFinalActionStandardReady(Number(document.getElementById('sales').value)); s.textContent=' ✓ '+r.sourceVersion; s.className='ok'; out.innerHTML=`<table><tr><th>항목</th><th>값</th></tr><tr><td>매출</td><td>${f(r.salesWon,0)}원</td></tr><tr><td>객단가</td><td>${f(r.guestUnitPrice,0)}원</td></tr><tr><td>일객수</td><td>${f(r.guests)}</td></tr><tr><td>주간객수</td><td>${f(r.weeklyGuests,0)}</td></tr><tr><td>V1 최소</td><td>${f(r.v1.minimum)}h</td></tr><tr><td>V1 1차</td><td>${f(r.v1.target1)}h</td></tr><tr><td>V1 가이드라인</td><td>${f(r.v1.guideline)}h</td></tr><tr><td>스시 절감</td><td>${f(r.sushi.total)}h</td></tr><tr><td>베이커리 최소 절감</td><td>${f(r.bakerySaving.minimum)}h</td></tr><tr><td>베이커리 1차 절감</td><td>${f(r.bakerySaving.target1)}h</td></tr><tr><td>베이커리 가이드라인 절감</td><td>${f(r.bakerySaving.guideline)}h</td></tr><tr><td><b>Action 최소</b></td><td><b>${f(r.action.minimum)}h</b></td></tr><tr><td><b>Action 1차</b></td><td><b>${f(r.action.target1)}h</b></td></tr><tr><td><b>Action 가이드라인</b></td><td><b>${f(r.action.guideline)}h</b></td></tr></table>`;}catch(e){s.textContent=' 오류: '+e.message;s.className='';}}
+document.getElementById('run').onclick=run;
+</script></body></html>

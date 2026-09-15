@@ -100,13 +100,13 @@ export default async function handler(req, res) {
       totalRowCount: 9,
       partCapRowCount: 3,
       guestUnitPrice: {
-        weekday: 21138,
-        weekend: 24889,
+        weekday: 22600,
+        weekend: 22600,
       },
       curve: {
         floor: 90,
         knot: 1200,
-        slope: 0.164532,
+        slope: 0.16453165,
         tiers: {
           minimum: { a: 47.6487, b: 0.5936, c: 0.8431 },
           target1: { a: 61.9593, b: 0.1823, c: 0.9948 },
