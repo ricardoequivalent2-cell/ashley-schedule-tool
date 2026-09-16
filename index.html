@@ -3241,35 +3241,13 @@ async function autoSaveDiagnosisResult(storeName) {
         t.slots.forEach((slot, index) => {
           const meta = standardBandMeta(slot, index > 0 ? t.slots[index - 1] : null);
           const rowStart = meta.start ? ' class="band-row-start"' : '';
-          const isOpenIntegrated = String(slot).slice(0, 5) < '11:00';
           html += '<tr' + rowStart + '><th class="time-col ' + meta.cls + '">' + slot + '</th>';
-
-          for (let partIndex = 0; partIndex < t.parts.length; partIndex += 1) {
-            const part = t.parts[partIndex];
-
-            // 오픈(09:00~10:30)만 핫·그릴·피파를 하나의 운영 인원으로 통합 표시한다.
-            // 계산 원본(hcByPart)은 건드리지 않고 화면에서만 세 파트 HC를 합산한다.
-            if (isOpenIntegrated && part === '핫') {
-              const integratedParts = ['핫', '그릴', '피파'];
-              const integratedValue = integratedParts.reduce(
-                (sum, integratedPart) => sum + Number((t.hcByPart[integratedPart] || [])[index] || 0),
-                0
-              );
-              const alpha = maxHc > 0 ? integratedValue / maxHc : 0;
-              const textColor = alpha > 0.72 ? '#FFFFFF' : '#334155';
-              html += '<td class="hc-cell" colspan="3" title="핫·그릴·피파 통합" style="background:' + standardHeatColor(integratedValue, maxHc) + ';color:' + textColor + ';font-weight:850;">' + standardHcLabel(integratedValue) + '</td>';
-              continue;
-            }
-
-            if (isOpenIntegrated && (part === '그릴' || part === '피파')) {
-              continue;
-            }
-
+          t.parts.forEach(part => {
             const value = Number((t.hcByPart[part] || [])[index] || 0);
             const alpha = maxHc > 0 ? value / maxHc : 0;
             const textColor = alpha > 0.72 ? '#FFFFFF' : '#334155';
             html += '<td class="hc-cell" style="background:' + standardHeatColor(value, maxHc) + ';color:' + textColor + ';">' + standardHcLabel(value) + '</td>';
-          }
+          });
           html += '<td class="total-col">' + standardHcLabel(t.slotTotals[index]) + '</td></tr>';
         });
 
