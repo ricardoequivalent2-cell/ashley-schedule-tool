@@ -1791,11 +1791,11 @@ function restoreGlanceTopFromTotal() {
 
   let status;
   if (Number(w.totalActual || 0) > Number(w.totalHurdle || 0)) {
-    status = { label:'즉시개선', color:'#A34848', bg:'#F7E3E3' };
+    status = { label:'즉시개선', color:'#FF1F1F', bg:'#FF3B30', textColor:'#FFFFFF' };
   } else if (Number(w.totalActual || 0) > Number(w.totalTarget1 || 0)) {
-    status = { label:'개선 필요', color:'#A86F14', bg:'#FFF1CC' };
+    status = { label:'개선 필요', color:'#E0A800', bg:'#FFD60A', textColor:'#3B2F00' };
   } else {
-    status = { label:'양호', color:'#3D8361', bg:'#E3F1E8' };
+    status = { label:'양호', color:'#00B83E', bg:'#00C853', textColor:'#FFFFFF' };
   }
 
   const numEl = document.getElementById('execGapNumber');
@@ -1808,7 +1808,7 @@ function restoreGlanceTopFromTotal() {
   if (wordEl) {
     wordEl.textContent = status.label;
     wordEl.style.background = status.bg;
-    wordEl.style.color = status.color;
+    wordEl.style.color = status.textColor || status.color;
   }
 
   const kpiEl = document.getElementById('glanceKpiRow');
@@ -2302,9 +2302,9 @@ async function autoSaveDiagnosisResult(storeName) {
 
     // 전 화면 공통 신호등: 가이드라인은 Gap 기준, 색상은 1차목표/최소허들 경계로 판정한다.
     function trafficMeta(actual, target1, hurdle) {
-      if (actual > hurdle) return { key:'red', label:'즉시개선', color:'#C64545', bg:'#FBECEC' };
-      if (actual > target1) return { key:'yellow', label:'개선 필요', color:'#B7791F', bg:'#FFF4D6' };
-      return { key:'green', label:'양호', color:'#3D8361', bg:'#E8F3EC' };
+      if (actual > hurdle) return { key:'red', label:'즉시개선', color:'#FF1F1F', bg:'#FFD6D6' };
+      if (actual > target1) return { key:'yellow', label:'개선 필요', color:'#E0A800', bg:'#FFF0A6' };
+      return { key:'green', label:'양호', color:'#00B83E', bg:'#D5F7DF' };
     }
 
     function trafficMetaFromStandard(actual, standard, t) {
@@ -2774,10 +2774,8 @@ async function autoSaveDiagnosisResult(storeName) {
       const el = document.getElementById('glanceDonut');
       const subEl = document.getElementById('glanceGapSub');
       const allGaps = computeWeekPartGaps();
-      const totalGap = allGaps.reduce((sum, g) => sum + g.gap, 0);
-      const totalWord = Math.abs(totalGap) < 0.5 ? '적정' : (totalGap > 0 ? '과다' : '절감');
-      const totalColor = Math.abs(totalGap) < 0.5 ? '#3D8361' : (totalGap > 0 ? '#A34848' : '#2C6690');
-      subEl.innerHTML = '이번 주 <b style="color:' + totalColor + ';">' + displaySignedHours(totalGap) + ' ' + totalWord + '</b>';
+      // 요약 상단에 전체 Gap이 이미 표시되므로 파트별 진단 우상단의 주간 Gap은 중복 노출하지 않는다.
+      if (subEl) subEl.innerHTML = '';
 
       document.querySelectorAll('#partGapTabs .part-gap-tab').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.partScope === glancePartScope);
@@ -2806,8 +2804,8 @@ async function autoSaveDiagnosisResult(storeName) {
 
       const rows = ranked.map(g => {
         const isOver = g.gap > 0.05;
-        const statusColor = g.tierStatus === 'red' ? '#C64545' : (g.tierStatus === 'yellow' ? '#B7791F' : '#3D8361');
-        const statusBg = g.tierStatus === 'red' ? '#FBECEC' : (g.tierStatus === 'yellow' ? '#FFF4D6' : '#E8F3EC');
+        const statusColor = g.tierStatus === 'red' ? '#FF1F1F' : (g.tierStatus === 'yellow' ? '#E0A800' : '#00B83E');
+        const statusBg = g.tierStatus === 'red' ? '#FFD6D6' : (g.tierStatus === 'yellow' ? '#FFF0A6' : '#D5F7DF');
         const rowClass = g.tierStatus === 'red' ? 'is-over' : 'is-ok';
         const halfWidthPct = (Math.abs(g.gap) / maxAbs) * 50;
         const style = isOver
