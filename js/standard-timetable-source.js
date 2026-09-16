@@ -871,7 +871,10 @@ parts.forEach(part => {
 });
 // 검증이 끝난 OPEN RULE 결과를 실제 표준시간표에 적용
 hcByPart = openResult.adjusted;
-logShiftCombinationTest(hcByPart, raw.partHours, slots);
+// 현실 근무조 조합 테스트 - 1,300만원에서만 실행
+if (sales === 13000000) {
+  logShiftCombinationTest(hcByPart, raw.partHours, slots);
+}
       const slotTotals = slots.map((_, i) => parts.reduce((sum, part) => sum + hcByPart[part][i], 0));
       const roundedTotalHours = slotTotals.reduce((sum, hc) => sum + hc * slotHours, 0);
 
