@@ -484,13 +484,13 @@
     <div class="glance-efficiency-pair">
       <div class="section-card">
         <div class="section-title">시간대별 배치율 (홀)</div>
-        <div id="glanceHallScoreCards"></div>
+        <div class="section-sub" style="margin-top:4px; margin-bottom:8px;">숫자 = 기준 대비 실제 사용률</div>
         <div id="glanceHallBlockChart"></div>
       </div>
 
       <div class="section-card">
         <div class="section-title">시간대별 배치율 (주방)</div>
-        <div id="glanceScoreCards"></div>
+        <div class="section-sub" style="margin-top:4px; margin-bottom:8px;">숫자 = 기준 대비 실제 사용률</div>
         <div id="glanceBlockChart"></div>
       </div>
     </div>
@@ -3004,7 +3004,7 @@ async function autoSaveDiagnosisResult(storeName) {
       const buildChart = (days) => {
         const data = GLANCE_BLOCKS.map(gb => Object.assign({ name: gb.name }, aggregateBlockForGroup(gb, days, sourceDiagnosis)));
         const maxVal = Math.max(1, ...data.map(d => Math.max(d.actual, d.standard))) * 1.15;
-        const W = 640, H = 160, PAD = 18;
+        const W = 700, H = 230, PAD = 28;
         const stepX = (W - PAD * 2) / (data.length - 1);
         const yOf = (v) => PAD + (H - PAD * 2) * (1 - v / maxVal);
         const xOf = (i) => PAD + stepX * i;
@@ -3028,8 +3028,12 @@ async function autoSaveDiagnosisResult(storeName) {
         // 기준선(핑크 점선)
         svg += '<path d="' + toPath(stdPts) + '" fill="none" stroke="#EC4899" stroke-width="2" stroke-dasharray="5,4"></path>';
         data.forEach((d, i) => {
-          svg += '<circle cx="' + actualPts[i][0] + '" cy="' + actualPts[i][1] + '" r="4" fill="#8B5CF6"></circle>';
+          svg += '<circle cx="' + actualPts[i][0] + '" cy="' + actualPts[i][1] + '" r="4.5" fill="#8B5CF6"></circle>';
           svg += '<circle cx="' + stdPts[i][0] + '" cy="' + stdPts[i][1] + '" r="3.5" fill="#fff" stroke="#EC4899" stroke-width="2"></circle>';
+          const ratioText = d.score === null ? '-' : Math.round(d.score) + '%';
+          const ratioColor = d.score === null ? '#6B7280' : (d.score > 105 ? '#C64545' : (d.score < 95 ? '#3B82F6' : '#3D8361'));
+          const labelY = Math.max(16, actualPts[i][1] - 12);
+          svg += '<text x="' + xOf(i) + '" y="' + labelY + '" text-anchor="middle" font-size="15" font-weight="800" fill="' + ratioColor + '">' + ratioText + '</text>';
           svg += '<text x="' + xOf(i) + '" y="' + (H + 18) + '" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">' + d.name + '</text>';
         });
         svg += '</svg>';
@@ -3129,9 +3133,7 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function renderGlanceAll() {
       renderPartRanking();
-      renderGlanceHallScoreCards();
       renderGlanceBlockChart('glanceHallBlockChart', hallBlockDiagnosis);
-      renderGlanceScoreCards();
       renderGlanceBlockChart('glanceBlockChart', blockDiagnosis);
       renderGlanceHeatmap('glanceHeatmapWeekday', false);
       renderGlanceHeatmap('glanceHeatmapWeekend', true);
