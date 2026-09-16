@@ -1091,6 +1091,9 @@ function activateMainView(viewName) {
   if (viewName === 'overview') {
     loadOverviewData(false);
   }
+  if (viewName === 'glance') {
+    restoreGlanceTopFromTotal();
+  }
 }
 
 function setupOverviewControls() {
@@ -1737,6 +1740,59 @@ function refreshScopeTabs() {
   });
 }
 
+// 요약 상단은 항상 '전체' 주간 진단값만 사용한다.
+// 주간/일간에서 주방·홀 조직 탭을 선택해 renderApp()이 다시 실행되어도
+// 요약 상단 숫자가 해당 조직 값으로 덮어써지지 않도록 별도로 복원한다.
+function restoreGlanceTopFromTotal() {
+  const total = diagnosisResultsByScope.total;
+  if (!total || !total.weeklySummary) return;
+
+  const w = total.weeklySummary;
+  const totalSales = (total.dateHeaders || []).reduce(
+    (sum, date) => sum + Number((total.tierDiagnosis?.[date]?.salesVal) || 0),
+    0
+  );
+  const gap = Math.round((Number(w.totalActual || 0) - Number(w.totalTarget2 || 0)) * 10) / 10;
+
+  let status;
+  if (Number(w.totalActual || 0) > Number(w.totalHurdle || 0)) {
+    status = { label:'즉시개선', color:'#A34848', bg:'#F7E3E3' };
+  } else if (Number(w.totalActual || 0) > Number(w.totalTarget1 || 0)) {
+    status = { label:'개선 필요', color:'#A86F14', bg:'#FFF1CC' };
+  } else {
+    status = { label:'양호', color:'#3D8361', bg:'#E3F1E8' };
+  }
+
+  const numEl = document.getElementById('execGapNumber');
+  if (numEl) {
+    numEl.textContent = displaySignedHours(gap);
+    numEl.style.color = status.color;
+  }
+
+  const wordEl = document.getElementById('execGapWord');
+  if (wordEl) {
+    wordEl.textContent = status.label;
+    wordEl.style.background = status.bg;
+    wordEl.style.color = status.color;
+  }
+
+  const kpiEl = document.getElementById('glanceKpiRow');
+  if (kpiEl) {
+    const cards = [
+      { icon:'₩', bg:'#EDE9F9', fg:'#5B3FA0', label:'주간 예상 매출', value:totalSales.toLocaleString() + '원' },
+      { icon:'人', bg:'#DCEEFB', fg:'#2C6690', label:'주간 예상 객수', value:Number(w.totalGuest || 0) + '명' },
+      { icon:'◎', bg:'#F8ECDA', fg:'#A67A3A', label:'가이드라인 총사용시간', value:displayHours(Number(w.totalTarget2 || 0)) + 'h' },
+      { icon:'≡', bg:'#E3F1E8', fg:'#3D8361', label:'실제 총사용시간', value:displayHours(Number(w.totalActual || 0)) + 'h' },
+    ];
+    kpiEl.innerHTML = cards.map(c =>
+      '<div class="kpi-card-5">' +
+        '<div class="kpi-icon" style="background:' + c.bg + '; color:' + c.fg + ';">' + c.icon + '</div>' +
+        '<div><div class="kpi-label">' + c.label + '</div><div class="kpi-value">' + c.value + '</div></div>' +
+      '</div>'
+    ).join('');
+  }
+}
+
 function setDiagnosisScope(scope) {
   const result = diagnosisResultsByScope[scope];
   if (!result) return;
@@ -1745,6 +1801,7 @@ function setDiagnosisScope(scope) {
   lastResult = result;
   refreshScopeTabs();
   renderApp(result);
+  restoreGlanceTopFromTotal();
 }
 
 
