@@ -209,7 +209,257 @@ parts.forEach(part => {
 
     return { sales, guestCount, guestUnitPrice, target2, partRatios, partHours, rawByPart, allocation, slots };
   }
+// ============================================================
+// OPEN FIXED RULE V1
+// 09:00~11:00 오픈 운영 고정 기준
+// FINAL 엔진의 파트별 필요시간 총량은 변경하지 않는다.
+// 핫/그릴/피파 통합 4.5h는 내부적으로 1:1:1 귀속한다.
+// ============================================================
+const OPEN_FIXED_RULE = {
+  '09:00': {
+    '스시': 1,
+    '콜드': 1,
+    '베이커리': 0,
+    '핫': 0.5,
+    '그릴': 0.5,
+    '피파': 0,
+    'DMO': 0,
+    '홀': 1
+  },
+  '09:30': {
+    '스시': 1,
+    '콜드': 1,
+    '베이커리': 0,
+    '핫': 0.5,
+    '그릴': 0.5,
+    '피파': 1,
+    'DMO': 0,
+    '홀': 1
+  },
+  '10:00': {
+    '스시': 2,
+    '콜드': 1,
+    '베이커리': 0,
+    '핫': 1,
+    '그릴': 1,
+    '피파': 1,
+    'DMO': 0,
+    '홀': 2
+  },
+  '10:30': {
+    '스시': 2,
+    '콜드': 1,
+    '베이커리': 0,
+    '핫': 1,
+    '그릴': 1,
+    '피파': 1,
+    'DMO': 0,
+    '홀': 2
+  }
+};
+// 오픈 고정화로 발생한 증감시간을 재배분할 피크 구간
+const OPEN_REALLOCATION_PEAKS = {
+  lunch: {
+    start: '11:00',
+    end: '14:00'
+  },
+  dinner: {
+    start: '17:00',
+    end: '20:00'
+  }
+};
+function applyOpenFixedRule(hcByPart, slots, slotHours) {
+  // 원본을 직접 변경하지 않고 복사본에서 작업
+  const adjusted = {};
+  Object.keys(hcByPart).forEach(part => {
+    adjusted[part] = hcByPart[part].slice();
+  });
 
+  // 파트별 오픈 고정화에 따른 시간 증감
+  // + : 오픈에서 시간이 더 필요함
+  // - : 오픈에서 시간이 남음
+  const deltaHoursByPart = {};
+
+  Object.keys(adjusted).forEach(part => {
+    let beforeHours = 0;
+    let afterHours = 0;
+
+    Object.entries(OPEN_FIXED_RULE).forEach(([time, rule]) => {
+      const slotIndex = slots.indexOf(time);
+      if (slotIndex < 0) return;
+      if (!(part in rule)) return;
+
+      const beforeHC = Number(adjusted[part][slotIndex] || 0);
+      const fixedHC = Number(rule[part] || 0);
+
+      beforeHours += beforeHC * slotHours;
+      afterHours += fixedHC * slotHours;
+
+      adjusted[part][slotIndex] = fixedHC;
+    });
+
+    deltaHoursByPart[part] = afterHours - beforeHours;
+  });
+
+  return {
+    adjusted,
+    deltaHoursByPart
+  };
+}
+function getPeakSlotIndexes(slots) {
+  const lunchStart = timeToMinutes(OPEN_REALLOCATION_PEAKS.lunch.start);
+  const lunchEnd = timeToMinutes(OPEN_REALLOCATION_PEAKS.lunch.end);
+  const dinnerStart = timeToMinutes(OPEN_REALLOCATION_PEAKS.dinner.start);
+  const dinnerEnd = timeToMinutes(OPEN_REALLOCATION_PEAKS.dinner.end);
+
+  const lunch = [];
+  const dinner = [];
+
+  slots.forEach((time, index) => {
+    const minute = timeToMinutes(time);
+
+    if (minute >= lunchStart && minute < lunchEnd) {
+      lunch.push(index);
+    }
+
+    if (minute >= dinnerStart && minute < dinnerEnd) {
+      dinner.push(index);
+    }
+  });
+
+  return {
+    lunch,
+    dinner,
+    all: [...lunch, ...dinner]
+  };
+}
+function redistributeOpenSurplus(adjusted, deltaHoursByPart, slots, slotHours) {
+  const peakIndexes = getPeakSlotIndexes(slots);
+  const addHoursPerStep = 0.5 * slotHours; // 0.5HC × 30분 = 0.25h
+
+  // 특정 피크 구간 안에서 기존 HC가 높은 슬롯부터 배분
+  function addHoursToPeak(part, indexes, hoursToAdd) {
+    let remaining = hoursToAdd;
+
+    const candidates = indexes
+      .map(index => ({
+        index,
+        hc: Number(adjusted[part][index] || 0)
+      }))
+      .sort((a, b) => {
+        if (b.hc !== a.hc) return b.hc - a.hc;
+        return a.index - b.index;
+      });
+
+    while (remaining >= addHoursPerStep - 1e-9) {
+      for (const candidate of candidates) {
+        if (remaining < addHoursPerStep - 1e-9) break;
+
+        adjusted[part][candidate.index] += 0.5;
+        remaining -= addHoursPerStep;
+      }
+    }
+
+    return remaining;
+  }
+
+  Object.keys(adjusted).forEach(part => {
+    const deltaHours = Number(deltaHoursByPart[part] || 0);
+
+    // delta < 0 = 오픈 고정 후 남은 시간
+    if (deltaHours >= 0) return;
+
+    const surplusHours = -deltaHours;
+
+    // 현재 BP 배치에서 런치/디너가 차지하는 인시 계산
+    const lunchHours = peakIndexes.lunch.reduce(
+      (sum, index) => sum + Number(adjusted[part][index] || 0) * slotHours,
+      0
+    );
+
+    const dinnerHours = peakIndexes.dinner.reduce(
+      (sum, index) => sum + Number(adjusted[part][index] || 0) * slotHours,
+      0
+    );
+
+    const peakTotalHours = lunchHours + dinnerHours;
+
+    // 기존 BP의 런치 : 디너 비율
+    // 둘 다 0인 예외 상황에서는 50:50
+    const lunchRatio =
+      peakTotalHours > 0 ? lunchHours / peakTotalHours : 0.5;
+
+    // 0.25h 단위로 런치 배분량 결정
+    const totalSteps = Math.round(surplusHours / addHoursPerStep);
+    const lunchSteps = Math.round(totalSteps * lunchRatio);
+    const dinnerSteps = totalSteps - lunchSteps;
+
+    const lunchTargetHours = lunchSteps * addHoursPerStep;
+    const dinnerTargetHours = dinnerSteps * addHoursPerStep;
+
+    addHoursToPeak(
+      part,
+      peakIndexes.lunch,
+      lunchTargetHours
+    );
+
+    addHoursToPeak(
+      part,
+      peakIndexes.dinner,
+      dinnerTargetHours
+    );
+  });
+
+  return adjusted;
+}
+function recoverOpenDeficit(adjusted, deltaHoursByPart, slots, slotHours) {
+  const peakIndexes = getPeakSlotIndexes(slots);
+  const removeHoursPerStep = 0.5 * slotHours; // 0.25h
+
+  Object.keys(adjusted).forEach(part => {
+    const deltaHours = Number(deltaHoursByPart[part] || 0);
+
+    // delta > 0 = 오픈 고정으로 기존보다 시간을 더 사용함
+    if (deltaHours <= 0) return;
+
+    let remainingHours = deltaHours;
+
+    // 런치 + 디너 피크 안에서만 회수
+    // HC가 높은 슬롯부터 회수하여 피크의 모양을 최대한 유지
+    const candidates = peakIndexes.all
+      .map(index => ({
+        index,
+        hc: Number(adjusted[part][index] || 0)
+      }))
+      .filter(item => item.hc >= 0.5)
+      .sort((a, b) => {
+        if (b.hc !== a.hc) return b.hc - a.hc;
+        return a.index - b.index;
+      });
+
+    while (remainingHours >= removeHoursPerStep - 1e-9) {
+      let removedInThisRound = false;
+
+      for (const candidate of candidates) {
+        if (remainingHours < removeHoursPerStep - 1e-9) break;
+
+        const currentHC = Number(adjusted[part][candidate.index] || 0);
+
+        // 0 아래로 내려가지 않도록 보호
+        if (currentHC < 0.5) continue;
+
+        adjusted[part][candidate.index] = currentHC - 0.5;
+        remainingHours -= removeHoursPerStep;
+        removedInThisRound = true;
+      }
+
+      // 더 이상 피크에서 뺄 시간이 없으면 무한루프 방지
+      if (!removedInThisRound) break;
+    }
+  });
+
+  return adjusted;
+}
   function buildMaster(guestUnitPriceOverride) {
     if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
 
@@ -224,7 +474,7 @@ parts.forEach(part => {
 
     for (let sales = Number(cfg.salesMinWon); sales <= Number(cfg.salesMaxWon); sales += Number(cfg.salesStepWon)) {
       const raw = rawTimetableForSales(sales, parts, slots, cfg, guestUnitPriceOverride);
-      const hcByPart = {};
+      let hcByPart = {};
       const roundedPartHours = {};
       const forcedCarryHoursByPart = {};
 
@@ -237,7 +487,33 @@ parts.forEach(part => {
         forcedCarryHoursByPart[part] = result.forcedCarryHours;
         previousByPart[part] = result.values.slice();
       });
+const openResult = applyOpenFixedRule(hcByPart, slots, slotHours);
 
+redistributeOpenSurplus(openResult.adjusted, openResult.deltaHoursByPart, slots, slotHours);
+recoverOpenDeficit(openResult.adjusted, openResult.deltaHoursByPart, slots, slotHours);
+// OPEN RULE 적용 전/후 파트별 총량 보존 검증
+parts.forEach(part => {
+  const beforeHours = hcByPart[part].reduce(
+    (sum, hc) => sum + Number(hc || 0) * slotHours,
+    0
+  );
+
+  const afterHours = openResult.adjusted[part].reduce(
+    (sum, hc) => sum + Number(hc || 0) * slotHours,
+    0
+  );
+
+  const diff = afterHours - beforeHours;
+
+  if (Math.abs(diff) > 1e-9) {
+    console.warn(
+      `[OPEN RULE 총량 불일치] 매출=${sales}, 파트=${part}, ` +
+      `적용전=${beforeHours.toFixed(2)}h, ` +
+      `적용후=${afterHours.toFixed(2)}h, ` +
+      `차이=${diff.toFixed(2)}h`
+    );
+  }
+});
       const slotTotals = slots.map((_, i) => parts.reduce((sum, part) => sum + hcByPart[part][i], 0));
       const roundedTotalHours = slotTotals.reduce((sum, hc) => sum + hc * slotHours, 0);
 
