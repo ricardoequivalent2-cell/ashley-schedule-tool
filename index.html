@@ -139,7 +139,7 @@
 #glancePartBars .diverge-col-header,
 #glancePartBars .diverge-row{
   display:grid !important;
-  grid-template-columns:72px 82px 82px 72px minmax(240px,1fr) 70px !important;
+  grid-template-columns:72px 108px 92px 72px minmax(220px,1fr) 70px !important;
   gap:12px;align-items:center;
 }
 #glancePartBars .diverge-col-header{padding:0 14px 6px;font-size:11px;color:#9AA2B1;font-weight:700}
@@ -445,14 +445,15 @@
   <div class="view-panel active" id="view-glance">
     <div class="exec-hero">
       <div class="exec-hero-left">
-        <div class="exec-eyebrow">이번 주 인력 진단</div>
+        <div class="exec-eyebrow" id="execDiagnosisTitle">이번 주 인력 진단</div>
+        <div class="exec-period" id="execDiagnosisPeriod"></div>
         <div class="exec-gap-row">
           <span class="exec-gap-number" id="execGapNumber">-</span>
           <span class="exec-gap-word" id="execGapWord"></span>
         </div>
       </div>
-      <div class="kpi-row-5 glance-kpi-row exec-hero-kpis" id="glanceKpiRow"></div>
     </div>
+    <div class="kpi-row-5 glance-kpi-row exec-hero-kpis" id="glanceKpiRow"></div>
 
     <div class="dashboard-grid-main glance-primary-grid">
       <div class="section-card">
@@ -1740,11 +1741,45 @@ function refreshScopeTabs() {
   });
 }
 
+function updateGlanceDiagnosisTitle(data) {
+  const titleEl = document.getElementById('execDiagnosisTitle');
+  const periodEl = document.getElementById('execDiagnosisPeriod');
+  if (!titleEl || !periodEl) return;
+
+  const parsed = window.lastParsedUpData || {};
+  const storeName = String(parsed.storeName || '').trim() || '매장';
+  const labels = (data && data.dateHeaders) || [];
+  if (!labels.length) {
+    titleEl.textContent = storeName + ' 인력진단';
+    periodEl.textContent = '';
+    return;
+  }
+
+  const parseDate = value => {
+    const m = String(value || '').match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  };
+  const start = parseDate(labels[0]);
+  const end = parseDate(labels[labels.length - 1]);
+  if (!start || !end) {
+    titleEl.textContent = storeName + ' 인력진단';
+    periodEl.textContent = '(' + labels[0] + ' ~ ' + labels[labels.length - 1] + ')';
+    return;
+  }
+
+  const first = new Date(start.getFullYear(), start.getMonth(), 1);
+  const mondayOffset = (first.getDay() + 6) % 7;
+  const weekNo = Math.ceil((start.getDate() + mondayOffset) / 7);
+  titleEl.textContent = storeName + ' ' + (start.getMonth() + 1) + '월 ' + weekNo + '주차 인력진단';
+  periodEl.textContent = '(' + (start.getMonth() + 1) + '월 ' + start.getDate() + '일 ~ ' + (end.getMonth() + 1) + '월 ' + end.getDate() + '일)';
+}
+
 // 요약 상단은 항상 '전체' 주간 진단값만 사용한다.
 // 주간/일간에서 주방·홀 조직 탭을 선택해 renderApp()이 다시 실행되어도
 // 요약 상단 숫자가 해당 조직 값으로 덮어써지지 않도록 별도로 복원한다.
 function restoreGlanceTopFromTotal() {
   const total = diagnosisResultsByScope.total;
+  updateGlanceDiagnosisTitle(total);
   if (!total || !total.weeklySummary) return;
 
   const w = total.weeklySummary;
@@ -2601,6 +2636,7 @@ async function autoSaveDiagnosisResult(storeName) {
     }
 
     function renderGlanceHero() {
+      updateGlanceDiagnosisTitle(data);
       const w = weeklySummary;
       if (!w) return;
       const totalSales = dateHeaders.reduce((s, d) => s + ((tierDiagnosis[d] && tierDiagnosis[d].salesVal) || 0), 0);
