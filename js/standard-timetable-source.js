@@ -669,115 +669,182 @@ function scoreShiftCombination(targetHcArray, shiftHcArray, slots) {
 
   return score;
 }
+
+
 function generateShiftCombinationCandidates(targetHours) {
+  const target = Number(targetHours || 0);
   const candidates = [];
 
-  const target = Number(targetHours || 0);
+  // 현실 근무조의 근로시간은 4h / 6h / 8h 세 종류
+  // 우선 필요한 "시간 조합"만 계산해서 탐색량을 제한한다.
+  const max4 = Math.ceil((target + 4) / 4);
+  const max6 = Math.ceil((target + 4) / 6);
+  const max8 = Math.ceil((target + 4) / 8);
 
-  // 가장 짧은 근무조가 4h이므로
-  // 필요시간을 충분히 넘길 수 있는 범위까지만 인원 수 탐색
-  const maxPeople = Math.ceil(target / 4) + 2;
+  for (let count4 = 0; count4 <= max4; count4 += 1) {
+    for (let count6 = 0; count6 <= max6; count6 += 1) {
+      for (let count8 = 0; count8 <= max8; count8 += 1) {
+        const totalHours =
+          count4 * 4 +
+          count6 * 6 +
+          count8 * 8;
 
-  function search(startIndex, selectedShifts, totalHours) {
-    // 현재까지 만든 조합도 후보로 저장
-    if (selectedShifts.length > 0) {
-      candidates.push({
-        shifts: selectedShifts.slice(),
-        totalHours,
-        hourDiff: totalHours - target
-      });
-    }
+        // 필요시간 ±4h 범위만 후보로 사용
+        if (Math.abs(totalHours - target) > 4) {
+          continue;
+        }
 
-    // 더 이상 사람을 추가하지 않음
-    if (selectedShifts.length >= maxPeople) {
-      return;
-    }
-
-    // 필요시간보다 지나치게 많은 조합은 탐색 중단
-    if (totalHours > target + 8) {
-      return;
-    }
-
-    for (let i = startIndex; i < REAL_SHIFT_LIBRARY.length; i += 1) {
-      const shift = REAL_SHIFT_LIBRARY[i];
-
-      selectedShifts.push(shift);
-
-      search(
-        i, // 같은 근무조를 여러 명 사용할 수 있음
-        selectedShifts,
-        totalHours + Number(shift.workHours || 0)
-      );
-
-      selectedShifts.pop();
+        candidates.push({
+          count4,
+          count6,
+          count8,
+          totalHours,
+          hourDiff: totalHours - target
+        });
+      }
     }
   }
 
-  search(0, [], 0);
-
   return candidates;
 }
+function expandHourCandidateToShiftCombinations(candidate) {
+  const fourHourShifts = REAL_SHIFT_LIBRARY.filter(
+    shift => Number(shift.workHours) === 4
+  );
+
+  const sixHourShifts = REAL_SHIFT_LIBRARY.filter(
+    shift => Number(shift.workHours) === 6
+  );
+
+  const eightHourShifts = REAL_SHIFT_LIBRARY.filter(
+    shift => Number(shift.workHours) === 8
+  );
+
+  const results = [];
+const MAX_EXPANDED_COMBINATIONS = 5000;
+  function buildCombinations(pool, count, startIndex, selected, callback) {
+    if (selected.length === count) {
+      callback(selected.slice());
+      return;
+    }
+
+    for (let i = startIndex; i < pool.length; i += 1) {
+      selected.push(pool[i]);
+
+      // 같은 근무조를 여러 명 사용할 수 있음
+      buildCombinations(
+        pool,
+        count,
+        i,
+        selected,
+        callback
+      );
+
+      selected.pop();
+    }
+  }
+
+  buildCombinations(
+    fourHourShifts,
+    candidate.count4,
+    0,
+    [],
+    selected4 => {
+      buildCombinations(
+        sixHourShifts,
+        candidate.count6,
+        0,
+        [],
+        selected6 => {
+          buildCombinations(
+            eightHourShifts,
+            candidate.count8,
+            0,
+            [],
+            selected8 => {
+              results.push([
+                ...selected4,
+                ...selected6,
+                ...selected8
+              ]);
+            }
+          );
+        }
+      );
+    }
+  );
+
+  return results;
+}
 function findBestShiftCombination(targetHcArray, targetHours, slots) {
-  const candidates = generateShiftCombinationCandidates(targetHours);
+  const hourCandidates =
+    generateShiftCombinationCandidates(targetHours);
 
   let best = null;
 
-  candidates.forEach(candidate => {
-    const shiftHcArray = combineShiftHcArrays(candidate.shifts, slots);
+  hourCandidates.forEach(hourCandidate => {
+    const shiftCombinations =
+      expandHourCandidateToShiftCombinations(hourCandidate);
 
-    // OPEN RULE + 기존 HC 모양 적합도
-    const shapeScore = scoreShiftCombination(
-      targetHcArray,
-      shiftHcArray,
-      slots
-    );
+    shiftCombinations.forEach(shifts => {
+      const shiftHcArray =
+        combineShiftHcArrays(shifts, slots);
 
-    // OPEN RULE 위반 조합은 탈락
-    if (!Number.isFinite(shapeScore)) {
-      return;
-    }
+      // OPEN RULE + 기존 HC 모양 적합도
+      const shapeScore = scoreShiftCombination(
+        targetHcArray,
+        shiftHcArray,
+        slots
+      );
 
-    const hourDiff = Math.abs(
-      Number(candidate.totalHours) - Number(targetHours)
-    );
+      // OPEN RULE 위반 조합은 탈락
+      if (!Number.isFinite(shapeScore)) {
+        return;
+      }
 
-    const evaluated = {
-      shifts: candidate.shifts,
-      shiftHcArray,
-      totalHours: candidate.totalHours,
-      hourDiff,
-      shapeScore
-    };
+      const hourDiff = Math.abs(
+        Number(hourCandidate.totalHours) -
+        Number(targetHours)
+      );
 
-    if (best === null) {
-      best = evaluated;
-      return;
-    }
+      const evaluated = {
+        shifts,
+        shiftHcArray,
+        totalHours: hourCandidate.totalHours,
+        hourDiff,
+        shapeScore
+      };
 
-    // 1순위: 필요 총시간과의 차이가 작은 조합
-    if (evaluated.hourDiff < best.hourDiff) {
-      best = evaluated;
-      return;
-    }
+      if (best === null) {
+        best = evaluated;
+        return;
+      }
 
-    if (evaluated.hourDiff > best.hourDiff) {
-      return;
-    }
+      // 1순위: 필요 총시간과의 차이가 작은 조합
+      if (evaluated.hourDiff < best.hourDiff) {
+        best = evaluated;
+        return;
+      }
 
-    // 2순위: 같은 총량 차이라면 기존 HC 모양과 더 비슷한 조합
-    if (evaluated.shapeScore < best.shapeScore) {
-      best = evaluated;
-      return;
-    }
+      if (evaluated.hourDiff > best.hourDiff) {
+        return;
+      }
 
-    if (evaluated.shapeScore > best.shapeScore) {
-      return;
-    }
+      // 2순위: 기존 HC 모양과 더 비슷한 조합
+      if (evaluated.shapeScore < best.shapeScore) {
+        best = evaluated;
+        return;
+      }
 
-    // 3순위: 그래도 같다면 사람이 적은 조합
-    if (evaluated.shifts.length < best.shifts.length) {
-      best = evaluated;
-    }
+      if (evaluated.shapeScore > best.shapeScore) {
+        return;
+      }
+
+      // 3순위: 사람이 더 적은 조합
+      if (evaluated.shifts.length < best.shifts.length) {
+        best = evaluated;
+      }
+    });
   });
 
   return best;
