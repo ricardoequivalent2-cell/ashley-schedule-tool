@@ -386,14 +386,14 @@
         <div class="overview-kpi-hint">Gap% 5% 초과</div>
       </div>
       <div class="overview-kpi">
-        <div class="overview-kpi-label">총 초과 인시</div>
+        <div class="overview-kpi-label">총 초과 사용시간</div>
         <div class="overview-kpi-value overview-gap-plus" id="overviewKpiExcessHours">-</div>
         <div class="overview-kpi-hint">Gap이 양수인 매장만 합산</div>
       </div>
       <div class="overview-kpi">
         <div class="overview-kpi-label">전체 Gap%</div>
         <div class="overview-kpi-value" id="overviewKpiGapPct">-</div>
-        <div class="overview-kpi-hint">전체 실제인시 ÷ 전체 표준인시 기준</div>
+        <div class="overview-kpi-hint">전체 실제사용시간 ÷ 전체 표준사용시간 기준</div>
       </div>
     </div>
 
@@ -410,8 +410,8 @@
               <th class="overview-sortable" data-sort="status">상태 <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="expected_sales">예상매출 <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="guest_count">객수 <span class="sort-mark"></span></th>
-              <th class="overview-sortable" data-sort="actual_hours">실제인시 <span class="sort-mark"></span></th>
-              <th class="overview-sortable" data-sort="standard_hours">표준인시 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="actual_hours">실제사용시간 <span class="sort-mark"></span></th>
+              <th class="overview-sortable" data-sort="standard_hours">표준사용시간 <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="gap_hours">Gap <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="gap_pct">Gap% <span class="sort-mark"></span></th>
               <th class="overview-sortable" data-sort="kitchen_gap_hours">주방 Gap <span class="sort-mark"></span></th>
@@ -450,13 +450,9 @@
           <span class="exec-gap-number" id="execGapNumber">-</span>
           <span class="exec-gap-word" id="execGapWord"></span>
         </div>
-        <div class="exec-relation" id="execRelation"></div>
       </div>
-      <div class="exec-hero-right" id="execContext"></div>
+      <div class="kpi-row-5 glance-kpi-row exec-hero-kpis" id="glanceKpiRow"></div>
     </div>
-
-    <div class="kpi-row-5 glance-kpi-row" id="glanceKpiRow"></div>
-    <div class="status-strip" id="glanceHeadlineBanner"></div>
 
     <div class="dashboard-grid-main glance-primary-grid">
       <div class="section-card">
@@ -569,7 +565,7 @@
         </div>
         <div id="heatmapContainer"></div>
         <div style="font-size:11px; color:#999; margin-top:10px;">
-          ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림) · 단위: 인시
+          ※ 기준 인원수는 절삭계산됨 (1명 미만은 1명으로, 1명 이상은 소수점 이하 버림) · 단위: 사용시간
         </div>
       </div>
       <div class="section-card">
@@ -585,7 +581,7 @@
         <div id="compareTableContainer"></div>
       </div>
       <div class="section-card">
-        <div class="section-title">파트별 일일 진단 요약 (인시)</div>
+        <div class="section-title">파트별 일일 진단 요약 (사용시간)</div>
         <div id="dailyPartRanking"></div>
       </div>
     </div>
@@ -618,7 +614,7 @@
 
     <div class="standard-kpi-strip">
       <div class="standard-mini-kpi"><div class="k">추정 객수</div><div class="v" id="standardGuestCount">-</div></div>
-      <div class="standard-mini-kpi"><div class="k">가이드라인</div><div class="v" id="standardTargetHours">-</div><div class="s">표준 총인시</div></div>
+      <div class="standard-mini-kpi"><div class="k">가이드라인</div><div class="v" id="standardTargetHours">-</div><div class="s">표준 총사용시간</div></div>
       <div class="standard-mini-kpi"><div class="k">표시 시간표 합계</div><div class="v" id="standardRoundedHours">-</div></div>
     </div>
 
@@ -634,7 +630,7 @@
   <!-- ===================== 백데이터 (관리자 전용, 비밀번호 보호) ===================== -->
   <div class="view-panel" id="view-backdata">
     <div class="daily-page-title">백데이터</div>
-    <div class="daily-page-sub">이 도구가 사용하는 기준 데이터(표준인시 V1.0 · 표준시간표)에 대한 설명입니다. 관리자 전용입니다.</div>
+    <div class="daily-page-sub">이 도구가 사용하는 기준 데이터(표준사용시간 V1.0 · 표준시간표)에 대한 설명입니다. 관리자 전용입니다.</div>
 
     <div class="section-card" id="backdataGate" style="max-width:360px;">
       <div class="section-title">관리자 확인</div>
@@ -646,7 +642,7 @@
 
     <div id="backdataContent" style="display:none;">
       <div class="section-card">
-        <div class="section-title">표준인시 (V1.0)</div>
+        <div class="section-title">표준사용시간 (V1.0)</div>
         <div style="font-size:12.5px; color:#5B6272; line-height:1.7; margin-bottom:16px;">
           81개 매장 × 19개월(2025~) 실측 데이터를 시계열로 분석해, 객수 대비 총사용시간의 <b>통계적 상위 20% 라인</b>을 3단계(최소허들·1차목표·가이드라인)로 도출한 기준선입니다.
           이 도구의 "재판관" 역할 — 매장 전체 총량이 적정한지 판단하는 유일한 기준입니다. 객수(N)가 1,200명 이하면 <code>a + b·N^c</code>, 초과하면 기울기 0.1645로 선형 증가합니다.
@@ -2024,7 +2020,7 @@ function buildWeeklyAdminSummary(storeName) {
     hallGapHours: hallGap,
     hallGapPct,
 
-    // 인시생산성 = 주간 예상매출 ÷ 실제 총인시
+    // 사용시간생산성 = 주간 예상매출 ÷ 실제 총사용시간
     laborProductivity: actualHours > 0
       ? Math.round((expectedSales / actualHours) * 100) / 100
       : null
@@ -2124,11 +2120,11 @@ async function autoSaveDiagnosisResult(storeName) {
       const summary = data.upMappingSummary || {};
       const box =
         '<div style="padding:18px;border:1px solid #E4E7EC;border-radius:10px;background:#FAFBFC;color:#555;line-height:1.65;">' +
-          '<b style="color:#333;">총인시 진단은 완료되었습니다.</b><br>' +
+          '<b style="color:#333;">총사용시간 진단은 완료되었습니다.</b><br>' +
           '시간대·파트 진단은 잘못된 피드백을 막기 위해 현재 보류합니다.<br>' +
           '<span style="font-size:12px;color:#8B93A5;">' + reason + '</span>' +
           (summary.nonStandardHours
-            ? '<br><span style="font-size:12px;color:#8B93A5;">현재 V1 표준파트 외 인시: ' + summary.nonStandardHours + 'h</span>'
+            ? '<br><span style="font-size:12px;color:#8B93A5;">현재 V1 표준파트 외 사용시간: ' + summary.nonStandardHours + 'h</span>'
             : '') +
         '</div>';
 
@@ -2276,8 +2272,8 @@ async function autoSaveDiagnosisResult(storeName) {
       const cards = [
         { icon: '₩', bg: '#EDE9F9', fg: '#5B3FA0', label: '예상 매출', value: (t.salesVal || 0).toLocaleString() + '원' },
         { icon: '人', bg: '#DCEEFB', fg: '#2C6690', label: '예상 객수', value: t.guestCount + '명' },
-        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '가이드라인 총인시', value: displayHours(t.target2) + 'h' },
-        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: displayHours(t.actualTotal) + 'h' },
+        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '가이드라인 총사용시간', value: displayHours(t.target2) + 'h' },
+        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총사용시간', value: displayHours(t.actualTotal) + 'h' },
       ];
       let html = cards.map(c =>
         '<div class="kpi-card-5">' +
@@ -2533,6 +2529,7 @@ async function autoSaveDiagnosisResult(storeName) {
     // 요약 화면 - 헤드라인 판단 한 줄 (기존 diffPhrase/levelPhrase 그대로 재사용)
     function renderGlanceHeadlineBanner() {
       const el = document.getElementById('glanceHeadlineBanner');
+      if (!el) return;
       const w = weeklySummary;
       if (!w) { el.innerHTML = ''; return; }
       const status = weeklyStatusMeta(w);
@@ -2564,15 +2561,6 @@ async function autoSaveDiagnosisResult(storeName) {
       wordEl.style.background = bg;
       wordEl.style.color = color;
 
-      document.getElementById('execRelation').innerHTML =
-        '가이드라인 <b>' + w.totalTarget2 + 'h</b><span class="arrow">→</span>실제 <b>' + w.totalActual + 'h</b>';
-
-      const walletIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>';
-      const usersIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
-
-      document.getElementById('execContext').innerHTML =
-        '<div>' + walletIcon + '예상매출 <b>' + totalSales.toLocaleString() + '원</b></div>' +
-        '<div>' + usersIcon + '예상객수 <b>' + w.totalGuest + '명</b></div>';
     }
 
     function renderWeekKPIRowInto(containerId) {
@@ -2589,8 +2577,8 @@ async function autoSaveDiagnosisResult(storeName) {
       const cards = [
         { icon: '₩', bg: '#EDE9F9', fg: '#5B3FA0', label: '주간 예상 매출', value: totalSales.toLocaleString() + '원' },
         { icon: '人', bg: '#DCEEFB', fg: '#2C6690', label: '주간 예상 객수', value: w.totalGuest + '명' },
-        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '가이드라인 총인시', value: displayHours(w.totalTarget2) + 'h' },
-        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총인시', value: displayHours(w.totalActual) + 'h' },
+        { icon: '◎', bg: '#F8ECDA', fg: '#A67A3A', label: '가이드라인 총사용시간', value: displayHours(w.totalTarget2) + 'h' },
+        { icon: '≡', bg: '#E3F1E8', fg: '#3D8361', label: '실제 총사용시간', value: displayHours(w.totalActual) + 'h' },
       ];
       let html = cards.map(c =>
         '<div class="kpi-card-5">' +
@@ -2598,13 +2586,6 @@ async function autoSaveDiagnosisResult(storeName) {
           '<div><div class="kpi-label">' + c.label + '</div><div class="kpi-value">' + c.value + '</div></div>' +
         '</div>'
       ).join('');
-      html +=
-        '<div class="kpi-card-5">' +
-          '<div class="kpi-icon" style="background:' + gapBg + '; color:' + gapFg + ';">!</div>' +
-          '<div><div class="kpi-label">가이드라인 대비 Gap</div>' +
-          '<div class="kpi-value">' + displaySignedHours(gap) +
-          '<span class="kpi-badge" style="background:' + gapBg + '; color:' + gapFg + ';">' + gapLabel + '</span></div></div>' +
-        '</div>';
       el.innerHTML = html;
     }
 
@@ -2756,7 +2737,7 @@ async function autoSaveDiagnosisResult(storeName) {
           '<div class="diverge-col-header">' +
             '<div>파트</div>' +
             '<div style="text-align:right;">가이드라인</div>' +
-            '<div style="text-align:right;">실제인시</div>' +
+            '<div style="text-align:right;">실제사용시간</div>' +
             '<div style="text-align:right;">GAP</div>' +
             '<div style="position:relative;text-align:center;"><span style="position:absolute;left:0;">← 절감</span><span>0</span><span style="position:absolute;right:0;">과다 →</span></div>' +
             '<div style="text-align:right;">진단</div>' +
@@ -2773,7 +2754,7 @@ async function autoSaveDiagnosisResult(storeName) {
 
       const gaps = computeWeekPartGaps();
       const overParts = gaps
-        // 문제 발생 위치에는 '빨간불'만 노출: 파트 실제인시가 최소허들을 초과한 경우만 표시
+        // 문제 발생 위치에는 '빨간불'만 노출: 파트 실제사용시간가 최소허들을 초과한 경우만 표시
         .filter(g => g.tierStatus === 'red')
         .sort((a, b) => b.gap - a.gap)
         .slice(0, 4);
@@ -2847,7 +2828,7 @@ async function autoSaveDiagnosisResult(storeName) {
     // 주간진단 - 요일별 진단 테이블 (월~일: 예상매출/목표/실제/Gap/상태)
     function renderWeeklyDayTable() {
       const el = document.getElementById('weeklyDayTable');
-      let html = '<table class="compare-table-v2"><tr><th>요일</th><th>예상매출</th><th>가이드라인</th><th>실제인시</th><th>Gap</th><th>상태</th></tr>';
+      let html = '<table class="compare-table-v2"><tr><th>요일</th><th>예상매출</th><th>가이드라인</th><th>실제사용시간</th><th>Gap</th><th>상태</th></tr>';
       dateHeaders.forEach(d => {
         const t = tierDiagnosis[d]; if (!t) return;
         const gap = Math.round((t.actualTotal - t.target2) * 10) / 10;
@@ -2901,7 +2882,7 @@ async function autoSaveDiagnosisResult(storeName) {
       const topBlockName = Object.keys(blockOverShare).sort((a, b) => blockOverShare[b] - blockOverShare[a])[0];
       if (topBlockName && totalOver > 0) {
         const share = Math.round(blockOverShare[topBlockName] / totalOver * 100);
-        comments.push({ bg: '#F7E3E3', fg: '#A34848', text: '이번 주 과다인시의 ' + share + '%가 ' + topBlockName + ' 시간대에 집중되어 있습니다.' });
+        comments.push({ bg: '#F7E3E3', fg: '#A34848', text: '이번 주 과다사용시간의 ' + share + '%가 ' + topBlockName + ' 시간대에 집중되어 있습니다.' });
       }
 
       // 반복성: 어느 파트가 며칠간 반복 초과했는지
@@ -3253,7 +3234,7 @@ async function autoSaveDiagnosisResult(storeName) {
           html += '<td class="total-col">' + standardHcLabel(t.slotTotals[index]) + '</td></tr>';
         });
 
-        html += '<tr class="total-row"><th class="time-col">일인시</th>';
+        html += '<tr class="total-row"><th class="time-col">일사용시간</th>';
         t.parts.forEach(part => {
           html += '<td>' + Math.round(Number(t.roundedPartHours[part] || 0)) + 'h</td>';
         });

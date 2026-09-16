@@ -11,7 +11,7 @@ const NO_EXTRAPOLATE_PARTS = ['DMO', '데코이', '폴리싱', '홀'];
 // 숫자 기준은 코드에 두지 않고 Supabase에서 전달받은 curveConfig만 사용한다.
 function tierHoursDaily(p, n, curveConfig) {
   if (!p || !curveConfig) {
-    throw new Error('표준인시 계산기준이 없습니다. Supabase model_config 로드를 확인해주세요.');
+    throw new Error('표준사용시간 계산기준이 없습니다. Supabase model_config 로드를 확인해주세요.');
   }
   const base1200 = p.a + p.b * Math.pow(curveConfig.KNOT, p.c);
   if (n <= curveConfig.KNOT) return Math.max(curveConfig.FLOOR, p.a + p.b * Math.pow(n, p.c));

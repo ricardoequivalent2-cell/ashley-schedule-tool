@@ -184,7 +184,7 @@
   function rawTimetableForSales(sales, parts, slots, cfg, guestUnitPriceOverride) {
     if (typeof getPartAllocationRatios !== 'function') throw new Error('Part Allocation V1.0 로더를 찾을 수 없습니다.');
     if (typeof getActiveDiagnosisConfig !== 'function' || typeof tierHoursDaily !== 'function') {
-      throw new Error('표준인시 V1.0 계산기준을 찾을 수 없습니다.');
+      throw new Error('표준사용시간 V1.0 계산기준을 찾을 수 없습니다.');
     }
 
     const finalAction = window.AshleyActionStandard.calculate(sales);

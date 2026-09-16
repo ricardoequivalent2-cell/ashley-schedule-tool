@@ -84,7 +84,7 @@ function getBakeryActionBasis(guests) {
 
 function calculateFinalActionStandard(salesWon) {
   if (typeof tierHoursDaily !== 'function' || typeof getPartAllocationRatios !== 'function') {
-    throw new Error('V1 표준인시/Part Allocation 엔진이 준비되지 않았습니다.');
+    throw new Error('V1 표준사용시간/Part Allocation 엔진이 준비되지 않았습니다.');
   }
   if (!ACTIVE_ACTION_CONFIG) throw new Error('Action 기준이 로드되지 않았습니다.');
 

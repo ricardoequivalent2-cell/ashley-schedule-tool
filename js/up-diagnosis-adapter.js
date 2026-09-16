@@ -3,10 +3,10 @@
 //   UP Parser가 만든 행/30분 실제배치를 기존 V1 진단 계산 구조에 연결한다.
 //
 // 안전 원칙:
-//   - 총인시 진단: UP의 '근무시간' 합계를 사용하여 항상 실행
+//   - 총사용시간 진단: UP의 '근무시간' 합계를 사용하여 항상 실행
 //   - 표준시간표: DB의 표준모델 + 정석 시간표 V2 기준으로 생성
-//   - 파트진단: V1 표준파트로 설명되지 않는 실제 근무인시가 있으면 자동 차단
-//               (예: '관리'). 해당 인시를 다른 파트로 임의 배분하지 않는다.
+//   - 파트진단: V1 표준파트로 설명되지 않는 실제 근무사용시간가 있으면 자동 차단
+//               (예: '관리'). 해당 사용시간를 다른 파트로 임의 배분하지 않는다.
 
 (function (global) {
   'use strict';
@@ -40,7 +40,7 @@
     const dateHeaders = (parsedUp.dates || []).map(d => d.label);
 
     // ------------------------------------------
-    // 1. 일자별 실제 근무인시
+    // 1. 일자별 실제 근무사용시간
     // ------------------------------------------
     const dailyHours = {};
     dateHeaders.forEach(label => {
@@ -117,7 +117,7 @@
       );
     }
     if (totalOtherHours >= 0.1) {
-      partBlockReasons.push(`V1 표준파트 외 실제인시 ${totalOtherHours}h`);
+      partBlockReasons.push(`V1 표준파트 외 실제사용시간 ${totalOtherHours}h`);
     }
     if (upActuals.unresolvedRows.length) {
       partBlockReasons.push(`미매핑 파트 ${upActuals.unresolvedRows.length}행`);
@@ -137,7 +137,7 @@
     const diagnosisList = [];
 
     // ------------------------------------------
-    // 3. 날짜별 V1 표준인시 + 표준시간표
+    // 3. 날짜별 V1 표준사용시간 + 표준시간표
     // ------------------------------------------
     dateHeaders.forEach(label => {
       const dateKey = keyByLabel[label];
@@ -188,9 +188,9 @@ const target2 = Number(finalAction.action.guideline);
         });
       });
 
-      // V2는 0.5HC 및 단조증가 보정 때문에 표시 인시가 곡선 Target2와 소폭 다를 수 있다.
+      // V2는 0.5HC 및 단조증가 보정 때문에 표시 사용시간가 곡선 Target2와 소폭 다를 수 있다.
       // 진단 상세/문제위치는 실제 화면에 보이는 정석 시간표 합계를 사용하고,
-      // 총인시 상태판정은 원래의 연속형 Target2 곡선을 유지한다.
+      // 총사용시간 상태판정은 원래의 연속형 Target2 곡선을 유지한다.
       let scheduleTargetHours = 0;
       slots.forEach(slot => {
         allTargetParts.forEach(part => {
@@ -199,7 +199,7 @@ const target2 = Number(finalAction.action.guideline);
       });
 
       // ----------------------------------------
-      // 총인시 진단: UP 근무시간 합계를 그대로 사용
+      // 총사용시간 진단: UP 근무시간 합계를 그대로 사용
       // ----------------------------------------
       const h = dailyHours[label];
       const actualTotal = h.total;

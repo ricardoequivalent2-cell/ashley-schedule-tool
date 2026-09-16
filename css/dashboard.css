@@ -97,7 +97,7 @@
     #view-glance .kpi-card-5 .kpi-value { font-size:16px; }
     #view-glance .status-strip { margin-bottom:12px; padding:10px 14px; }
 
-    .exec-hero { display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 2px 16px; }
+    .exec-hero { display:grid; grid-template-columns:minmax(180px, .72fr) minmax(0, 4fr); gap:18px; align-items:end; padding:4px 2px 12px; }
     .exec-eyebrow { font-size: 11.5px; font-weight: 700; color: #9AA1B0; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; }
     .exec-gap-row { display: flex; align-items: baseline; gap: 10px; }
     .exec-gap-number { font-size: 46px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -341,3 +341,14 @@
     #status.error { color: #c0392b; font-weight: bold; }
     #app { display: none; }
   
+
+    /* 요약 상단: 총 상태 + 핵심 4개 지표를 한 줄에 배치 */
+    #view-glance .exec-hero-kpis {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:10px; margin:0; align-self:end;
+    }
+    #view-glance .exec-hero-kpis .kpi-card-5 { min-width:0; }
+    @media (max-width: 1180px) {
+      .exec-hero { grid-template-columns:1fr; align-items:start; }
+      #view-glance .exec-hero-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+    }
