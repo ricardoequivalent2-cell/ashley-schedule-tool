@@ -460,6 +460,174 @@ function recoverOpenDeficit(adjusted, deltaHoursByPart, slots, slotHours) {
 
   return adjusted;
 }
+// ============================================================
+// REAL SHIFT LIBRARY V1 - FINAL
+// 실제 매장에서 사용하는 현실 근무조
+// start/end = 체류 시간대
+// workHours = 휴게시간을 제외한 실제 인정 근로시간
+// breakMinutes = 휴게시간(분)
+// recommendedBreakStart/End = 표준시간표 기본 휴게 배치시간
+// ============================================================
+const REAL_SHIFT_LIBRARY = [
+  {
+    id: 'OPEN_HALF_1',
+    name: '오픈하프①',
+    start: '09:00',
+    end: '15:30',
+    workHours: 6,
+    breakMinutes: 30,
+    recommendedBreakStart: '11:00',
+    recommendedBreakEnd: '11:30'
+  },
+  {
+    id: 'OPEN_HALF_2',
+    name: '오픈하프②',
+    start: '10:00',
+    end: '16:00',
+    workHours: 6,
+    breakMinutes: 30,
+    recommendedBreakStart: '11:30',
+    recommendedBreakEnd: '12:00'
+  },
+  {
+    id: 'FULL_1',
+    name: '풀타임①',
+    start: '11:00',
+    end: '20:00',
+    workHours: 8,
+    breakMinutes: 60,
+    recommendedBreakStart: '15:00',
+    recommendedBreakEnd: '16:00'
+  },
+  {
+    id: 'FULL_2',
+    name: '풀타임②',
+    start: '12:00',
+    end: '21:00',
+    workHours: 8,
+    breakMinutes: 60,
+    recommendedBreakStart: '15:00',
+    recommendedBreakEnd: '16:00'
+  },
+  {
+    id: 'FULL_3',
+    name: '풀타임③',
+    start: '12:30',
+    end: '21:30',
+    workHours: 8,
+    breakMinutes: 60,
+    recommendedBreakStart: '15:00',
+    recommendedBreakEnd: '16:00'
+  },
+  {
+    id: 'FULL_4',
+    name: '풀타임④',
+    start: '13:00',
+    end: '22:00',
+    workHours: 8,
+    breakMinutes: 60,
+    recommendedBreakStart: '15:30',
+    recommendedBreakEnd: '16:30'
+  },
+  {
+    id: 'CLOSE_HALF_1',
+    name: '마감하프①',
+    start: '15:00',
+    end: '21:30',
+    workHours: 6,
+    breakMinutes: 30,
+    recommendedBreakStart: '17:00',
+    recommendedBreakEnd: '17:30'
+  },
+  {
+    id: 'CLOSE_HALF_2',
+    name: '마감하프②',
+    start: '15:30',
+    end: '22:00',
+    workHours: 6,
+    breakMinutes: 30,
+    recommendedBreakStart: '17:00',
+    recommendedBreakEnd: '17:30'
+  },
+  {
+    id: 'PEAK_SHORT_1',
+    name: '피크초단기①',
+    start: '11:00',
+    end: '15:30',
+    workHours: 4,
+    breakMinutes: 30,
+    recommendedBreakStart: '13:00',
+    recommendedBreakEnd: '13:30'
+  },
+  {
+    id: 'PEAK_SHORT_2',
+    name: '피크초단기②',
+    start: '10:00',
+    end: '14:30',
+    workHours: 4,
+    breakMinutes: 30,
+    recommendedBreakStart: '13:00',
+    recommendedBreakEnd: '13:30'
+  }
+];
+function shiftToHcArray(shift, slots) {
+  const startMinute = timeToMinutes(shift.start);
+  const endMinute = timeToMinutes(shift.end);
+
+  const breakStartMinute =
+    shift.recommendedBreakStart != null
+      ? timeToMinutes(shift.recommendedBreakStart)
+      : null;
+
+  const breakEndMinute =
+    shift.recommendedBreakEnd != null
+      ? timeToMinutes(shift.recommendedBreakEnd)
+      : null;
+
+  return slots.map(time => {
+    const minute = timeToMinutes(time);
+
+    // 근무 시작 전 / 종료 후
+    if (minute < startMinute || minute >= endMinute) {
+      return 0;
+    }
+
+    // 추천 휴게시간
+    if (
+      breakStartMinute != null &&
+      breakEndMinute != null &&
+      minute >= breakStartMinute &&
+      minute < breakEndMinute
+    ) {
+      return 0;
+    }
+
+    // 실제 근무 중
+    return 1;
+  });
+}
+function validateRealShiftLibrary(slots, slotHours) {
+  REAL_SHIFT_LIBRARY.forEach(shift => {
+    const hcArray = shiftToHcArray(shift, slots);
+
+    const calculatedHours = hcArray.reduce(
+      (sum, hc) => sum + Number(hc || 0) * slotHours,
+      0
+    );
+
+    const expectedHours = Number(shift.workHours);
+    const diff = calculatedHours - expectedHours;
+
+    if (Math.abs(diff) > 1e-9) {
+      console.warn(
+        `[SHIFT 검증 실패] ${shift.name} | ` +
+        `기준=${expectedHours.toFixed(1)}h | ` +
+        `계산=${calculatedHours.toFixed(1)}h | ` +
+        `차이=${diff.toFixed(1)}h`
+      );
+    }
+  });
+}
   function buildMaster(guestUnitPriceOverride) {
     if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
 
@@ -469,6 +637,7 @@ function recoverOpenDeficit(adjusted, deltaHoursByPart, slots, slotHours) {
     const hcStep = Number(cfg.hcStep);
     const slotHours = Number(cfg.slotMinutes) / 60;
     const master = new Map();
+    validateRealShiftLibrary(slots, slotHours);
     const previousByPart = {};
     parts.forEach(part => { previousByPart[part] = slots.map(() => 0); });
 
