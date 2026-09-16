@@ -149,3 +149,8 @@ async function calculateFinalActionStandardReady(salesWon) {
   ]);
   return calculateFinalActionStandard(salesWon);
 }
+window.AshleyActionStandard = {
+  ensureLoaded: ensureActionConfigLoaded,
+  calculate: calculateFinalActionStandard,
+  calculateReady: calculateFinalActionStandardReady
+};

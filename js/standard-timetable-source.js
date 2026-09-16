@@ -187,21 +187,25 @@
       throw new Error('표준인시 V1.0 계산기준을 찾을 수 없습니다.');
     }
 
-    const diagnosisConfig = getActiveDiagnosisConfig();
-    const guestUnitPrice = Number(guestUnitPriceOverride || cfg.mixedGuestUnitPrice);
-    if (!(guestUnitPrice > 0)) throw new Error('객단가 기준이 올바르지 않습니다.');
-    const guestCount = sales / guestUnitPrice;
-    const target2 = tierHoursDaily(diagnosisConfig.CURVE.TIERS['2차목표'], guestCount, diagnosisConfig.CURVE);
-    const partRatios = getPartAllocationRatios(sales);
-    const allocation = interpolateAllocation(sales, parts, cfg);
-    const slotHours = Number(cfg.slotMinutes) / 60;
+    const finalAction = window.AshleyActionStandard.calculate(sales);
 
-    const rawByPart = {};
-    const partHours = {};
-    parts.forEach(part => {
-      partHours[part] = target2 * Number(partRatios[part] || 0);
-      rawByPart[part] = allocation.byPart[part].map(ratio => partHours[part] * ratio / slotHours);
-    });
+const guestUnitPrice = Number(finalAction.guestUnitPrice);
+const guestCount = Number(finalAction.guests);
+const target2 = Number(finalAction.action.guideline);
+const partRatios = finalAction.partAllocation;
+const allocation = interpolateAllocation(sales, parts, cfg);
+const slotHours = Number(cfg.slotMinutes) / 60;
+
+const rawByPart = {};
+const partHours = {};
+
+parts.forEach(part => {
+  partHours[part] = Number(finalAction.partTargets.guideline[part] || 0);
+  rawByPart[part] = allocation.byPart[part].map(
+    ratio => partHours[part] * ratio / slotHours
+  );
+});
+    
 
     return { sales, guestCount, guestUnitPrice, target2, partRatios, partHours, rawByPart, allocation, slots };
   }
@@ -295,9 +299,13 @@
   }
 
   async function ensureLoaded() {
-    await ensureTimetableConfigLoaded();
-    return { source:'supabase', version:ACTIVE_TIMETABLE_CONFIG.version };
-  }
+  await Promise.all([
+    ensureTimetableConfigLoaded(),
+    window.AshleyActionStandard.ensureLoaded()
+  ]);
+
+  return { source:'supabase', version:ACTIVE_TIMETABLE_CONFIG.version };
+}
 
   function invalidate() {
     ACTIVE_TIMETABLE_CONFIG = null;
