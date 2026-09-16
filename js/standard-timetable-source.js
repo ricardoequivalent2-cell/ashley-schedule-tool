@@ -5,6 +5,10 @@
 // - 30-min BP source: Supabase standard_models + standard_model_slots
 // - Timetable operating config: Supabase standard_timetable_config_v2
 // Calculation logic only lives in code. No local data fallback.
+//
+// NOTE: "REAL SHIFT LIBRARY" 근무조 조합 탐색 블록은 제거됨.
+// 그 블록은 sales===13000000일 때 console.log로 근무조 조합을 진단 출력만 하던 코드로,
+// hcByPart/master 등 실제 계산 결과에는 전혀 반영되지 않았음 (제거해도 산출값 동일).
 
 (function (global) {
   let ACTIVE_TIMETABLE_CONFIG = null;
@@ -79,7 +83,6 @@
 
     const allocation = {};
     parts.forEach(part => {
-      // 운영시간 밖 슬롯(예: 08:30)은 먼저 제외하고, 남은 운영시간만 다시 100%로 정규화한다.
       const values = active.map(x => Number(((model.table || {})[slotKeys[x.index]] || {})[part] || 0));
       const total = values.reduce((sum, value) => sum + value, 0);
       allocation[part] = total > 0 ? values.map(value => value / total) : values.map(() => 0);
@@ -144,8 +147,7 @@
   }
 
   // Core V2 rule:
-  // For the same part × same 30-min slot, higher sales can never have lower HC.
-  // We work in integer HC-step units so 0.5 HC is exact and no floating-step drift occurs.
+  // For the same part x same 30-min slot, higher sales can never have lower HC.
   function monotonicBalance(rawValues, previousValues, targetPartHours, hcStep, slotHours) {
     const unitHours = hcStep * slotHours;
     const desiredUnits = rawValues.map(v => Math.max(0, Number(v) || 0) / hcStep);
@@ -158,8 +160,6 @@
       let bestIndex = 0;
       let bestScore = -Infinity;
       for (let i = 0; i < units.length; i += 1) {
-        // Priority 1: fill the biggest gap versus BP-derived raw demand.
-        // Priority 2: when every slot is already above raw demand, preserve BP peak shape.
         const deficit = desiredUnits[i] - units[i];
         const shape = desiredUnits[i] * 1e-6;
         const score = deficit + shape - i * 1e-10;
@@ -189,698 +189,180 @@
 
     const finalAction = window.AshleyActionStandard.calculate(sales);
 
-const guestUnitPrice = Number(finalAction.guestUnitPrice);
-const guestCount = Number(finalAction.guests);
-const target2 = Number(finalAction.action.guideline);
-const partRatios = finalAction.partAllocation;
-const allocation = interpolateAllocation(sales, parts, cfg);
-const slotHours = Number(cfg.slotMinutes) / 60;
+    const guestUnitPrice = Number(finalAction.guestUnitPrice);
+    const guestCount = Number(finalAction.guests);
+    const target2 = Number(finalAction.action.guideline);
+    const partRatios = finalAction.partAllocation;
+    const allocation = interpolateAllocation(sales, parts, cfg);
+    const slotHours = Number(cfg.slotMinutes) / 60;
 
-const rawByPart = {};
-const partHours = {};
+    const rawByPart = {};
+    const partHours = {};
 
-parts.forEach(part => {
-  partHours[part] = Number(finalAction.partTargets.guideline[part] || 0);
-  rawByPart[part] = allocation.byPart[part].map(
-    ratio => partHours[part] * ratio / slotHours
-  );
-});
-    
+    parts.forEach(part => {
+      partHours[part] = Number(finalAction.partTargets.guideline[part] || 0);
+      rawByPart[part] = allocation.byPart[part].map(
+        ratio => partHours[part] * ratio / slotHours
+      );
+    });
 
     return { sales, guestCount, guestUnitPrice, target2, partRatios, partHours, rawByPart, allocation, slots };
   }
-// ============================================================
-// OPEN FIXED RULE V1
-// 09:00~11:00 오픈 운영 고정 기준
-// FINAL 엔진의 파트별 필요시간 총량은 변경하지 않는다.
-// 핫/그릴/피파 통합 4.5h는 내부적으로 1:1:1 귀속한다.
-// ============================================================
-const OPEN_FIXED_RULE = {
-  '09:00': {
-    '스시': 1,
-    '콜드': 1,
-    '베이커리': 0,
-    '핫': 0.5,
-    '그릴': 0.5,
-    '피파': 0,
-    'DMO': 0,
-    '홀': 1
-  },
-  '09:30': {
-    '스시': 1,
-    '콜드': 1,
-    '베이커리': 0,
-    '핫': 0.5,
-    '그릴': 0.5,
-    '피파': 1,
-    'DMO': 0,
-    '홀': 1
-  },
-  '10:00': {
-    '스시': 2,
-    '콜드': 1,
-    '베이커리': 0,
-    '핫': 1,
-    '그릴': 1,
-    '피파': 1,
-    'DMO': 0,
-    '홀': 2
-  },
-  '10:30': {
-    '스시': 2,
-    '콜드': 1,
-    '베이커리': 0,
-    '핫': 1,
-    '그릴': 1,
-    '피파': 1,
-    'DMO': 0,
-    '홀': 2
-  }
-};
-// 오픈 고정화로 발생한 증감시간을 재배분할 피크 구간
-const OPEN_REALLOCATION_PEAKS = {
-  lunch: {
-    start: '11:00',
-    end: '14:00'
-  },
-  dinner: {
-    start: '17:00',
-    end: '20:00'
-  }
-};
-function applyOpenFixedRule(hcByPart, slots, slotHours) {
-  // 원본을 직접 변경하지 않고 복사본에서 작업
-  const adjusted = {};
-  Object.keys(hcByPart).forEach(part => {
-    adjusted[part] = hcByPart[part].slice();
-  });
 
-  // 파트별 오픈 고정화에 따른 시간 증감
-  // + : 오픈에서 시간이 더 필요함
-  // - : 오픈에서 시간이 남음
-  const deltaHoursByPart = {};
+  // ============================================================
+  // OPEN FIXED RULE V1
+  // 09:00~11:00 오픈 운영 고정 기준
+  // FINAL 엔진의 파트별 필요시간 총량은 변경하지 않는다.
+  // 핫/그릴/피파 통합 4.5h는 내부적으로 1:1:1 귀속한다.
+  // ============================================================
+  const OPEN_FIXED_RULE = {
+    '09:00': { '스시': 1, '콜드': 1, '베이커리': 0, '핫': 0.5, '그릴': 0.5, '피파': 0, 'DMO': 0, '홀': 1 },
+    '09:30': { '스시': 1, '콜드': 1, '베이커리': 0, '핫': 0.5, '그릴': 0.5, '피파': 1, 'DMO': 0, '홀': 1 },
+    '10:00': { '스시': 2, '콜드': 1, '베이커리': 0, '핫': 1, '그릴': 1, '피파': 1, 'DMO': 0, '홀': 2 },
+    '10:30': { '스시': 2, '콜드': 1, '베이커리': 0, '핫': 1, '그릴': 1, '피파': 1, 'DMO': 0, '홀': 2 },
+  };
 
-  Object.keys(adjusted).forEach(part => {
-    let beforeHours = 0;
-    let afterHours = 0;
+  // 오픈 고정화로 발생한 증감시간을 재배분할 피크 구간
+  const OPEN_REALLOCATION_PEAKS = {
+    lunch: { start: '11:00', end: '14:00' },
+    dinner: { start: '17:00', end: '20:00' },
+  };
 
-    Object.entries(OPEN_FIXED_RULE).forEach(([time, rule]) => {
-      const slotIndex = slots.indexOf(time);
-      if (slotIndex < 0) return;
-      if (!(part in rule)) return;
-
-      const beforeHC = Number(adjusted[part][slotIndex] || 0);
-      const fixedHC = Number(rule[part] || 0);
-
-      beforeHours += beforeHC * slotHours;
-      afterHours += fixedHC * slotHours;
-
-      adjusted[part][slotIndex] = fixedHC;
+  function applyOpenFixedRule(hcByPart, slots, slotHours) {
+    const adjusted = {};
+    Object.keys(hcByPart).forEach(part => {
+      adjusted[part] = hcByPart[part].slice();
     });
 
-    deltaHoursByPart[part] = afterHours - beforeHours;
-  });
+    const deltaHoursByPart = {};
 
-  return {
-    adjusted,
-    deltaHoursByPart
-  };
-}
-function getPeakSlotIndexes(slots) {
-  const lunchStart = timeToMinutes(OPEN_REALLOCATION_PEAKS.lunch.start);
-  const lunchEnd = timeToMinutes(OPEN_REALLOCATION_PEAKS.lunch.end);
-  const dinnerStart = timeToMinutes(OPEN_REALLOCATION_PEAKS.dinner.start);
-  const dinnerEnd = timeToMinutes(OPEN_REALLOCATION_PEAKS.dinner.end);
+    Object.keys(adjusted).forEach(part => {
+      let beforeHours = 0;
+      let afterHours = 0;
 
-  const lunch = [];
-  const dinner = [];
+      Object.entries(OPEN_FIXED_RULE).forEach(([time, rule]) => {
+        const slotIndex = slots.indexOf(time);
+        if (slotIndex < 0) return;
+        if (!(part in rule)) return;
 
-  slots.forEach((time, index) => {
-    const minute = timeToMinutes(time);
+        const beforeHC = Number(adjusted[part][slotIndex] || 0);
+        const fixedHC = Number(rule[part] || 0);
 
-    if (minute >= lunchStart && minute < lunchEnd) {
-      lunch.push(index);
-    }
+        beforeHours += beforeHC * slotHours;
+        afterHours += fixedHC * slotHours;
 
-    if (minute >= dinnerStart && minute < dinnerEnd) {
-      dinner.push(index);
-    }
-  });
-
-  return {
-    lunch,
-    dinner,
-    all: [...lunch, ...dinner]
-  };
-}
-function redistributeOpenSurplus(adjusted, deltaHoursByPart, slots, slotHours) {
-  const peakIndexes = getPeakSlotIndexes(slots);
-  const addHoursPerStep = 0.5 * slotHours; // 0.5HC × 30분 = 0.25h
-
-  // 특정 피크 구간 안에서 기존 HC가 높은 슬롯부터 배분
-  function addHoursToPeak(part, indexes, hoursToAdd) {
-    let remaining = hoursToAdd;
-
-    const candidates = indexes
-      .map(index => ({
-        index,
-        hc: Number(adjusted[part][index] || 0)
-      }))
-      .sort((a, b) => {
-        if (b.hc !== a.hc) return b.hc - a.hc;
-        return a.index - b.index;
+        adjusted[part][slotIndex] = fixedHC;
       });
 
-    while (remaining >= addHoursPerStep - 1e-9) {
-      for (const candidate of candidates) {
-        if (remaining < addHoursPerStep - 1e-9) break;
-
-        adjusted[part][candidate.index] += 0.5;
-        remaining -= addHoursPerStep;
-      }
-    }
-
-    return remaining;
-  }
-
-  Object.keys(adjusted).forEach(part => {
-    const deltaHours = Number(deltaHoursByPart[part] || 0);
-
-    // delta < 0 = 오픈 고정 후 남은 시간
-    if (deltaHours >= 0) return;
-
-    const surplusHours = -deltaHours;
-
-    // 현재 BP 배치에서 런치/디너가 차지하는 인시 계산
-    const lunchHours = peakIndexes.lunch.reduce(
-      (sum, index) => sum + Number(adjusted[part][index] || 0) * slotHours,
-      0
-    );
-
-    const dinnerHours = peakIndexes.dinner.reduce(
-      (sum, index) => sum + Number(adjusted[part][index] || 0) * slotHours,
-      0
-    );
-
-    const peakTotalHours = lunchHours + dinnerHours;
-
-    // 기존 BP의 런치 : 디너 비율
-    // 둘 다 0인 예외 상황에서는 50:50
-    const lunchRatio =
-      peakTotalHours > 0 ? lunchHours / peakTotalHours : 0.5;
-
-    // 0.25h 단위로 런치 배분량 결정
-    const totalSteps = Math.round(surplusHours / addHoursPerStep);
-    const lunchSteps = Math.round(totalSteps * lunchRatio);
-    const dinnerSteps = totalSteps - lunchSteps;
-
-    const lunchTargetHours = lunchSteps * addHoursPerStep;
-    const dinnerTargetHours = dinnerSteps * addHoursPerStep;
-
-    addHoursToPeak(
-      part,
-      peakIndexes.lunch,
-      lunchTargetHours
-    );
-
-    addHoursToPeak(
-      part,
-      peakIndexes.dinner,
-      dinnerTargetHours
-    );
-  });
-
-  return adjusted;
-}
-function recoverOpenDeficit(adjusted, deltaHoursByPart, slots, slotHours) {
-  const peakIndexes = getPeakSlotIndexes(slots);
-  const removeHoursPerStep = 0.5 * slotHours; // 0.25h
-
-  Object.keys(adjusted).forEach(part => {
-    const deltaHours = Number(deltaHoursByPart[part] || 0);
-
-    // delta > 0 = 오픈 고정으로 기존보다 시간을 더 사용함
-    if (deltaHours <= 0) return;
-
-    let remainingHours = deltaHours;
-
-    // 런치 + 디너 피크 안에서만 회수
-    // HC가 높은 슬롯부터 회수하여 피크의 모양을 최대한 유지
-    const candidates = peakIndexes.all
-      .map(index => ({
-        index,
-        hc: Number(adjusted[part][index] || 0)
-      }))
-      .filter(item => item.hc >= 0.5)
-      .sort((a, b) => {
-        if (b.hc !== a.hc) return b.hc - a.hc;
-        return a.index - b.index;
-      });
-
-    while (remainingHours >= removeHoursPerStep - 1e-9) {
-      let removedInThisRound = false;
-
-      for (const candidate of candidates) {
-        if (remainingHours < removeHoursPerStep - 1e-9) break;
-
-        const currentHC = Number(adjusted[part][candidate.index] || 0);
-
-        // 0 아래로 내려가지 않도록 보호
-        if (currentHC < 0.5) continue;
-
-        adjusted[part][candidate.index] = currentHC - 0.5;
-        remainingHours -= removeHoursPerStep;
-        removedInThisRound = true;
-      }
-
-      // 더 이상 피크에서 뺄 시간이 없으면 무한루프 방지
-      if (!removedInThisRound) break;
-    }
-  });
-
-  return adjusted;
-}
-// ============================================================
-// REAL SHIFT LIBRARY V1 - FINAL
-// 실제 매장에서 사용하는 현실 근무조
-// start/end = 체류 시간대
-// workHours = 휴게시간을 제외한 실제 인정 근로시간
-// breakMinutes = 휴게시간(분)
-// recommendedBreakStart/End = 표준시간표 기본 휴게 배치시간
-// ============================================================
-const REAL_SHIFT_LIBRARY = [
-  {
-    id: 'OPEN_HALF_1',
-    name: '오픈하프①',
-    start: '09:00',
-    end: '15:30',
-    workHours: 6,
-    breakMinutes: 30,
-    recommendedBreakStart: '11:00',
-    recommendedBreakEnd: '11:30'
-  },
-  {
-    id: 'OPEN_HALF_2',
-    name: '오픈하프②',
-    start: '10:00',
-    end: '16:30',
-    workHours: 6,
-    breakMinutes: 30,
-    recommendedBreakStart: '11:30',
-    recommendedBreakEnd: '12:00'
-  },
-  {
-    id: 'FULL_1',
-    name: '풀타임①',
-    start: '11:00',
-    end: '20:00',
-    workHours: 8,
-    breakMinutes: 60,
-    recommendedBreakStart: '15:00',
-    recommendedBreakEnd: '16:00'
-  },
-  {
-    id: 'FULL_2',
-    name: '풀타임②',
-    start: '12:00',
-    end: '21:00',
-    workHours: 8,
-    breakMinutes: 60,
-    recommendedBreakStart: '15:00',
-    recommendedBreakEnd: '16:00'
-  },
-  {
-    id: 'FULL_3',
-    name: '풀타임③',
-    start: '12:30',
-    end: '21:30',
-    workHours: 8,
-    breakMinutes: 60,
-    recommendedBreakStart: '15:00',
-    recommendedBreakEnd: '16:00'
-  },
-  {
-    id: 'FULL_4',
-    name: '풀타임④',
-    start: '13:00',
-    end: '22:00',
-    workHours: 8,
-    breakMinutes: 60,
-    recommendedBreakStart: '15:30',
-    recommendedBreakEnd: '16:30'
-  },
-  {
-    id: 'CLOSE_HALF_1',
-    name: '마감하프①',
-    start: '15:00',
-    end: '21:30',
-    workHours: 6,
-    breakMinutes: 30,
-    recommendedBreakStart: '17:00',
-    recommendedBreakEnd: '17:30'
-  },
-  {
-    id: 'CLOSE_HALF_2',
-    name: '마감하프②',
-    start: '15:30',
-    end: '22:00',
-    workHours: 6,
-    breakMinutes: 30,
-    recommendedBreakStart: '17:00',
-    recommendedBreakEnd: '17:30'
-  },
-  {
-    id: 'PEAK_SHORT_1',
-    name: '피크초단기①',
-    start: '11:00',
-    end: '15:30',
-    workHours: 4,
-    breakMinutes: 30,
-    recommendedBreakStart: '13:00',
-    recommendedBreakEnd: '13:30'
-  },
-  {
-    id: 'PEAK_SHORT_2',
-    name: '피크초단기②',
-    start: '10:00',
-    end: '14:30',
-    workHours: 4,
-    breakMinutes: 30,
-    recommendedBreakStart: '13:00',
-    recommendedBreakEnd: '13:30'
-  }
-];
-function shiftToHcArray(shift, slots) {
-  const startMinute = timeToMinutes(shift.start);
-  const endMinute = timeToMinutes(shift.end);
-
-  const breakStartMinute =
-    shift.recommendedBreakStart != null
-      ? timeToMinutes(shift.recommendedBreakStart)
-      : null;
-
-  const breakEndMinute =
-    shift.recommendedBreakEnd != null
-      ? timeToMinutes(shift.recommendedBreakEnd)
-      : null;
-
-  return slots.map(time => {
-    const minute = timeToMinutes(time);
-
-    // 근무 시작 전 / 종료 후
-    if (minute < startMinute || minute >= endMinute) {
-      return 0;
-    }
-
-    // 추천 휴게시간
-    if (
-      breakStartMinute != null &&
-      breakEndMinute != null &&
-      minute >= breakStartMinute &&
-      minute < breakEndMinute
-    ) {
-      return 0;
-    }
-
-    // 실제 근무 중
-    return 1;
-  });
-}
-function validateRealShiftLibrary(slots, slotHours) {
-  REAL_SHIFT_LIBRARY.forEach(shift => {
-    const hcArray = shiftToHcArray(shift, slots);
-
-    const calculatedHours = hcArray.reduce(
-      (sum, hc) => sum + Number(hc || 0) * slotHours,
-      0
-    );
-
-    const expectedHours = Number(shift.workHours);
-    const diff = calculatedHours - expectedHours;
-
-    if (Math.abs(diff) > 1e-9) {
-      console.warn(
-        `[SHIFT 검증 실패] ${shift.name} | ` +
-        `기준=${expectedHours.toFixed(1)}h | ` +
-        `계산=${calculatedHours.toFixed(1)}h | ` +
-        `차이=${diff.toFixed(1)}h`
-      );
-    }
-  });
-}
-function combineShiftHcArrays(shifts, slots) {
-  const combined = slots.map(() => 0);
-
-  shifts.forEach(shift => {
-    const shiftArray = shiftToHcArray(shift, slots);
-
-    shiftArray.forEach((hc, index) => {
-      combined[index] += Number(hc || 0);
+      deltaHoursByPart[part] = afterHours - beforeHours;
     });
-  });
 
-  return combined;
-}
-function scoreShiftCombination(targetHcArray, shiftHcArray, slots) {
-  let score = 0;
-
-  for (let index = 0; index < slots.length; index += 1) {
-    const time = slots[index];
-    const minute = timeToMinutes(time);
-
-    const targetHC = Number(targetHcArray[index] || 0);
-    const shiftHC = Number(shiftHcArray[index] || 0);
-
-    // 09:00~11:00 OPEN RULE은 절대 변경하지 않음
-    if (
-      minute >= timeToMinutes('09:00') &&
-      minute < timeToMinutes('11:00')
-    ) {
-      if (Math.abs(targetHC - shiftHC) > 1e-9) {
-        return Infinity;
-      }
-
-      continue;
-    }
-
-    // 나머지 시간대는 기존 표준 HC와의 차이를 누적
-    score += Math.abs(targetHC - shiftHC);
+    return { adjusted, deltaHoursByPart };
   }
 
-  return score;
-}
+  function getPeakSlotIndexes(slots) {
+    const lunchStart = timeToMinutes(OPEN_REALLOCATION_PEAKS.lunch.start);
+    const lunchEnd = timeToMinutes(OPEN_REALLOCATION_PEAKS.lunch.end);
+    const dinnerStart = timeToMinutes(OPEN_REALLOCATION_PEAKS.dinner.start);
+    const dinnerEnd = timeToMinutes(OPEN_REALLOCATION_PEAKS.dinner.end);
 
+    const lunch = [];
+    const dinner = [];
 
-function generateShiftCombinationCandidates(targetHours) {
-  const target = Number(targetHours || 0);
-  const candidates = [];
+    slots.forEach((time, index) => {
+      const minute = timeToMinutes(time);
+      if (minute >= lunchStart && minute < lunchEnd) lunch.push(index);
+      if (minute >= dinnerStart && minute < dinnerEnd) dinner.push(index);
+    });
 
-  // 현실 근무조의 근로시간은 4h / 6h / 8h 세 종류
-  // 우선 필요한 "시간 조합"만 계산해서 탐색량을 제한한다.
-  const max4 = Math.ceil((target + 4) / 4);
-  const max6 = Math.ceil((target + 4) / 6);
-  const max8 = Math.ceil((target + 4) / 8);
+    return { lunch, dinner, all: [...lunch, ...dinner] };
+  }
 
-  for (let count4 = 0; count4 <= max4; count4 += 1) {
-    for (let count6 = 0; count6 <= max6; count6 += 1) {
-      for (let count8 = 0; count8 <= max8; count8 += 1) {
-        const totalHours =
-          count4 * 4 +
-          count6 * 6 +
-          count8 * 8;
+  function redistributeOpenSurplus(adjusted, deltaHoursByPart, slots, slotHours) {
+    const peakIndexes = getPeakSlotIndexes(slots);
+    const addHoursPerStep = 0.5 * slotHours;
 
-        // 필요시간 ±4h 범위만 후보로 사용
-        if (Math.abs(totalHours - target) > 4) {
-          continue;
+    function addHoursToPeak(part, indexes, hoursToAdd) {
+      let remaining = hoursToAdd;
+
+      const candidates = indexes
+        .map(index => ({ index, hc: Number(adjusted[part][index] || 0) }))
+        .sort((a, b) => (b.hc !== a.hc ? b.hc - a.hc : a.index - b.index));
+
+      while (remaining >= addHoursPerStep - 1e-9) {
+        for (const candidate of candidates) {
+          if (remaining < addHoursPerStep - 1e-9) break;
+          adjusted[part][candidate.index] += 0.5;
+          remaining -= addHoursPerStep;
+        }
+      }
+
+      return remaining;
+    }
+
+    Object.keys(adjusted).forEach(part => {
+      const deltaHours = Number(deltaHoursByPart[part] || 0);
+      if (deltaHours >= 0) return;
+
+      const surplusHours = -deltaHours;
+
+      const lunchHours = peakIndexes.lunch.reduce(
+        (sum, index) => sum + Number(adjusted[part][index] || 0) * slotHours, 0
+      );
+      const dinnerHours = peakIndexes.dinner.reduce(
+        (sum, index) => sum + Number(adjusted[part][index] || 0) * slotHours, 0
+      );
+
+      const peakTotalHours = lunchHours + dinnerHours;
+      const lunchRatio = peakTotalHours > 0 ? lunchHours / peakTotalHours : 0.5;
+
+      const totalSteps = Math.round(surplusHours / addHoursPerStep);
+      const lunchSteps = Math.round(totalSteps * lunchRatio);
+      const dinnerSteps = totalSteps - lunchSteps;
+
+      addHoursToPeak(part, peakIndexes.lunch, lunchSteps * addHoursPerStep);
+      addHoursToPeak(part, peakIndexes.dinner, dinnerSteps * addHoursPerStep);
+    });
+
+    return adjusted;
+  }
+
+  function recoverOpenDeficit(adjusted, deltaHoursByPart, slots, slotHours) {
+    const peakIndexes = getPeakSlotIndexes(slots);
+    const removeHoursPerStep = 0.5 * slotHours;
+
+    Object.keys(adjusted).forEach(part => {
+      const deltaHours = Number(deltaHoursByPart[part] || 0);
+      if (deltaHours <= 0) return;
+
+      let remainingHours = deltaHours;
+
+      const candidates = peakIndexes.all
+        .map(index => ({ index, hc: Number(adjusted[part][index] || 0) }))
+        .filter(item => item.hc >= 0.5)
+        .sort((a, b) => (b.hc !== a.hc ? b.hc - a.hc : a.index - b.index));
+
+      while (remainingHours >= removeHoursPerStep - 1e-9) {
+        let removedInThisRound = false;
+
+        for (const candidate of candidates) {
+          if (remainingHours < removeHoursPerStep - 1e-9) break;
+
+          const currentHC = Number(adjusted[part][candidate.index] || 0);
+          if (currentHC < 0.5) continue;
+
+          adjusted[part][candidate.index] = currentHC - 0.5;
+          remainingHours -= removeHoursPerStep;
+          removedInThisRound = true;
         }
 
-        candidates.push({
-          count4,
-          count6,
-          count8,
-          totalHours,
-          hourDiff: totalHours - target
-        });
-      }
-    }
-  }
-
-  return candidates;
-}
-function expandHourCandidateToShiftCombinations(candidate) {
-  const fourHourShifts = REAL_SHIFT_LIBRARY.filter(
-    shift => Number(shift.workHours) === 4
-  );
-
-  const sixHourShifts = REAL_SHIFT_LIBRARY.filter(
-    shift => Number(shift.workHours) === 6
-  );
-
-  const eightHourShifts = REAL_SHIFT_LIBRARY.filter(
-    shift => Number(shift.workHours) === 8
-  );
-
-  const results = [];
-const MAX_EXPANDED_COMBINATIONS = 5000;
-  function buildCombinations(pool, count, startIndex, selected, callback) {
-    if (selected.length === count) {
-      callback(selected.slice());
-      return;
-    }
-
-    for (let i = startIndex; i < pool.length; i += 1) {
-      selected.push(pool[i]);
-
-      // 같은 근무조를 여러 명 사용할 수 있음
-      buildCombinations(
-        pool,
-        count,
-        i,
-        selected,
-        callback
-      );
-
-      selected.pop();
-    }
-  }
-
-  buildCombinations(
-    fourHourShifts,
-    candidate.count4,
-    0,
-    [],
-    selected4 => {
-      buildCombinations(
-        sixHourShifts,
-        candidate.count6,
-        0,
-        [],
-        selected6 => {
-          buildCombinations(
-            eightHourShifts,
-            candidate.count8,
-            0,
-            [],
-            selected8 => {
-              results.push([
-                ...selected4,
-                ...selected6,
-                ...selected8
-              ]);
-            }
-          );
-        }
-      );
-    }
-  );
-
-  return results;
-}
-function findBestShiftCombination(targetHcArray, targetHours, slots) {
-  const hourCandidates =
-    generateShiftCombinationCandidates(targetHours);
-
-  let best = null;
-
-  hourCandidates.forEach(hourCandidate => {
-    const shiftCombinations =
-      expandHourCandidateToShiftCombinations(hourCandidate);
-
-    shiftCombinations.forEach(shifts => {
-      const shiftHcArray =
-        combineShiftHcArrays(shifts, slots);
-
-      // OPEN RULE + 기존 HC 모양 적합도
-      const shapeScore = scoreShiftCombination(
-        targetHcArray,
-        shiftHcArray,
-        slots
-      );
-
-      // OPEN RULE 위반 조합은 탈락
-      if (!Number.isFinite(shapeScore)) {
-        return;
-      }
-
-      const hourDiff = Math.abs(
-        Number(hourCandidate.totalHours) -
-        Number(targetHours)
-      );
-
-      const evaluated = {
-        shifts,
-        shiftHcArray,
-        totalHours: hourCandidate.totalHours,
-        hourDiff,
-        shapeScore
-      };
-
-      if (best === null) {
-        best = evaluated;
-        return;
-      }
-
-      // 1순위: 필요 총시간과의 차이가 작은 조합
-      if (evaluated.hourDiff < best.hourDiff) {
-        best = evaluated;
-        return;
-      }
-
-      if (evaluated.hourDiff > best.hourDiff) {
-        return;
-      }
-
-      // 2순위: 기존 HC 모양과 더 비슷한 조합
-      if (evaluated.shapeScore < best.shapeScore) {
-        best = evaluated;
-        return;
-      }
-
-      if (evaluated.shapeScore > best.shapeScore) {
-        return;
-      }
-
-      // 3순위: 사람이 더 적은 조합
-      if (evaluated.shifts.length < best.shifts.length) {
-        best = evaluated;
+        if (!removedInThisRound) break;
       }
     });
-  });
 
-  return best;
-}
-function logShiftCombinationTest(hcByPart, partHours, slots) {
-  console.group('[REAL SHIFT 조합 테스트]');
+    return adjusted;
+  }
 
-  Object.keys(hcByPart).forEach(part => {
-    // 베이커리는 현실 근무조 편성 대상에서 제외
-    if (part === '베이커리') return;
-
-    const best = findBestShiftCombination(
-      hcByPart[part],
-      partHours[part],
-      slots
-    );
-
-    if (!best) {
-      console.warn(`[SHIFT 조합 없음] ${part}`);
-      return;
-    }
-
-    const shiftNames = best.shifts
-      .map(shift => shift.name)
-      .join(' + ');
-
-    console.log(
-      `${part} | 필요=${Number(partHours[part]).toFixed(1)}h | ` +
-      `조합=${Number(best.totalHours).toFixed(1)}h | ` +
-      `차이=${Number(best.hourDiff).toFixed(1)}h | ` +
-      `${shiftNames}`
-    );
-  });
-
-  console.groupEnd();
-}
   function buildMaster(guestUnitPriceOverride) {
     if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
 
@@ -890,7 +372,6 @@ function logShiftCombinationTest(hcByPart, partHours, slots) {
     const hcStep = Number(cfg.hcStep);
     const slotHours = Number(cfg.slotMinutes) / 60;
     const master = new Map();
-    validateRealShiftLibrary(slots, slotHours);
     const previousByPart = {};
     parts.forEach(part => { previousByPart[part] = slots.map(() => 0); });
 
@@ -909,39 +390,28 @@ function logShiftCombinationTest(hcByPart, partHours, slots) {
         forcedCarryHoursByPart[part] = result.forcedCarryHours;
         previousByPart[part] = result.values.slice();
       });
-const openResult = applyOpenFixedRule(hcByPart, slots, slotHours);
 
-redistributeOpenSurplus(openResult.adjusted, openResult.deltaHoursByPart, slots, slotHours);
-recoverOpenDeficit(openResult.adjusted, openResult.deltaHoursByPart, slots, slotHours);
-// OPEN RULE 적용 전/후 파트별 총량 보존 검증
-parts.forEach(part => {
-  const beforeHours = hcByPart[part].reduce(
-    (sum, hc) => sum + Number(hc || 0) * slotHours,
-    0
-  );
+      const openResult = applyOpenFixedRule(hcByPart, slots, slotHours);
 
-  const afterHours = openResult.adjusted[part].reduce(
-    (sum, hc) => sum + Number(hc || 0) * slotHours,
-    0
-  );
+      redistributeOpenSurplus(openResult.adjusted, openResult.deltaHoursByPart, slots, slotHours);
+      recoverOpenDeficit(openResult.adjusted, openResult.deltaHoursByPart, slots, slotHours);
 
-  const diff = afterHours - beforeHours;
+      // OPEN RULE 적용 전/후 파트별 총량 보존 검증
+      parts.forEach(part => {
+        const beforeHours = hcByPart[part].reduce((sum, hc) => sum + Number(hc || 0) * slotHours, 0);
+        const afterHours = openResult.adjusted[part].reduce((sum, hc) => sum + Number(hc || 0) * slotHours, 0);
+        const diff = afterHours - beforeHours;
 
-  if (Math.abs(diff) > 1e-9) {
-    console.warn(
-      `[OPEN RULE 총량 불일치] 매출=${sales}, 파트=${part}, ` +
-      `적용전=${beforeHours.toFixed(2)}h, ` +
-      `적용후=${afterHours.toFixed(2)}h, ` +
-      `차이=${diff.toFixed(2)}h`
-    );
-  }
-});
-// 검증이 끝난 OPEN RULE 결과를 실제 표준시간표에 적용
-hcByPart = openResult.adjusted;
-// 현실 근무조 조합 테스트 - 1,300만원에서만 실행
-if (sales === 13000000) {
-  logShiftCombinationTest(hcByPart, raw.partHours, slots);
-}
+        if (Math.abs(diff) > 1e-9) {
+          console.warn(
+            `[OPEN RULE 총량 불일치] 매출=${sales}, 파트=${part}, ` +
+            `적용전=${beforeHours.toFixed(2)}h, 적용후=${afterHours.toFixed(2)}h, 차이=${diff.toFixed(2)}h`
+          );
+        }
+      });
+
+      hcByPart = openResult.adjusted;
+
       const slotTotals = slots.map((_, i) => parts.reduce((sum, part) => sum + hcByPart[part][i], 0));
       const roundedTotalHours = slotTotals.reduce((sum, hc) => sum + hc * slotHours, 0);
 
@@ -996,20 +466,18 @@ if (sales === 13000000) {
     return result;
   }
 
-  // 일간/주간 진단은 평일·주말 객단가가 이미 DB model_config에 있으므로
-  // 동일한 V2 알고리즘을 쓰되 해당 일자의 객단가 기준으로 별도 master를 계산한다.
   function buildForDiagnosis(salesWon, guestUnitPrice) {
     return buildStandardTimetable(salesWon, guestUnitPrice);
   }
 
   async function ensureLoaded() {
-  await Promise.all([
-    ensureTimetableConfigLoaded(),
-    window.AshleyActionStandard.ensureLoaded()
-  ]);
+    await Promise.all([
+      ensureTimetableConfigLoaded(),
+      window.AshleyActionStandard.ensureLoaded()
+    ]);
 
-  return { source:'supabase', version:ACTIVE_TIMETABLE_CONFIG.version };
-}
+    return { source: 'supabase', version: ACTIVE_TIMETABLE_CONFIG.version };
+  }
 
   function invalidate() {
     ACTIVE_TIMETABLE_CONFIG = null;
