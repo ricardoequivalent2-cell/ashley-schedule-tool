@@ -483,7 +483,7 @@ const REAL_SHIFT_LIBRARY = [
     id: 'OPEN_HALF_2',
     name: '오픈하프②',
     start: '10:00',
-    end: '16:00',
+    end: '16:30',
     workHours: 6,
     breakMinutes: 30,
     recommendedBreakStart: '11:30',
