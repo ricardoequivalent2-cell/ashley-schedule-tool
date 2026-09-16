@@ -514,6 +514,8 @@ parts.forEach(part => {
     );
   }
 });
+// 검증이 끝난 OPEN RULE 결과를 실제 표준시간표에 적용
+hcByPart = openResult.adjusted;
       const slotTotals = slots.map((_, i) => parts.reduce((sum, part) => sum + hcByPart[part][i], 0));
       const roundedTotalHours = slotTotals.reduce((sum, hc) => sum + hc * slotHours, 0);
 
