@@ -149,9 +149,11 @@
         : calcConfig.GUEST_UNIT_PRICE_WEEKDAY;
       const guestCount = price > 0 ? salesVal / price : 0;
 
-      const hurdle = tierHoursDaily(calcConfig.CURVE.TIERS['최소허들'], guestCount, calcConfig.CURVE);
-      const target1 = tierHoursDaily(calcConfig.CURVE.TIERS['1차목표'], guestCount, calcConfig.CURVE);
-      const target2 = tierHoursDaily(calcConfig.CURVE.TIERS['2차목표'], guestCount, calcConfig.CURVE);
+      const finalAction = global.AshleyActionStandard.calculate(salesVal);
+
+const hurdle = Number(finalAction.action.minimum);
+const target1 = Number(finalAction.action.target1);
+const target2 = Number(finalAction.action.guideline);
 
       // V2 기준 통일:
       // - 총량 진단 경계는 기존 2차목표(BHAG) 곡선을 유지한다.
