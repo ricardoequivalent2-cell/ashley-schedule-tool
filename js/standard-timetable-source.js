@@ -628,6 +628,192 @@ function validateRealShiftLibrary(slots, slotHours) {
     }
   });
 }
+function combineShiftHcArrays(shifts, slots) {
+  const combined = slots.map(() => 0);
+
+  shifts.forEach(shift => {
+    const shiftArray = shiftToHcArray(shift, slots);
+
+    shiftArray.forEach((hc, index) => {
+      combined[index] += Number(hc || 0);
+    });
+  });
+
+  return combined;
+}
+function scoreShiftCombination(targetHcArray, shiftHcArray, slots) {
+  let score = 0;
+
+  for (let index = 0; index < slots.length; index += 1) {
+    const time = slots[index];
+    const minute = timeToMinutes(time);
+
+    const targetHC = Number(targetHcArray[index] || 0);
+    const shiftHC = Number(shiftHcArray[index] || 0);
+
+    // 09:00~11:00 OPEN RULE은 절대 변경하지 않음
+    if (
+      minute >= timeToMinutes('09:00') &&
+      minute < timeToMinutes('11:00')
+    ) {
+      if (Math.abs(targetHC - shiftHC) > 1e-9) {
+        return Infinity;
+      }
+
+      continue;
+    }
+
+    // 나머지 시간대는 기존 표준 HC와의 차이를 누적
+    score += Math.abs(targetHC - shiftHC);
+  }
+
+  return score;
+}
+function generateShiftCombinationCandidates(targetHours) {
+  const candidates = [];
+
+  const target = Number(targetHours || 0);
+
+  // 가장 짧은 근무조가 4h이므로
+  // 필요시간을 충분히 넘길 수 있는 범위까지만 인원 수 탐색
+  const maxPeople = Math.ceil(target / 4) + 2;
+
+  function search(startIndex, selectedShifts, totalHours) {
+    // 현재까지 만든 조합도 후보로 저장
+    if (selectedShifts.length > 0) {
+      candidates.push({
+        shifts: selectedShifts.slice(),
+        totalHours,
+        hourDiff: totalHours - target
+      });
+    }
+
+    // 더 이상 사람을 추가하지 않음
+    if (selectedShifts.length >= maxPeople) {
+      return;
+    }
+
+    // 필요시간보다 지나치게 많은 조합은 탐색 중단
+    if (totalHours > target + 8) {
+      return;
+    }
+
+    for (let i = startIndex; i < REAL_SHIFT_LIBRARY.length; i += 1) {
+      const shift = REAL_SHIFT_LIBRARY[i];
+
+      selectedShifts.push(shift);
+
+      search(
+        i, // 같은 근무조를 여러 명 사용할 수 있음
+        selectedShifts,
+        totalHours + Number(shift.workHours || 0)
+      );
+
+      selectedShifts.pop();
+    }
+  }
+
+  search(0, [], 0);
+
+  return candidates;
+}
+function findBestShiftCombination(targetHcArray, targetHours, slots) {
+  const candidates = generateShiftCombinationCandidates(targetHours);
+
+  let best = null;
+
+  candidates.forEach(candidate => {
+    const shiftHcArray = combineShiftHcArrays(candidate.shifts, slots);
+
+    // OPEN RULE + 기존 HC 모양 적합도
+    const shapeScore = scoreShiftCombination(
+      targetHcArray,
+      shiftHcArray,
+      slots
+    );
+
+    // OPEN RULE 위반 조합은 탈락
+    if (!Number.isFinite(shapeScore)) {
+      return;
+    }
+
+    const hourDiff = Math.abs(
+      Number(candidate.totalHours) - Number(targetHours)
+    );
+
+    const evaluated = {
+      shifts: candidate.shifts,
+      shiftHcArray,
+      totalHours: candidate.totalHours,
+      hourDiff,
+      shapeScore
+    };
+
+    if (best === null) {
+      best = evaluated;
+      return;
+    }
+
+    // 1순위: 필요 총시간과의 차이가 작은 조합
+    if (evaluated.hourDiff < best.hourDiff) {
+      best = evaluated;
+      return;
+    }
+
+    if (evaluated.hourDiff > best.hourDiff) {
+      return;
+    }
+
+    // 2순위: 같은 총량 차이라면 기존 HC 모양과 더 비슷한 조합
+    if (evaluated.shapeScore < best.shapeScore) {
+      best = evaluated;
+      return;
+    }
+
+    if (evaluated.shapeScore > best.shapeScore) {
+      return;
+    }
+
+    // 3순위: 그래도 같다면 사람이 적은 조합
+    if (evaluated.shifts.length < best.shifts.length) {
+      best = evaluated;
+    }
+  });
+
+  return best;
+}
+function logShiftCombinationTest(hcByPart, partHours, slots) {
+  console.group('[REAL SHIFT 조합 테스트]');
+
+  Object.keys(hcByPart).forEach(part => {
+    // 베이커리는 현실 근무조 편성 대상에서 제외
+    if (part === '베이커리') return;
+
+    const best = findBestShiftCombination(
+      hcByPart[part],
+      partHours[part],
+      slots
+    );
+
+    if (!best) {
+      console.warn(`[SHIFT 조합 없음] ${part}`);
+      return;
+    }
+
+    const shiftNames = best.shifts
+      .map(shift => shift.name)
+      .join(' + ');
+
+    console.log(
+      `${part} | 필요=${Number(partHours[part]).toFixed(1)}h | ` +
+      `조합=${Number(best.totalHours).toFixed(1)}h | ` +
+      `차이=${Number(best.hourDiff).toFixed(1)}h | ` +
+      `${shiftNames}`
+    );
+  });
+
+  console.groupEnd();
+}
   function buildMaster(guestUnitPriceOverride) {
     if (!ACTIVE_TIMETABLE_CONFIG) throw new Error('정석 시간표 V2 DB 설정이 아직 로드되지 않았습니다.');
 
@@ -685,6 +871,7 @@ parts.forEach(part => {
 });
 // 검증이 끝난 OPEN RULE 결과를 실제 표준시간표에 적용
 hcByPart = openResult.adjusted;
+logShiftCombinationTest(hcByPart, raw.partHours, slots);
       const slotTotals = slots.map((_, i) => parts.reduce((sum, part) => sum + hcByPart[part][i], 0));
       const roundedTotalHours = slotTotals.reduce((sum, hc) => sum + hc * slotHours, 0);
 
