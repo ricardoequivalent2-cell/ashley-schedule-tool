@@ -3055,6 +3055,7 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function renderPartRanking() {
       const el = document.getElementById('partRanking');
+      if (!el) return;
       const rows = computeWeekPartGaps().slice().sort((a, b) => {
         const order = { red:3, yellow:2, green:1 };
         if (order[a.tierStatus] !== order[b.tierStatus]) return order[b.tierStatus] - order[a.tierStatus];
@@ -3240,7 +3241,8 @@ async function autoSaveDiagnosisResult(storeName) {
     }
 
     function renderGlanceAll() {
-      renderPartRanking();
+      // 파트별 반복 문제 순위 UI는 제거되었으므로 더 이상 렌더링하지 않는다.
+      // 존재하지 않는 #partRanking에 접근하면 이후 히트맵/주간진단 렌더링까지 중단된다.
       renderGlanceHeatmap('glanceHeatmapWeekday', false);
       renderGlanceHeatmap('glanceHeatmapWeekend', true);
     }
