@@ -363,3 +363,36 @@
   text-align: center;
   padding-left: 6px;
 }
+
+/* 주간진단: 요일별 진단 60% + 해결 우선순위 40% */
+#view-weekly .weekly-diagnosis-top {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+#view-weekly .weekly-day-card,
+#view-weekly .weekly-priority-card { margin: 0; min-width: 0; }
+#view-weekly .weekly-table-scroll { width: 100%; overflow-x: auto; }
+#view-weekly .weekly-day-table { min-width: 900px; table-layout: auto; }
+#view-weekly .weekly-day-table th,
+#view-weekly .weekly-day-table td { white-space: nowrap; }
+#view-weekly .weekly-day-table th:first-child,
+#view-weekly .weekly-day-table td:first-child { text-align: center; }
+#view-weekly .weekly-priority-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 4px;
+  border-bottom: 1px solid #EEF0F4;
+}
+#view-weekly .weekly-priority-row:last-child { border-bottom: 0; }
+#view-weekly .weekly-priority-rank { font-size: 12px; font-weight: 800; color: #A7AEBD; }
+#view-weekly .weekly-priority-day { font-size: 14px; font-weight: 800; color: #1A2233; }
+#view-weekly .weekly-priority-gap { font-size: 20px; line-height: 1; font-weight: 900; color: #FF1F1F; }
+#view-weekly .weekly-priority-empty { padding: 22px 4px; font-size: 13px; font-weight: 700; color: #7B8497; }
+@media (max-width: 1100px) {
+  #view-weekly .weekly-diagnosis-top { grid-template-columns: 1fr; }
+}

@@ -502,11 +502,16 @@
       <button type="button" class="scope-tab" data-scope="hall" style="padding:7px 14px;border:1px solid #D9DEE8;border-radius:999px;background:#fff;color:#555;font-size:12px;font-weight:700;cursor:pointer;">홀</button>
     </div>
 
-    <div class="kpi-row-5" id="weeklyKpiRow"></div>
-
-    <div class="section-card">
-      <div class="section-title">요일별 인력 진단</div>
-      <div id="weeklyDayTable"></div>
+    <div class="weekly-diagnosis-top">
+      <div class="section-card weekly-day-card">
+        <div class="section-title">요일별 인력 진단</div>
+        <div id="weeklyDayTable"></div>
+      </div>
+      <div class="section-card weekly-priority-card">
+        <div class="section-title">해결 우선순위</div>
+        <div class="section-sub" style="margin-bottom:12px;">가이드라인보다 더 사용한 시간이 큰 요일부터 확인하세요.</div>
+        <div id="weeklyPriorityDays"></div>
+      </div>
     </div>
 
     <div class="dashboard-grid-main">
@@ -2892,21 +2897,58 @@ async function autoSaveDiagnosisResult(storeName) {
       }).join('');
     }
 
-    // 주간진단 - 요일별 진단 테이블 (월~일: 예상매출/목표/실제/Gap/상태)
+    // 주간진단 - 요일별 진단 테이블 + 해결 우선순위
+    // 동일한 일자별 tierDiagnosis를 한 번만 사용해 표와 우선순위의 Gap이 항상 일치한다.
     function renderWeeklyDayTable() {
       const el = document.getElementById('weeklyDayTable');
-      let html = '<table class="compare-table-v2"><tr><th>요일</th><th>예상매출</th><th>가이드라인</th><th>실제사용시간</th><th>Gap</th><th>상태</th></tr>';
+      if (!el) return;
+      let html = '<div class="weekly-table-scroll"><table class="compare-table-v2 weekly-day-table"><tr>' +
+        '<th>날짜·요일</th><th>예상매출</th><th>가이드라인 합</th><th>주방 가이드라인</th><th>홀 가이드라인</th>' +
+        '<th>주방 실사용시간</th><th>홀 실사용시간</th><th>Gap</th><th>진단</th></tr>';
+
       dateHeaders.forEach(d => {
         const t = tierDiagnosis[d]; if (!t) return;
-        const gap = Math.round((t.actualTotal - t.target2) * 10) / 10;
+        const kitchenGuideline = sumStandardHoursForScope(data, d, 'kitchen');
+        const hallGuideline = sumStandardHoursForScope(data, d, 'hall');
+        const gap = Math.round((Number(t.actualTotal || 0) - Number(t.target2 || 0)) * 10) / 10;
         const meta = trafficMeta(t.actualTotal, t.target1, t.hurdle);
-        html += '<tr class="row-actual group-start" style="background:' + meta.bg + ';"><td>' + d + '</td><td>' + (t.salesVal || 0).toLocaleString() + '원</td>' +
-          '<td>' + displayHours(t.target2) + 'h</td><td>' + displayHours(t.actualTotal) + 'h</td>' +
-          '<td style="color:' + meta.color + '; font-weight:700;">' + displaySignedHours(gap) + '</td>' +
-          '<td><span class="kpi-badge" style="background:' + meta.bg + '; color:' + meta.color + ';">' + meta.label + '</span></td></tr>';
+        html += '<tr class="row-actual group-start" style="background:' + meta.bg + ';">' +
+          '<td>' + d + '</td>' +
+          '<td>' + Number(t.salesVal || 0).toLocaleString() + '원</td>' +
+          '<td>' + displayHours(t.target2) + 'h</td>' +
+          '<td>' + displayHours(kitchenGuideline) + 'h</td>' +
+          '<td>' + displayHours(hallGuideline) + 'h</td>' +
+          '<td>' + displayHours(t.kitchenActualHours || 0) + 'h</td>' +
+          '<td>' + displayHours(t.hallActualHours || 0) + 'h</td>' +
+          '<td style="color:' + meta.color + ';font-weight:800;">' + displaySignedHours(gap) + '</td>' +
+          '<td><span class="kpi-badge" style="background:' + meta.bg + ';color:' + meta.color + ';">' + meta.label + '</span></td></tr>';
       });
-      html += '</table>';
+      html += '</table></div>';
       el.innerHTML = html;
+      renderWeeklyPriorityDays();
+    }
+
+    function renderWeeklyPriorityDays() {
+      const el = document.getElementById('weeklyPriorityDays');
+      if (!el) return;
+      const rows = dateHeaders.map(d => {
+        const t = tierDiagnosis[d];
+        if (!t) return null;
+        const gap = Math.round((Number(t.actualTotal || 0) - Number(t.target2 || 0)) * 10) / 10;
+        return { day:d, gap };
+      }).filter(Boolean).filter(x => x.gap > 0).sort((a,b) => b.gap - a.gap);
+
+      if (!rows.length) {
+        el.innerHTML = '<div class="weekly-priority-empty">가이드라인보다 더 사용한 요일이 없습니다.</div>';
+        return;
+      }
+      el.innerHTML = rows.map((x,i) =>
+        '<div class="weekly-priority-row">' +
+          '<div class="weekly-priority-rank">' + String(i+1).padStart(2,'0') + '</div>' +
+          '<div class="weekly-priority-day">' + x.day + '</div>' +
+          '<div class="weekly-priority-gap">' + displaySignedHours(x.gap) + '</div>' +
+        '</div>'
+      ).join('');
     }
 
     // 주간진단 - 요일 x 시간대 히트맵 (행=시간대블록, 열=요일)
@@ -3387,7 +3429,6 @@ async function autoSaveDiagnosisResult(storeName) {
       renderGlanceHero();
       renderWeekKPIRowInto('glanceKpiRow');
       renderGlanceHeadlineBanner();
-      renderWeekKPIRowInto('weeklyKpiRow');
       renderWeeklyDayTable();
       renderPartDiagnosisPending();
       return;
@@ -3401,7 +3442,6 @@ async function autoSaveDiagnosisResult(storeName) {
     renderGlancePartGapSummary();
     renderGlanceComments();
     renderGlanceAll();
-    renderWeekKPIRowInto('weeklyKpiRow');
     renderWeeklyDayTable();
     renderWeeklyDayBlockHeatmap();
     renderWeeklyComments();
