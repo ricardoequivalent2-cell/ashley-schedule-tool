@@ -352,3 +352,14 @@
     @media (max-width: 1180px) {
       #view-glance .exec-hero-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
     }
+
+/* 요약 평일/주말 히트맵 가독성 개선 */
+#view-glance table.glance-heatmap th,
+#view-glance table.glance-heatmap td {
+  font-weight: 700;
+}
+#view-glance table.glance-heatmap th:first-child,
+#view-glance table.glance-heatmap td:first-child {
+  text-align: center;
+  padding-left: 6px;
+}
