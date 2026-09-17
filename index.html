@@ -2845,34 +2845,24 @@ async function autoSaveDiagnosisResult(storeName) {
       }
 
       function collectCauseBuckets(part) {
-        const bucketMap = {};
-        dateHeaders.forEach(d => {
-          const dayType = isWeekendDay(d) ? '주말' : '평일';
-
-          if (part === '홀') {
-            (hallBlockDiagnosis[d] || []).forEach(b => {
-              const diff = Number(b.netDiffHours || 0);
-              if (diff <= 0) return;
-              const key = dayType + '|' + b.name;
-              if (!bucketMap[key]) bucketMap[key] = { dayType, block: b.name, diff: 0, days: 0 };
-              bucketMap[key].diff += diff;
-              bucketMap[key].days += 1;
-            });
-          } else {
-            (blockDiagnosis[d] || []).forEach(b => {
-              const diff = Number((b.partDiffHours && b.partDiffHours[part]) || 0);
-              if (diff <= 0) return;
-              const key = dayType + '|' + b.name;
-              if (!bucketMap[key]) bucketMap[key] = { dayType, block: b.name, diff: 0, days: 0 };
-              bucketMap[key].diff += diff;
-              bucketMap[key].days += 1;
-            });
-          }
+        // 문제 발생 위치와 요약 히트맵은 반드시 같은 공통 집계값을 사용한다.
+        // 기존에는 문제 발생 위치가 날짜별 +Gap만 더하고(-Gap은 버림),
+        // 히트맵은 평일/주말 전체를 순합산해 같은 구간의 숫자가 달라질 수 있었다.
+        const buckets = [];
+        [
+          { dayType: '평일', matrix: computeGlanceGroupMatrix(false) },
+          { dayType: '주말', matrix: computeGlanceGroupMatrix(true) }
+        ].forEach(group => {
+          GLANCE_BLOCKS.forEach(gb => {
+            const cell = group.matrix[gb.name] && group.matrix[gb.name][part];
+            if (!cell) return;
+            const diff = Math.round((Number(cell.actual || 0) - Number(cell.standard || 0)) * 10) / 10;
+            if (diff <= 0.5) return;
+            buckets.push({ dayType: group.dayType, block: gb.name, diff });
+          });
         });
 
-        return Object.values(bucketMap)
-          .filter(x => x.diff > 0.5)
-          .sort((a, b) => b.diff - a.diff);
+        return buckets.sort((a, b) => b.diff - a.diff);
       }
 
       el.innerHTML = overParts.map((g, i) => {
