@@ -1138,10 +1138,6 @@ function setupOverviewControls() {
 
 
 // ==================== CONFIG (Code.gs 최신본과 동일) ====================
-const COLOR_TO_PART_DEFAULT = {
-  '#FF0000': '핫', '#FFC000': '피파', '#7AADDC': '콜드', '#92D050': '스시',
-  '#9F5FCF': '그릴', '#A6A6A6': 'DMO', '#F4B084': '베이커리',
-};
 const PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO'];
 const SHIFT_BLOCKS = [
   { name: '오픈',     startMin: 8*60+30,  endMin: 11*60 },
@@ -1152,7 +1148,6 @@ const SHIFT_BLOCKS = [
 ];
 
 const SLOT_START_MIN = 8*60+30, SLOT_END_MIN = 22*60, SLOT_SIZE_MIN = 30;
-const DATE_BLOCK_COUNT = 7;
 
 function getTimeSlots() {
   const slots = [];
@@ -1996,14 +1991,6 @@ function severityRatio(value, maxValue) {
   const v = Math.max(0, Number(value || 0));
   const m = Math.max(0.0001, Number(maxValue || 0));
   return Math.max(0, Math.min(1, v / m));
-}
-function overRowStyle(value, maxValue) {
-  if (Number(value || 0) <= 0) return '';
-  const r = severityRatio(value, maxValue);
-  const alpha = 0.06 + 0.18 * r;
-  const borderAlpha = 0.16 + 0.34 * r;
-  return 'background:rgba(190,55,55,' + alpha.toFixed(3) + ');' +
-         'border-color:rgba(190,55,55,' + borderAlpha.toFixed(3) + ') !important;';
 }
 function causeSeverityStyle(value, maxValue) {
   if (Number(value || 0) <= 0) return '';
@@ -3049,137 +3036,6 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function isWeekendDay(label) { return /[토일]\s*$/.test(label.trim()); }
 
-
-    function aggregateBlockForGroup(gb, days, sourceDiagnosis) {
-      const source = sourceDiagnosis || blockDiagnosis;
-      let actual = 0, standard = 0;
-      days.forEach(d => {
-        const b = (source[d] || []).find(x => x.name === gb.name);
-        if (b) { actual += b.actualHours; standard += b.standardHours; }
-      });
-      const net = Math.round((actual - standard) * 10) / 10;
-      const verdict = Math.abs(net) < 0.5 ? '적정' : (net > 0 ? '과다' : '부족');
-      const score = standard > 0 ? Math.round((actual / standard) * 1000) / 10 : null; // 배치율(%) = 실제÷기준
-      return { actual, standard, net, verdict, score };
-    }
-
-    function renderPartRanking() {
-      const el = document.getElementById('partRanking');
-      if (!el) return;
-      const rows = computeWeekPartGaps().slice().sort((a, b) => {
-        const order = { red:3, yellow:2, green:1 };
-        if (order[a.tierStatus] !== order[b.tierStatus]) return order[b.tierStatus] - order[a.tierStatus];
-        return b.gap - a.gap;
-      }).slice(0, 8);
-      if (!rows.length) {
-        el.innerHTML = '<div style="color:#888; font-size:13px; padding:12px 0;">표시할 파트 진단이 없습니다.</div>';
-        return;
-      }
-      const maxAbs = Math.max(1, ...rows.map(r => Math.abs(r.gap)));
-      el.innerHTML = rows.map(r => {
-        const meta = r.tierStatus === 'red'
-          ? { color:'#C64545', bg:'#FBECEC', label:'즉시개선' }
-          : (r.tierStatus === 'yellow'
-            ? { color:'#B7791F', bg:'#FFF4D6', label:'개선 필요' }
-            : { color:'#3D8361', bg:'#E8F3EC', label:'양호' });
-        const pct = Math.round((Math.abs(r.gap) / maxAbs) * 100);
-        return (
-          '<div class="part-rank-row" style="background:' + meta.bg + '; border-radius:8px; padding:8px 10px; margin-bottom:6px;">' +
-            '<div class="part-rank-head">' +
-              '<span style="font-weight:600;">' + r.part + '</span>' +
-              '<span>' + displaySignedHours(r.gap) + ' &nbsp; <b style="color:' + meta.color + ';">' + meta.label + '</b></span>' +
-            '</div>' +
-            '<div class="part-rank-bar-bg"><div class="part-rank-bar-fill" style="width:' + pct + '%; background:' + meta.color + ';"></div></div>' +
-          '</div>'
-        );
-      }).join('');
-    }
-
-    function renderGlanceBlockChart(containerId, sourceDiagnosis) {
-      const el = document.getElementById(containerId);
-      const weekdayDays = dateHeaders.filter(d => !isWeekendDay(d));
-      const weekendDays = dateHeaders.filter(d => isWeekendDay(d));
-
-      const buildChart = (days) => {
-        const data = GLANCE_BLOCKS.map(gb => Object.assign({ name: gb.name }, aggregateBlockForGroup(gb, days, sourceDiagnosis)));
-        const maxVal = Math.max(1, ...data.map(d => Math.max(d.actual, d.standard))) * 1.15;
-        const W = 700, H = 230, PAD = 28;
-        const stepX = (W - PAD * 2) / (data.length - 1);
-        const yOf = (v) => PAD + (H - PAD * 2) * (1 - v / maxVal);
-        const xOf = (i) => PAD + stepX * i;
-
-        const actualPts = data.map((d, i) => [xOf(i), yOf(d.actual)]);
-        const stdPts = data.map((d, i) => [xOf(i), yOf(d.standard)]);
-        const toPath = (pts) => pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0] + ',' + p[1]).join(' ');
-        const areaPath = toPath(actualPts) + ' L' + xOf(data.length - 1) + ',' + (H - PAD) + ' L' + xOf(0) + ',' + (H - PAD) + ' Z';
-
-        let svg = '<svg viewBox="0 0 ' + W + ' ' + (H + 28) + '" style="width:100%; height:auto;">';
-        svg += '<defs><linearGradient id="grad-' + containerId + '" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.35"/><stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/></linearGradient></defs>';
-        // 보조 가로 점선(그리드)
-        for (let g = 0; g <= 2; g++) {
-          const gy = PAD + (H - PAD * 2) * g / 2;
-          svg += '<line x1="' + PAD + '" x2="' + (W - PAD) + '" y1="' + gy + '" y2="' + gy + '" stroke="#eee" stroke-dasharray="3,3"></line>';
-        }
-        // 실제(보라 영역+실선)
-        svg += '<path d="' + areaPath + '" fill="url(#grad-' + containerId + ')" stroke="none"></path>';
-        svg += '<path d="' + toPath(actualPts) + '" fill="none" stroke="#8B5CF6" stroke-width="2.5"></path>';
-        // 기준선(핑크 점선)
-        svg += '<path d="' + toPath(stdPts) + '" fill="none" stroke="#EC4899" stroke-width="2" stroke-dasharray="5,4"></path>';
-        data.forEach((d, i) => {
-          svg += '<circle cx="' + actualPts[i][0] + '" cy="' + actualPts[i][1] + '" r="4.5" fill="#8B5CF6"></circle>';
-          svg += '<circle cx="' + stdPts[i][0] + '" cy="' + stdPts[i][1] + '" r="3.5" fill="#fff" stroke="#EC4899" stroke-width="2"></circle>';
-          const ratioText = d.score === null ? '-' : Math.round(d.score) + '%';
-          const ratioColor = d.score === null ? '#6B7280' : (d.score > 105 ? '#C64545' : (d.score < 95 ? '#3B82F6' : '#3D8361'));
-          const labelY = Math.max(16, actualPts[i][1] - 12);
-          svg += '<text x="' + xOf(i) + '" y="' + labelY + '" text-anchor="middle" font-size="15" font-weight="800" fill="' + ratioColor + '">' + ratioText + '</text>';
-          svg += '<text x="' + xOf(i) + '" y="' + (H + 18) + '" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">' + d.name + '</text>';
-        });
-        svg += '</svg>';
-        return svg;
-      };
-
-      el.innerHTML =
-        '<div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:8px;">' +
-          '<div style="flex:1; min-width:280px;"><div class="block-label">평일 (월~금)</div>' + buildChart(weekdayDays) + '</div>' +
-          '<div style="flex:1; min-width:280px;"><div class="block-label">주말 (토~일)</div>' + buildChart(weekendDays) + '</div>' +
-        '</div>' +
-        '<div style="font-size:14px; color:#555; margin-bottom:14px; display:flex; gap:18px; align-items:center;">' +
-          '<span><span style="display:inline-block; width:11px; height:11px; border-radius:50%; background:#8B5CF6; margin-right:5px;"></span>실제 사용시간</span>' +
-          '<span><span style="display:inline-block; width:11px; height:11px; border-radius:50%; background:#fff; border:2px solid #EC4899; margin-right:5px;"></span>기준선(목표)</span>' +
-        '</div>';
-    }
-
-    function renderGlanceScoreCardsInto(containerId, sourceDiagnosis) {
-      const el = document.getElementById(containerId);
-      const weekdayDays = dateHeaders.filter(d => !isWeekendDay(d));
-      const weekendDays = dateHeaders.filter(d => isWeekendDay(d));
-
-      const cardHtml = (gb, days) => {
-        const agg = aggregateBlockForGroup(gb, days, sourceDiagnosis);
-        const cls = agg.verdict === '과다' ? 'gd-over' : (agg.verdict === '부족' ? 'gd-under' : 'gd-ok');
-        const scoreText = agg.score === null ? '-' : agg.score + '%';
-        return '<div class="glance-day-card ' + cls + '"><div class="day-label">' + gb.name + ' 배치율</div><div class="day-score">' + scoreText + '</div></div>';
-      };
-
-      el.innerHTML =
-        '<div class="glance-block-row">' +
-          '<div class="block-label">평일 (월~금)</div>' +
-          '<div class="glance-day-cards">' + GLANCE_BLOCKS.map(gb => cardHtml(gb, weekdayDays)).join('') + '</div>' +
-        '</div>' +
-        '<div class="glance-block-row">' +
-          '<div class="block-label">주말 (토~일)</div>' +
-          '<div class="glance-day-cards">' + GLANCE_BLOCKS.map(gb => cardHtml(gb, weekendDays)).join('') + '</div>' +
-        '</div>';
-    }
-
-    function renderGlanceScoreCards() {
-      renderGlanceScoreCardsInto('glanceScoreCards', blockDiagnosis);
-    }
-
-    function renderGlanceHallScoreCards() {
-      renderGlanceScoreCardsInto('glanceHallScoreCards', hallBlockDiagnosis);
-    }
 
     function computeGlanceGroupMatrix(wantWeekend) {
       // 요약 히트맵의 수치는 가이드라인 대비 Gap을 보여주고, 색상은 기존 진단의 1차목표/최소허들 경계를 사용한다.
