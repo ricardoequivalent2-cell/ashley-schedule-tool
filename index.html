@@ -2901,6 +2901,20 @@ async function autoSaveDiagnosisResult(storeName) {
         const t = tierDiagnosis[d]; if (!t) return '';
         const kitchenGuideline = sumStandardHoursForScope(data, d, 'kitchen');
         const hallGuideline = sumStandardHoursForScope(data, d, 'hall');
+        const metricItems = diagnosisScope === 'kitchen'
+          ? [['주방 가이드라인', kitchenGuideline], ['주방 실사용시간', t.kitchenActualHours || 0]]
+          : diagnosisScope === 'hall'
+            ? [['홀 가이드라인', hallGuideline], ['홀 실사용시간', t.hallActualHours || 0]]
+            : [
+                ['전체 가이드라인 합', t.target2],
+                ['주방 가이드라인', kitchenGuideline],
+                ['주방 실사용시간', t.kitchenActualHours || 0],
+                ['홀 가이드라인', hallGuideline],
+                ['홀 실사용시간', t.hallActualHours || 0]
+              ];
+        const metricsHtml = metricItems.map(item =>
+          '<div><span>' + item[0] + '</span><b>' + displayHours(item[1]) + 'h</b></div>'
+        ).join('');
         const gap = Math.round((Number(t.actualTotal || 0) - Number(t.target2 || 0)) * 10) / 10;
         const meta = trafficMeta(t.actualTotal, t.target1, t.hurdle);
         return '<div class="weekly-day-row-card" style="--diag-bg:' + meta.bg + ';--diag-color:' + meta.color + ';">' +
@@ -2910,12 +2924,8 @@ async function autoSaveDiagnosisResult(storeName) {
             '<div class="weekly-day-gap"><span>Gap</span><b>' + displaySignedHours(gap) + '</b></div>' +
             '<div class="weekly-day-status">' + meta.label + '</div>' +
           '</div>' +
-          '<div class="weekly-day-metrics">' +
-            '<div><span>가이드라인 합</span><b>' + displayHours(t.target2) + 'h</b></div>' +
-            '<div><span>주방 가이드라인</span><b>' + displayHours(kitchenGuideline) + 'h</b></div>' +
-            '<div><span>홀 가이드라인</span><b>' + displayHours(hallGuideline) + 'h</b></div>' +
-            '<div><span>주방 실사용시간</span><b>' + displayHours(t.kitchenActualHours || 0) + 'h</b></div>' +
-            '<div><span>홀 실사용시간</span><b>' + displayHours(t.hallActualHours || 0) + 'h</b></div>' +
+          '<div class="weekly-day-metrics" style="--metric-count:' + metricItems.length + ';">' +
+            metricsHtml +
           '</div>' +
         '</div>';
       }).join('');
