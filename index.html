@@ -480,12 +480,12 @@
 
     <div class="glance-heatmap-grid">
       <div class="section-card">
-        <div class="section-title">평일 히트맵 <span style="font-weight:500;color:#A7AEBD;">· Action 2차기준 대비 · 빨강=과다 / 파랑=절감</span></div>
+        <div class="section-title">평일 히트맵 <span style="font-weight:500;color:#A7AEBD;">· 가이드라인 대비 · 초록=양호 / 노랑=개선 필요 / 빨강=즉시개선</span></div>
         <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
       </div>
 
       <div class="section-card">
-        <div class="section-title">주말 히트맵 <span style="font-weight:500;color:#A7AEBD;">· Action 2차기준 대비 · 빨강=과다 / 파랑=절감</span></div>
+        <div class="section-title">주말 히트맵 <span style="font-weight:500;color:#A7AEBD;">· 가이드라인 대비 · 초록=양호 / 노랑=개선 필요 / 빨강=즉시개선</span></div>
         <table class="glance-heatmap" id="glanceHeatmapWeekend"></table>
       </div>
     </div>
@@ -2372,9 +2372,9 @@ async function autoSaveDiagnosisResult(storeName) {
     function renderHeatmapLegendInto(containerId) {
       const el = document.getElementById(containerId);
       const items = [
-        { c: '#C64545', t: '최소허들 초과 · 즉시개선' },
-        { c: '#B7791F', t: '1차목표 초과 · 개선 필요' },
-        { c: '#3D8361', t: '1차목표 이내 · 양호' },
+        { c: '#C64545', t: '즉시개선' },
+        { c: '#B7791F', t: '개선 필요' },
+        { c: '#3D8361', t: '양호' },
       ];
       el.innerHTML = items.map(i => '<span><span class="legend-dot" style="background:' + i.c + ';"></span>' + i.t + '</span>').join('');
     }
@@ -2840,7 +2840,7 @@ async function autoSaveDiagnosisResult(storeName) {
 
       if (!overParts.length) {
         el.innerHTML =
-          '<div class="cause-empty">이번 주 최소허들을 초과한 빨간불 파트가 없습니다.</div>';
+          '<div class="cause-empty">이번 주 즉시개선이 필요한 파트가 없습니다.</div>';
         return;
       }
 
@@ -3141,12 +3141,12 @@ async function autoSaveDiagnosisResult(storeName) {
     }
 
     function computeGlanceGroupMatrix(wantWeekend) {
-      // 요약 히트맵은 FINAL Action의 2차목표(가이드라인) 표준시간표를 기준으로 본다.
-      // 셀마다 실제 사용시간과 가이드라인 사용시간을 각각 누적해 절대 기준으로 비교한다.
+      // 요약 히트맵의 수치는 가이드라인 대비 Gap을 보여주고, 색상은 기존 진단의 1차목표/최소허들 경계를 사용한다.
+      // 셀마다 실제·가이드라인·1차목표·최소허들을 누적해 평일/주말 단위로 판정한다.
       const matrix = {};
       GLANCE_BLOCKS.forEach(b => {
         matrix[b.name] = {};
-        GLANCE_PARTS.forEach(p => { matrix[b.name][p] = { actual:0, standard:0 }; });
+        GLANCE_PARTS.forEach(p => { matrix[b.name][p] = { actual:0, standard:0, target1:0, hurdle:0 }; });
       });
 
       dateHeaders.forEach(label => {
@@ -3162,7 +3162,13 @@ async function autoSaveDiagnosisResult(storeName) {
               GLANCE_PARTS.forEach(p => {
                 const diff = Number((dayHeatmap[slot] && dayHeatmap[slot][p]) || 0);
                 const std = Number((dayStd[slot] && dayStd[slot][p]) || 0);
-                matrix[gb.name][p].standard += std * 0.5;
+                const t = tierDiagnosis[label] || {};
+                const target1Ratio = Number(t.target2) > 0 ? Number(t.target1) / Number(t.target2) : 1;
+                const hurdleRatio = Number(t.target2) > 0 ? Number(t.hurdle) / Number(t.target2) : 1;
+                const stdHours = std * 0.5;
+                matrix[gb.name][p].standard += stdHours;
+                matrix[gb.name][p].target1 += stdHours * target1Ratio;
+                matrix[gb.name][p].hurdle += stdHours * hurdleRatio;
                 matrix[gb.name][p].actual += (std + diff) * 0.5;
               });
             }
@@ -3181,24 +3187,24 @@ async function autoSaveDiagnosisResult(storeName) {
         html += '<tr><th>' + gb.name + '</th>' + GLANCE_PARTS.map(p => {
           const cell = matrix[gb.name][p];
           const actual = Number(cell.actual || 0);
-          const standard = Number(cell.standard || 0); // FINAL Action 2차목표(가이드라인)
+          const standard = Number(cell.standard || 0); // 가이드라인
+          const target1 = Number(cell.target1 || 0);
+          const hurdle = Number(cell.hurdle || 0);
           const diff = actual - standard;
           const v = Math.round(diff * 10) / 10;
 
-          // 다른 셀의 최대값에 따라 색이 달라지지 않도록, 2차목표 대비 편차율을 절대 기준으로 사용.
-          // 10% 이내=약, 10~20%=중, 20% 초과=강. 기준이 0인데 실제가 있으면 강한 과다.
-          const deviationRate = standard > 0 ? Math.abs(diff) / standard : (actual > 0 ? 1 : 0);
-          let strength = 0;
-          if (deviationRate > 0) strength = deviationRate > 0.20 ? 0.88 : (deviationRate > 0.10 ? 0.62 : 0.36);
-
-          let bg = '#fafafa', color = '#444';
-          if (Math.abs(v) > 0.05) {
-            if (v > 0) bg = 'rgba(255,0,0,' + strength + ')';       // 2차목표 초과
-            else bg = 'rgba(0,102,255,' + strength + ')';          // 2차목표 이하(절감)
-            color = strength >= 0.62 ? 'white' : '#222';
-          }
-          const label = Math.abs(v) > 0.05 ? ((v > 0 ? '+' : '') + v + 'h') : '';
-          const title = '실제 ' + actual.toFixed(1) + 'h / Action 2차기준 ' + standard.toFixed(1) + 'h';
+          // 기존 진단과 동일한 3단계 신호등 기준을 그대로 적용한다.
+          // 실제 <= 1차목표: 초록 / 1차목표 < 실제 <= 최소허들: 노랑 / 실제 > 최소허들: 빨강
+          const meta = trafficMeta(actual, target1, hurdle);
+          const signal = {
+            green: { bg:'#00B83E', color:'#FFFFFF' },
+            yellow:{ bg:'#FFD400', color:'#1F1F1F' },
+            red:   { bg:'#FF1F1F', color:'#FFFFFF' }
+          }[meta.key];
+          const bg = signal.bg;
+          const color = signal.color;
+          const label = Math.abs(v) > 0.05 ? ((v > 0 ? '+' : '') + v + 'h') : '0h';
+          const title = '실제 ' + actual.toFixed(1) + 'h / 가이드라인 ' + standard.toFixed(1) + 'h / ' + meta.label;
           return '<td title="' + title + '" style="background:' + bg + '; color:' + color + ';">' + label + '</td>';
         }).join('') + '</tr>';
       });
