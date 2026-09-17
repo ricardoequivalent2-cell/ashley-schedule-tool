@@ -478,28 +478,14 @@
       </div>
     </div>
 
-    <div class="glance-efficiency-pair">
-      <div class="section-card">
-        <div class="section-title">시간대별 배치율 (홀)</div>
-        <div class="section-sub" style="margin-top:4px; margin-bottom:8px;">숫자 = 기준 대비 실제 사용률</div>
-        <div id="glanceHallBlockChart"></div>
-      </div>
-
-      <div class="section-card">
-        <div class="section-title">시간대별 배치율 (주방)</div>
-        <div class="section-sub" style="margin-top:4px; margin-bottom:8px;">숫자 = 기준 대비 실제 사용률</div>
-        <div id="glanceBlockChart"></div>
-      </div>
-    </div>
-
     <div class="glance-heatmap-grid">
       <div class="section-card">
-        <div class="section-title">평일 히트맵 <span style="font-weight:500;color:#A7AEBD;">· 빨강=과다 / 파랑=절감</span></div>
+        <div class="section-title">평일 히트맵 <span style="font-weight:500;color:#A7AEBD;">· Action 2차기준 대비 · 빨강=과다 / 파랑=절감</span></div>
         <table class="glance-heatmap" id="glanceHeatmapWeekday"></table>
       </div>
 
       <div class="section-card">
-        <div class="section-title">주말 히트맵 <span style="font-weight:500;color:#A7AEBD;">· 빨강=과다 / 파랑=절감</span></div>
+        <div class="section-title">주말 히트맵 <span style="font-weight:500;color:#A7AEBD;">· Action 2차기준 대비 · 빨강=과다 / 파랑=절감</span></div>
         <table class="glance-heatmap" id="glanceHeatmapWeekend"></table>
       </div>
     </div>
@@ -3019,7 +3005,7 @@ async function autoSaveDiagnosisResult(storeName) {
       { name: '디너', start: 17*60, end: 20*60 },
       { name: '마감', start: 20*60, end: 22*60 },
     ];
-    const GLANCE_PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO'];
+    const GLANCE_PARTS = ['스시','콜드','베이커리','핫','그릴','피파','DMO','홀'];
 
     function isWeekendDay(label) { return /[토일]\s*$/.test(label.trim()); }
 
@@ -3155,19 +3141,29 @@ async function autoSaveDiagnosisResult(storeName) {
     }
 
     function computeGlanceGroupMatrix(wantWeekend) {
+      // 요약 히트맵은 FINAL Action의 2차목표(가이드라인) 표준시간표를 기준으로 본다.
+      // 셀마다 실제 사용시간과 가이드라인 사용시간을 각각 누적해 절대 기준으로 비교한다.
       const matrix = {};
-      GLANCE_BLOCKS.forEach(b => { matrix[b.name] = {}; GLANCE_PARTS.forEach(p => matrix[b.name][p] = 0); });
+      GLANCE_BLOCKS.forEach(b => {
+        matrix[b.name] = {};
+        GLANCE_PARTS.forEach(p => { matrix[b.name][p] = { actual:0, standard:0 }; });
+      });
+
       dateHeaders.forEach(label => {
         if (isWeekendDay(label) !== wantWeekend) return;
-        const dayData = heatmap[label];
-        if (!dayData) return;
-        Object.keys(dayData).forEach(slotStr => {
+        const dayHeatmap = heatmap[label];
+        const dayStd = standardSchedule[label];
+        if (!dayHeatmap || !dayStd) return;
+
+        Object.keys(dayHeatmap).forEach(slotStr => {
           const slot = parseInt(slotStr, 10);
           GLANCE_BLOCKS.forEach(gb => {
             if (slot >= gb.start && slot < gb.end) {
               GLANCE_PARTS.forEach(p => {
-                const diff = (dayData[slot] && dayData[slot][p]) || 0;
-                matrix[gb.name][p] += diff * 0.5; // 30분=0.5h, 과다(+)/부족(-) 부호 그대로 누적
+                const diff = Number((dayHeatmap[slot] && dayHeatmap[slot][p]) || 0);
+                const std = Number((dayStd[slot] && dayStd[slot][p]) || 0);
+                matrix[gb.name][p].standard += std * 0.5;
+                matrix[gb.name][p].actual += (std + diff) * 0.5;
               });
             }
           });
@@ -3178,26 +3174,32 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function renderGlanceHeatmap(tableId, wantWeekend) {
       const matrix = computeGlanceGroupMatrix(wantWeekend);
-      let maxAbs = 0;
-      GLANCE_BLOCKS.forEach(b => GLANCE_PARTS.forEach(p => { maxAbs = Math.max(maxAbs, Math.abs(matrix[b.name][p])); }));
-
       const table = document.getElementById(tableId);
       let html = '<tr><th>시간대 × 파트</th>' + GLANCE_PARTS.map(p => '<th>' + p + '</th>').join('') + '</tr>';
+
       GLANCE_BLOCKS.forEach(gb => {
         html += '<tr><th>' + gb.name + '</th>' + GLANCE_PARTS.map(p => {
-          const v = Math.round(matrix[gb.name][p] * 10) / 10;
-          const alpha = maxAbs > 0 ? Math.min(1, Math.abs(v) / maxAbs) : 0;
+          const cell = matrix[gb.name][p];
+          const actual = Number(cell.actual || 0);
+          const standard = Number(cell.standard || 0); // FINAL Action 2차목표(가이드라인)
+          const diff = actual - standard;
+          const v = Math.round(diff * 10) / 10;
+
+          // 다른 셀의 최대값에 따라 색이 달라지지 않도록, 2차목표 대비 편차율을 절대 기준으로 사용.
+          // 10% 이내=약, 10~20%=중, 20% 초과=강. 기준이 0인데 실제가 있으면 강한 과다.
+          const deviationRate = standard > 0 ? Math.abs(diff) / standard : (actual > 0 ? 1 : 0);
+          let strength = 0;
+          if (deviationRate > 0) strength = deviationRate > 0.20 ? 0.88 : (deviationRate > 0.10 ? 0.62 : 0.36);
+
           let bg = '#fafafa', color = '#444';
-          if (alpha > 0.02) {
-            if (v > 0) {
-              bg = 'rgba(231,76,60,' + (0.12 + alpha * 0.75).toFixed(2) + ')'; // 과다: 빨강
-            } else {
-              bg = 'rgba(52,120,246,' + (0.12 + alpha * 0.75).toFixed(2) + ')'; // 부족: 파랑
-            }
-            color = alpha > 0.55 ? 'white' : '#444';
+          if (Math.abs(v) > 0.05) {
+            if (v > 0) bg = 'rgba(255,0,0,' + strength + ')';       // 2차목표 초과
+            else bg = 'rgba(0,102,255,' + strength + ')';          // 2차목표 이하(절감)
+            color = strength >= 0.62 ? 'white' : '#222';
           }
           const label = Math.abs(v) > 0.05 ? ((v > 0 ? '+' : '') + v + 'h') : '';
-          return '<td style="background:' + bg + '; color:' + color + ';">' + label + '</td>';
+          const title = '실제 ' + actual.toFixed(1) + 'h / Action 2차기준 ' + standard.toFixed(1) + 'h';
+          return '<td title="' + title + '" style="background:' + bg + '; color:' + color + ';">' + label + '</td>';
         }).join('') + '</tr>';
       });
       table.innerHTML = html;
@@ -3205,8 +3207,6 @@ async function autoSaveDiagnosisResult(storeName) {
 
     function renderGlanceAll() {
       renderPartRanking();
-      renderGlanceBlockChart('glanceHallBlockChart', hallBlockDiagnosis);
-      renderGlanceBlockChart('glanceBlockChart', blockDiagnosis);
       renderGlanceHeatmap('glanceHeatmapWeekday', false);
       renderGlanceHeatmap('glanceHeatmapWeekend', true);
     }
