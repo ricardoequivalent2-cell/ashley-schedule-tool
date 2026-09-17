@@ -3169,7 +3169,9 @@ async function autoSaveDiagnosisResult(storeName) {
                 matrix[gb.name][p].standard += stdHours;
                 matrix[gb.name][p].target1 += stdHours * target1Ratio;
                 matrix[gb.name][p].hurdle += stdHours * hurdleRatio;
-                matrix[gb.name][p].actual += (std + diff) * 0.5;
+                // 파트별 인력 진단과 동일하게 휴게시간 보정계수를 적용한 실제 사용시간으로 판정한다.
+                const scale = (p === '홀') ? Number(t.hallScaleFactor || 1) : Number(t.kitchenScaleFactor || 1);
+                matrix[gb.name][p].actual += (std + diff) * 0.5 * scale;
               });
             }
           });
@@ -3196,13 +3198,9 @@ async function autoSaveDiagnosisResult(storeName) {
           // 기존 진단과 동일한 3단계 신호등 기준을 그대로 적용한다.
           // 실제 <= 1차목표: 초록 / 1차목표 < 실제 <= 최소허들: 노랑 / 실제 > 최소허들: 빨강
           const meta = trafficMeta(actual, target1, hurdle);
-          const signal = {
-            green: { bg:'#00B83E', color:'#FFFFFF' },
-            yellow:{ bg:'#FFD400', color:'#1F1F1F' },
-            red:   { bg:'#FF1F1F', color:'#FFFFFF' }
-          }[meta.key];
-          const bg = signal.bg;
-          const color = signal.color;
+          // 파트별 인력 진단과 같은 trafficMeta 색상 값을 그대로 사용한다.
+          const bg = meta.bg;
+          const color = meta.key === 'yellow' ? '#3B2F00' : meta.color;
           const label = Math.abs(v) > 0.05 ? ((v > 0 ? '+' : '') + v + 'h') : '0h';
           const title = '실제 ' + actual.toFixed(1) + 'h / 가이드라인 ' + standard.toFixed(1) + 'h / ' + meta.label;
           return '<td title="' + title + '" style="background:' + bg + '; color:' + color + ';">' + label + '</td>';
